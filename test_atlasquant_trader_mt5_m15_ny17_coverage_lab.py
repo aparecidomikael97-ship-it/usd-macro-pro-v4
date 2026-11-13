@@ -87,6 +87,90 @@ class Ny17M15CoverageTests(unittest.TestCase):
         self.assertEqual(r["reason"], "M15_MISSING_DUPLICATE_OR_WRONG_EPOCH")
         self.safe(r)
 
+    def test_frozen_ny17_week_sunday_open_absent_is_not_labelable(self):
+        start, end = ny(2026, 11, 8), ny(2026, 11, 13)
+        epochs = full_epochs(start, end)[8:]
+        r = audit(start=start, end=end, horizon="W1", epochs=epochs)
+        self.assertEqual(r["reason"], "M15_MISSING_DUPLICATE_OR_WRONG_EPOCH")
+        self.assertEqual(r["first_mismatch_index"], 0)
+        self.assertEqual(r["m15_expected_candle_count"], 480)
+        self.assertEqual(r["missing_expected_m15_slots"], 8)
+        self.assertFalse(r["first_expected_m15_open_present"])
+        self.assertTrue(r["last_expected_m15_open_present"])
+        self.assertEqual(r["missing_at_start_consecutive_m15_slots"], 8)
+        self.assertEqual(r["missing_at_end_consecutive_m15_slots"], 0)
+        self.assertEqual(r["missing_interior_m15_slots"], 0)
+        self.assertEqual(r["first_observed_delay_minutes"], 120)
+        self.assertEqual(r["missing_m15_classification"], "MISSING_FIRST_M15")
+        self.assertTrue(r["m15_boundary_input_integrity_valid"])
+        self.safe(r)
+
+    def test_previous_week_edst_open_twelve_slots_missing(self):
+        start, end = ny(2026, 10, 25), ny(2026, 10, 30)
+        r = audit(start=start, end=end, horizon="W1",
+                  epochs=full_epochs(start, end)[12:])
+        self.assertEqual(r["missing_expected_m15_slots"], 12)
+        self.assertEqual(r["first_observed_delay_minutes"], 180)
+        self.assertEqual(r["first_observed_m15_open_utc"],
+                         "2026-10-26T00:00:00+00:00")
+        self.assertFalse(r["first_expected_m15_open_present"])
+        self.assertEqual(r["missing_m15_classification"], "MISSING_FIRST_M15")
+        self.safe(r)
+
+    def test_terminal_m15_missing_is_distinct_from_sunday_open_gap(self):
+        start, end = ny(2026, 11, 8), ny(2026, 11, 13)
+        epochs = full_epochs(start, end)[:-1]
+        r = audit(start=start, end=end, horizon="W1", epochs=epochs)
+        self.assertTrue(r["first_expected_m15_open_present"])
+        self.assertFalse(r["last_expected_m15_open_present"])
+        self.assertEqual(r["missing_at_start_consecutive_m15_slots"], 0)
+        self.assertEqual(r["missing_at_end_consecutive_m15_slots"], 1)
+        self.assertEqual(r["last_observed_early_minutes"], 15)
+        self.assertEqual(r["missing_m15_classification"], "MISSING_LAST_M15")
+        self.safe(r)
+
+    def test_interior_gap_not_relabelled_as_endpoints(self):
+        start, end = ny(2026, 11, 8), ny(2026, 11, 13)
+        epochs = full_epochs(start, end)
+        epochs.pop(90)
+        r = audit(start=start, end=end, horizon="W1", epochs=epochs)
+        self.assertTrue(r["first_expected_m15_open_present"])
+        self.assertTrue(r["last_expected_m15_open_present"])
+        self.assertEqual(r["missing_at_start_consecutive_m15_slots"], 0)
+        self.assertEqual(r["missing_at_end_consecutive_m15_slots"], 0)
+        self.assertEqual(r["missing_interior_m15_slots"], 1)
+        self.assertEqual(r["missing_m15_classification"], "MISSING_INTERIOR_M15")
+        self.safe(r)
+
+    def test_totally_empty_history_is_not_closed_market_proof(self):
+        r = audit(epochs=[])
+        self.assertFalse(r["first_expected_m15_open_present"])
+        self.assertFalse(r["last_expected_m15_open_present"])
+        self.assertEqual(r["missing_expected_m15_slots"], 96)
+        self.assertEqual(r["missing_at_start_consecutive_m15_slots"], 96)
+        self.assertEqual(r["missing_at_end_consecutive_m15_slots"], 0)
+        self.assertIsNone(r["first_observed_m15_open_utc"])
+        self.assertEqual(r["missing_m15_classification"],
+                         "MISSING_FIRST_AND_LAST_M15")
+        self.assertFalse(r["broker_session_calendar_independently_verified"])
+        self.safe(r)
+
+    def test_offgrid_or_duplicate_epoch_never_gets_safe_missing_classification(self):
+        start, end = ny(2026, 11, 8), ny(2026, 11, 9)
+        full = full_epochs(start, end)
+        for bad in (
+            full[:8] + [full[7]] + full[9:],
+            full[:8] + [full[8]+1] + full[9:],
+            full[:8] + [int(end.timestamp())] + full[9:],
+            [True] + full[1:],
+        ):
+            with self.subTest(bad=bad[8] if len(bad)>8 else None):
+                r = audit(start=start,end=end,epochs=bad)
+                self.assertIsNone(r["missing_expected_m15_slots"])
+                self.assertIsNone(r["missing_m15_classification"])
+                self.assertFalse(r["m15_boundary_input_integrity_valid"])
+                self.safe(r)
+
     def test_duplicate_m15_epoch_is_blocked(self):
         start, end = ny(2026, 11, 8), ny(2026, 11, 9)
         candles = full_epochs(start, end)
