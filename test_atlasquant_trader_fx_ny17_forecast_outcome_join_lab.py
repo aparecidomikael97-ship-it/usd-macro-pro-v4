@@ -8,6 +8,9 @@ import unittest
 from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx28_ny17_m15_source_claim_lab import (
+    expected_ny17_m15_endpoint_claim_lab,
+)
 from atlasquant_trader_fx_ny17_forecast_outcome_join_lab import (
     Ny17ForecastClaim, inspect_ny17_full_forecast_outcome_join_lab as join,
 )
@@ -50,6 +53,8 @@ def roster(*, horizon="D1", days=(8,), outcome="UP"):
                     "end_close_documentary": close,
                     "change_bps_documentary": bps,
                     "direction_documentary": outcome,
+                    **expected_ny17_m15_endpoint_claim_lab(
+                        start_at_utc=start, end_at_utc=end),
                 }
                 for pair in OFFICIAL_PAIRS
             },
