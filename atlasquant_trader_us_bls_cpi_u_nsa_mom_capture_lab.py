@@ -294,8 +294,8 @@ def replay_bls_cpi_u_nsa_original_lab(
         if parsed is None:
             return out
         out.update({
-            "state": "LAB_US_BLS_CPI_U_NSA_YOY_LOCAL_DOCUMENT_REPLAY_NO_GO",
-            "reason": "TWO_INDEX_LEVELS_RECONSTRUCTED_NOT_ISSUER_VINTAGE_PROOF",
+            "state": "LAB_US_BLS_CPI_U_NSA_MOM_LOCAL_DOCUMENT_REPLAY_NO_GO",
+            "reason": "TWO_NSA_MONTH_INDEX_LEVELS_RECONSTRUCTED_NOT_ISSUER_VINTAGE_PROOF",
             **parsed,
             "raw_body_sha256": sha256(body).hexdigest(),
             "archive_directory_basename": archive_basename,
