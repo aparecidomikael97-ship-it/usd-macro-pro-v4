@@ -174,11 +174,22 @@ def collect_five_missing_policy_sources_once_lab(
             ).replace(tzinfo=timezone.utc)
             # Do NOT let a caller's future or fabricated capture time
             # pass by moving the decision cutoff forward.
-            if finish > now or finish.tzinfo is None:
-                out["currency_results"][currency] = "CAPTURE_CLAIMED_FUTURE_OF_DECISION"
+            # The capture happens AFTER the preflight clock reading.
+            # A second local UTC check must bound its finish time, or all
+            # correctly downloaded sources may appear "future-stamped".
+            checked_at = decision_clock()
+            if (not isinstance(checked_at, datetime)
+                    or checked_at.tzinfo is None
+                    or checked_at.utcoffset() is None
+                    or checked_at.microsecond):
+                out["currency_results"][currency] = "POST_CAPTURE_CLOCK_INVALID"
+                continue
+            checked_at = checked_at.astimezone(timezone.utc)
+            if finish > checked_at or checked_at < now:
+                out["currency_results"][currency] = "CAPTURE_CLAIMED_FUTURE_OR_CLOCK_REWIND"
                 continue
             checked = validator(
-                **{source_key: body}, receipt=receipt, decision_at_utc=now)
+                **{source_key: body}, receipt=receipt, decision_at_utc=checked_at)
             if (type(checked) is not dict or checked.get("state") != expected
                     or checked.get("trade_authorized") is not False
                     or checked.get("publishable") is not False):
@@ -190,7 +201,24 @@ def collect_five_missing_policy_sources_once_lab(
                 RuntimeError, UnicodeError):
             out["currency_results"][currency] = "FETCH_VALIDATE_OR_SAVE_FAILED"
 
-    after = replay(local_appdata=local_appdata, decision_at_utc=now)
+    # The post-run audit must not discard just-captured files merely
+    # because their timestamps are later than the INITIAL preflight.
+    try:
+        audited_at = decision_clock()
+        if (not isinstance(audited_at, datetime)
+                or audited_at.tzinfo is None
+                or audited_at.utcoffset() is None
+                or audited_at.microsecond):
+            out["reason"] = "POST_RUN_CLOCK_INVALID"
+            return out
+        audited_at = audited_at.astimezone(timezone.utc)
+        if audited_at < now:
+            out["reason"] = "POST_RUN_CLOCK_REWIND"
+            return out
+        after = replay(local_appdata=local_appdata, decision_at_utc=audited_at)
+    except (OSError, ValueError, TypeError, RuntimeError, OverflowError):
+        out["reason"] = "POST_RUN_REPLAY_EXCEPTION"
+        return out
     postchecked = set(after.get("currencies_locally_checked", []))
     out["replayed_source_codes_after_run"] = sorted(postchecked)
     out["replayed_currency_count_after_run"] = len(postchecked)
