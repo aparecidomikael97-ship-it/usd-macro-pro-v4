@@ -365,6 +365,58 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
 
 
 
+
+    def test_36_actual_bls_implicit_5_plus_8_html_header_resolves_month(self):
+        # REAL September BLS HTML STRUCTURE, synthetic October values:
+        # 5 top-level TH + 8 TH in second row, *without* colspan/rowspan.
+        report = self.audit(body=bls_implicit_header_october())
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"], "0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_37_implicit_grouping_never_treats_nsa_as_sa(self):
+        body = bls_implicit_header_october().replace(
+            b"Seasonally adjusted 1-month percent change",
+            b"Unadjusted 12-month percent change")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_38_implicit_month_missing_or_duplicate_never_fallback_last(self):
+        original = bls_implicit_header_october()
+        for body in (
+            original.replace(b"Sept. to Oct.", b"Aug. to Sept."),
+            original.replace(b"Aug. to Sept.", b"Sept. to Oct."),
+            original.replace(b"Item<br/>code", b"Unknown<br/>code"),
+        ):
+            with self.subTest(body=body[:180]):
+                report = self.audit(body=body)
+                self.assertEqual(report["reason"],
+                    "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+                self.safe(report)
+
+    def test_39_actual_bls_mixed_heading_row_no_header_confusion(self):
+        body = bls_implicit_header_october()
+        self.assertIn(b'<tr><th>Final Demand</th><td></td></tr>', body)
+        report = self.audit(body=body)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.safe(report)
+
+    def test_40_implicit_header_10_cols_row_11_cols_abstains(self):
+        body = bls_implicit_header_october().replace(
+            b"<td>0.4</td><td>0.5</td></tr>",
+            b"<td>0.4</td><td>9.9</td><td>0.5</td></tr>")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+
+
 def bls_like_multilevel_october():
     """Synthetic table shaped after BLS Sep-2026 Table 1 header, not BLS data."""
     html = raw().decode("utf-8")
@@ -390,6 +442,47 @@ def bls_like_multilevel_october():
         '<td>100.000</td><td>4.6</td><td>0.1</td><td>0.2</td>'
         '<td>0.3</td><td>0.4</td>')
     return html.encode("utf-8")
+
+
+
+def bls_implicit_header_october():
+    """Exact top/sub-header COUNTS of BLS Sept-2026; test values invented."""
+    html = bls_like_multilevel_october().decode("utf-8")
+    old = (
+        '<table><tr><th rowspan="2">Grouping</th>'
+        '<th colspan="2">Commodity code</th>'
+        '<th rowspan="2">Relative importance Dec. 2025</th>'
+        '<th rowspan="2">Unadjusted 12-month percent change</th>'
+        '<th colspan="5">Seasonally adjusted 1-month percent change</th></tr>'
+        '<tr><th>Group code</th><th>Item code</th>'
+        '<th>May to June</th><th>June to July</th>'
+        '<th>July to Aug.</th><th>Aug. to Sept.</th>'
+        '<th>Sept. to Oct.</th></tr>')
+    new = (
+        '<table><caption>Table 1. Producer price index percentage changes and '
+        'weights for Final Demand-Intermediate Demand groupings, seasonally '
+        'adjusted [October 2026]</caption>'
+        '<thead><tr><th>Grouping</th><th>Commodity code</th>'
+        '<th>Relative<br/>Importance<br/>Dec.<br/>2025(1)</th>'
+        '<th>Unadjusted<br/>12-month<br/>percent<br/>change(2)</th>'
+        '<th>Seasonally adjusted 1-month percent change(2)</th></tr>'
+        '<tr><th>Group<br/>code</th><th>Item<br/>code</th>'
+        '<th>Oct. 2025<br/>to<br/>Oct. 2026(p)</th>'
+        '<th>May to<br/>June</th><th>June to<br/>July(p)</th>'
+        '<th>July to<br/>Aug.(p)</th><th>Aug. to<br/>Sept.(p)</th>'
+        '<th>Sept. to<br/>Oct.(p)</th></tr></thead><tbody>'
+        '<tr><th>Final Demand</th><td></td></tr>')
+    if old not in html:
+        raise AssertionError("explicit synthetic fixture changed")
+    html = html.replace(old, new, 1)
+    # Scope must come from the real HTML-style <caption> inside table,
+    # not an earlier heading outside the table.
+    html = html.replace(
+        '<h2>Table 1. Producer price index percentage changes and weights '
+        'for Final Demand-Intermediate Demand groupings, seasonally adjusted '
+        '[October 2026]</h2>', '', 1)
+    return html.encode("utf-8")
+
 
 
 if __name__ == '__main__':
