@@ -157,9 +157,9 @@ def _empty(reason: str, state: str = "LAB_PPI_FIRST_PRINT_BLOCKED") -> dict[str,
 # visible header; otherwise abstain rather than mistake year-on-year NSA,
 # prior-month or weight figures for the October 2026 SA monthly surprise.
 _MONTH_TO_MONTH = re.compile(
-    r"\\bsep(?:t(?:ember)?)?[.]?\\s+to\\s+oct(?:ober)?[.]?\\b", re.I
+    r"\bsep(?:t(?:ember)?)?[.]?\s+to\s+oct(?:ober)?[.]?\b", re.I
 )
-_SEASONAL = re.compile(r"\\bsa\\b|\\bseasonally\\s+adjusted\\b", re.I)
+_SEASONAL = re.compile(r"\bsa\b|\bseasonally\s+adjusted\b", re.I)
 
 
 def _oct2026_sa_month_column(rows: list[tuple[str, ...]]) -> tuple[int, int] | None:
