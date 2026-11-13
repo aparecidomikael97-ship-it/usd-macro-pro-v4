@@ -376,5 +376,24 @@ class BLSCpiUNSAOriginalArchiveTests(unittest.TestCase):
         self.assertIsNone(_parse_original(json.dumps(obj).encode(),END))
 
 
+
+    def test_26_bls_published_oct2026_table1_nsa_levels_regression_only(self):
+        # Public BLS release Table 1:
+        # https://www.bls.gov/news.release/archives/cpi_11102026.htm
+        # All items CPI-U NSA indexes: Sep 2026 = 336.940,
+        # Oct 2026 = 337.511, Oct 2025 = '-' (not collected).
+        # Values are copied from the PUBLIC RELEASE for formula checking.
+        # This is NOT a real API GET, verified local issuer bytes,
+        # independent vintage PIT, consensus or prospective prediction.
+        packet=body(v2026="337.511",vsep="336.940")
+        parsed=_parse_original(packet,END)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["index_target_level_documentary"],"337.511")
+        self.assertEqual(parsed["index_base_level_documentary"],"336.940")
+        self.assertEqual(parsed["calculated_mom_nsa_pct_documentary"],"0.169")
+        self.assertIsNone(parsed["calculated_yoy_pct_documentary"])
+        self.assertNotEqual(parsed["calculated_mom_nsa_pct_documentary"],"0.4")
+
+
 if __name__=="__main__":
     unittest.main()
