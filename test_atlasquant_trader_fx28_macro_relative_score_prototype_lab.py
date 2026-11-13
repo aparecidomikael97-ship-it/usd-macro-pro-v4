@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from copy import deepcopy
+from hashlib import sha256
 import unittest
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
@@ -31,7 +32,7 @@ def samples(*, values=None, conflict=None):
                 event_published_at_utc=BEFORE-timedelta(hours=1),
                 source_locally_captured_at_utc=BEFORE-timedelta(minutes=10),
                 event_root_id=f"EVENT.{currency}.{factor.upper()}",
-                source_sha256_claim="a"*64,
+                source_sha256_claim=sha256(f"{currency}:{factor}".encode("ascii")).hexdigest(),
             ))
     return claims
 
@@ -257,7 +258,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                  if x.currency=="USD" and x.category=="inflation_impact")
         index=next(i for i,x in enumerate(factors)
                    if x.currency=="EUR" and x.category=="inflation_impact")
-        factors[index]=replace(factors[index], event_root_id=usd.event_root_id)
+        factors[index]=replace(factors[index], event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         out=self.execute(inputs=factors)
         self.safe(out)
         self.assertEqual(out["state"],"LAB_FX28_HYPOTHETICAL_MACRO_SCORE_COHERENT_NO_GO")
@@ -283,7 +284,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                  if x.currency=="USD" and x.category=="inflation_impact")
         index=next(i for i,x in enumerate(factors)
                    if x.currency=="EUR" and x.category=="activity_impact")
-        factors[index]=replace(factors[index],event_root_id=usd.event_root_id)
+        factors[index]=replace(factors[index],event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         out=self.blocked(inputs=factors)
         self.assertEqual(out["reason"],"REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
 
@@ -297,6 +298,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                            if x.currency=="EUR" and x.category=="inflation_impact")
                 factors[index]=replace(
                     factors[index],event_root_id=usd.event_root_id,
+                    source_sha256_claim=usd.source_sha256_claim,
                     **{field:getattr(usd,field)-timedelta(seconds=1)})
                 out=self.blocked(inputs=factors)
                 self.assertEqual(out["reason"],"REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
@@ -307,7 +309,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                  if x.currency=="USD" and x.category=="inflation_impact")
         index=next(i for i,x in enumerate(factors)
                    if x.currency=="EUR" and x.category=="inflation_impact")
-        factors[index]=replace(factors[index],event_root_id=usd.event_root_id)
+        factors[index]=replace(factors[index],event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         x=self.execute(inputs=factors)
         y=self.execute(inputs=list(reversed(factors)))
         self.safe(x);self.safe(y)
@@ -323,7 +325,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                     and f.category=="inflation_impact")
         i=next(i for i,f in enumerate(factors)
                if f.currency=="EUR" and f.category=="inflation_impact")
-        factors[i]=replace(factors[i],event_root_id=shared.event_root_id)
+        factors[i]=replace(factors[i],event_root_id=shared.event_root_id, source_sha256_claim=shared.source_sha256_claim)
         result=self.execute(inputs=factors)
         self.safe(result)
         self.assertEqual(result["state"],
@@ -352,7 +354,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
             i=next(i for i,f in enumerate(factors)
                    if f.currency==currency
                    and f.category=="policy_expectations")
-            factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+            factors[i]=replace(factors[i],event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         result=self.execute(inputs=factors)
         self.safe(result)
         self.assertEqual(result["distinct_root_catalyst_claim_count"],30)
@@ -372,7 +374,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                  and f.category=="inflation_impact")
         i=next(i for i,f in enumerate(factors)
                if f.currency=="EUR" and f.category=="inflation_impact")
-        factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        factors[i]=replace(factors[i],event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         mt=timezone(timedelta(hours=-4))
         shifted=[replace(f,
             event_published_at_utc=f.event_published_at_utc.astimezone(mt),
@@ -396,7 +398,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                  and f.category=="inflation_impact")
         i=next(i for i,f in enumerate(factors)
                if f.currency=="EUR" and f.category=="inflation_impact")
-        factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        factors[i]=replace(factors[i],event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         result=self.execute(inputs=factors)
         self.safe(result)
         self.assertFalse(result["inputs_are_authenticated_macro_sources"])
@@ -425,7 +427,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                  and f.category=="inflation_impact")
         i=next(i for i,f in enumerate(factors)
                if f.currency=="EUR" and f.category=="inflation_impact")
-        factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        factors[i]=replace(factors[i],event_root_id=usd.event_root_id, source_sha256_claim=usd.source_sha256_claim)
         result=self.execute(inputs=factors)
         self.safe(result)
         self.assertEqual(result["pair_shared_root_overlap_veto_count"],1)
@@ -433,6 +435,71 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
         eurusd=next(r for r in result["pairs"] if r["pair"]=="EUR/USD")
         self.assertEqual(eurusd["research_relative_label"],"AGUARDAR")
         self.assertIsNone(eurusd["hypothetical_points"])
+
+
+
+    def test_29_alias_root_same_source_category_and_clock_must_block(self):
+        factors=samples(values={"USD":90,"EUR":-90})
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="inflation_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="inflation_impact")
+        # Keep DIFFERENT event_root_id but counterfeit one shared document.
+        factors[i]=replace(
+            factors[i],source_sha256_claim=usd.source_sha256_claim)
+        blocked=self.blocked(inputs=factors)
+        self.assertEqual(blocked["reason"],
+                         "SAME_SOURCE_BYTES_TWO_ROOT_ALIASES_NOT_INDEPENDENT")
+        self.assertEqual(blocked["currency_score_claims_reconciled"],0)
+        self.assertFalse(blocked["prospective_forecast_witnessed"])
+
+    def test_30_same_original_document_eight_aliases_are_not_eight_events(self):
+        factors=samples(values={"USD":80})
+        shared=next(x for x in factors if x.currency=="USD"
+                    and x.category=="policy_expectations")
+        for i,f in enumerate(factors):
+            if f.category=="policy_expectations" and f.currency!="USD":
+                factors[i]=replace(f,
+                    source_sha256_claim=shared.source_sha256_claim)
+        blocked=self.blocked(inputs=factors)
+        self.assertEqual(blocked["reason"],
+                         "SAME_SOURCE_BYTES_TWO_ROOT_ALIASES_NOT_INDEPENDENT")
+        self.assertEqual(blocked["hypothetical_labeled_pair_count"],0)
+        self.assertTrue(all(row["research_relative_label"]=="AGUARDAR"
+                            for row in blocked["pairs"]))
+
+    def test_31_shared_root_must_have_identical_document_sha_and_utc(self):
+        factors=samples(values={"USD":90,"EUR":-60})
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="inflation_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="inflation_impact")
+        factors[i]=replace(
+            factors[i],event_root_id=usd.event_root_id,
+            source_sha256_claim=usd.source_sha256_claim)
+        coherent=self.execute(inputs=factors)
+        self.safe(coherent)
+        self.assertEqual(coherent["pair_shared_root_overlap_veto_count"],1)
+        pair=next(x for x in coherent["pairs"] if x["pair"]=="EUR/USD")
+        self.assertEqual(pair["research_relative_label"],"AGUARDAR")
+        self.assertIsNone(pair["hypothetical_points"])
+        self.assertEqual(coherent["distinct_root_catalyst_claim_count"],31)
+        self.assertIsNone(coherent["calibrated_probability"])
+
+    def test_32_alias_rejection_invariant_to_factor_input_order(self):
+        factors=samples(values={"USD":80,"EUR":-70})
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="activity_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="activity_impact")
+        factors[i]=replace(factors[i],
+                           source_sha256_claim=usd.source_sha256_claim)
+        first=self.blocked(inputs=factors)
+        second=self.blocked(inputs=list(reversed(factors)))
+        self.assertEqual(first,second)
+        self.assertEqual(first["reason"],
+                         "SAME_SOURCE_BYTES_TWO_ROOT_ALIASES_NOT_INDEPENDENT")
+        self.assertFalse(first["trade_authorized"])
 
 
 if __name__=="__main__":
