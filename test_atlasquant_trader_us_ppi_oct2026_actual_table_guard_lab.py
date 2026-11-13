@@ -146,6 +146,62 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.assertEqual(r['headline_final_demand_sa_mom_pct_body_claim'],'-0.4')
         self.safe(r)
 
+    def test_44_official_was_unchanged_october_text_maps_to_zero_not_missing(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"],
+                         "0.0")
+        self.safe(report)
+
+    def test_45_unchanged_statement_must_match_table_zero(self):
+        body = raw(head="0.2", headline_table="0.2").replace(
+            b"increased 0.2 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+    def test_46_conflicting_unchanged_and_increased_headlines_block(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted, but "
+            b"The Producer Price Index for final demand increased 0.0 "
+            b"percent in October, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "HEADLINE_PPI_MONTHLY_TEXT_NOT_EXACTLY_IDENTIFIED")
+        self.safe(report)
+
+    def test_47_unverified_unchanged_wording_in_other_month_rejected(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in September, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "HEADLINE_PPI_MONTHLY_TEXT_NOT_EXACTLY_IDENTIFIED")
+        self.safe(report)
+
+    def test_48_zero_change_still_research_only_consensus_difference(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted",
+        )
+        joined = compare(actual=self.audit(body=body),
+                         td_snapshot=td(), te_snapshot=te())
+        self.assertEqual(joined["state"],
+                         "LAB_PPI_RESEARCH_SURPRISE_ONLY_UNATTESTED")
+        self.assertEqual(joined["headline_vs_td_pre_event_diff_pp"], "-0.4")
+        self.safe(joined)
+
     def test_12_tampering_body_without_hash_detected(self):
         b=raw()
         r=self.audit(body=b+b'X',rec=receipt(b))
@@ -185,6 +241,44 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.assertEqual(r['reason'],'PRE_EVENT_CONSENSUS_CONFLICT')
         self.safe(r)
 
+    def test_41_both_sources_rewritten_consensus_cannot_forge_surprise(self):
+        # Same fake numbers on both sides used to pass equality even when
+        # they did not match the pre-event locked value. The SHA claim is
+        # deliberately left unchanged to simulate hindsight manipulation.
+        for changed in ({"headline_consensus_mom_pct": "0.7"},
+                        {"core_consensus_mom_pct": "0.8"},
+                        {"headline_consensus_mom_pct": "0.3",
+                         "core_consensus_mom_pct": "0.7"}):
+            with self.subTest(changed=changed):
+                a, b = td(), te()
+                a.update(changed)
+                b.update(changed)
+                report = compare(actual=self.audit(), td_snapshot=a,
+                                 te_snapshot=b)
+                self.assertEqual(report["reason"],
+                                 "PRE_EVENT_FROZEN_CONSENSUS_VALUES_CHANGED")
+                self.assertIsNone(report["headline_vs_td_pre_event_diff_pp"])
+                self.assertIsNone(report["core_vs_td_pre_event_diff_pp"])
+                self.safe(report)
+
+    def test_42_te_private_forecast_cannot_replace_consensus_benchmark(self):
+        a, b = td(), te()
+        a["headline_consensus_mom_pct"] = b["headline_te_own_forecast_mom_pct"]
+        b["headline_consensus_mom_pct"] = b["headline_te_own_forecast_mom_pct"]
+        report = compare(actual=self.audit(), td_snapshot=a, te_snapshot=b)
+        self.assertEqual(report["reason"],
+                         "PRE_EVENT_FROZEN_CONSENSUS_VALUES_CHANGED")
+        self.safe(report)
+
+    def test_43_original_pre_event_consensus_still_computes_research_only(self):
+        report = compare(actual=self.audit(), td_snapshot=td(),
+                         te_snapshot=te())
+        self.assertEqual(report["state"],
+                         "LAB_PPI_RESEARCH_SURPRISE_ONLY_UNATTESTED")
+        self.assertEqual(report["headline_vs_td_pre_event_diff_pp"], "0.1")
+        self.assertEqual(report["core_vs_td_pre_event_diff_pp"], "-0.1")
+        self.safe(report)
+
     def test_17_bad_source_actual_not_accepted_to_join(self):
         r=compare(actual=self.audit(body=raw(include_table=False)),td_snapshot=td(),te_snapshot=te())
         self.assertEqual(r['reason'],'NO_ACCEPTED_FIRST_PRINT_CANDIDATE')
@@ -207,6 +301,65 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.safe(r)
 
 
+    def test_23_missing_mom_column_header_never_uses_nsa_yoy_value(self):
+        b=raw().replace(b"<th>Sep to Oct SA</th>",
+                        b"<th>12-month unadjusted</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.assertIsNone(report["headline_final_demand_sa_mom_pct_body_claim"])
+        self.safe(report)
+
+    def test_24_reordered_columns_use_explicit_monthly_header_not_last_cell(self):
+        text=raw().decode("utf-8")
+        text=text.replace(
+            "<th>Earlier</th><th>Sep to Oct SA</th>",
+            "<th>Sep to Oct SA</th><th>12-month unadjusted</th>")
+        for v in ("0.5","0.2","0.9","9.8"):
+            text=text.replace(
+                "<td>0.4</td><td>"+v+"</td>",
+                "<td>"+v+"</td><td>9.9</td>")
+        report=self.audit(body=text.encode("utf-8"))
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"],"0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"],"0.2")
+        self.assertNotEqual(report["headline_final_demand_sa_mom_pct_body_claim"],"9.9")
+        self.safe(report)
+
+    def test_25_duplicated_october_sa_month_header_blocks_ambiguous_columns(self):
+        b=raw().replace(b"<th>Earlier</th>",
+                        b"<th>Sep to Oct SA</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_26_wrong_year_october_sa_month_header_rejected(self):
+        b=raw().replace(b"<th>Sep to Oct SA</th>",
+                        b"<th>Sep to Oct SA 2025</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_27_table_row_with_extra_unlabeled_numeric_cell_rejected(self):
+        b=raw().replace(
+            b"<td>4</td><td>100</td><td>n/a</td><td>0.4</td><td>0.5</td></tr>",
+            b"<td>4</td><td>100</td><td>n/a</td><td>0.4</td><td>9.9</td><td>0.5</td></tr>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+    def test_28_same_release_still_requires_october_2026_not_any_annual_headline(self):
+        b=raw().replace(b"<th>Sep to Oct SA</th>",
+                        b"<th>Sep to Oct NSA annual change</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
     def test_21_forged_actual_report_has_no_provenance(self):
         candidate=self.audit().copy()
         candidate['source_sha256']=None
@@ -220,6 +373,216 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         r=compare(actual=candidate,td_snapshot=td(),te_snapshot=te())
         self.assertEqual(r['reason'],'ACTUAL_DOCUMENT_PROVENANCE_CLAIM_INCOMPLETE')
         self.safe(r)
+
+
+    def test_29_bls_like_multilevel_table_header_october_is_resolved(self):
+        # The Sep-2026 official BLS Table 1 has top-level grouped seasonally
+        # adjusted columns and a second row with month-to-month spans.
+        # This is a REPRESENTATIVE synthetic HTML, not original BLS bytes.
+        report = self.audit(body=bls_like_multilevel_october())
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"], "0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_30_header_with_trailing_nsa_cannot_relabel_october_sa_value(self):
+        html = bls_like_multilevel_october().decode("utf-8")
+        html = html.replace(
+            '<th colspan="5">Seasonally adjusted 1-month percent change</th></tr>',
+            '<th colspan="5">Seasonally adjusted 1-month percent change</th>'
+            '<th rowspan="2">Unadjusted annual NSA value</th></tr>')
+        for value in ("0.5", "0.9", "0.2"):
+            html = html.replace('<td>0.4</td><td>' + value + '</td></tr>',
+                                '<td>0.4</td><td>' + value + '</td>'
+                                '<td>9.9</td></tr>')
+        report = self.audit(body=html.encode("utf-8"))
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"], "0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_31_grouped_october_header_without_sa_parent_abstains(self):
+        body = bls_like_multilevel_october().replace(
+            b"Seasonally adjusted 1-month percent change",
+            b"Unadjusted 12-month percent change")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_32_multiple_month_labels_or_bad_span_abstains(self):
+        body = bls_like_multilevel_october()
+        duplicate = body.replace(b"<th>Aug. to Sept.</th>",
+                                 b"<th>Sept. to Oct.</th>")
+        for candidate in (duplicate,
+                          body.replace(b'colspan="5"', b'colspan="99"'),
+                          body.replace(b'rowspan="2"', b'rowspan="0"')):
+            with self.subTest(candidate=candidate[:130]):
+                report = self.audit(body=candidate)
+                self.assertEqual(report["state"], "LAB_PPI_FIRST_PRINT_BLOCKED")
+                self.safe(report)
+
+    def test_34_real_bls_style_core_49104_numbered_footnote_is_allowed(self):
+        body = bls_like_multilevel_october().replace(
+            b"Final demand less foods and energy</td>",
+            b"Final demand less foods and energy(5)</td>")
+        report = self.audit(body=body)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_35_footnote_does_not_permit_wrong_core_label_or_commodity(self):
+        original = bls_like_multilevel_october()
+        for candidate in (
+            original.replace(
+                b"Final demand less foods and energy</td>",
+                b"Final demand goods less foods and energy(5)</td>"),
+            original.replace(b"<td>49104</td>", b"<td>49116</td>"),
+        ):
+            with self.subTest(candidate=candidate[:160]):
+                report = self.audit(body=candidate)
+                self.assertEqual(report["reason"],
+                                 "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+                self.safe(report)
+
+    def test_33_bls_like_header_with_misaligned_data_row_blocks(self):
+        body = bls_like_multilevel_october().replace(
+            b"<td>0.4</td><td>0.5</td></tr>",
+            b"<td>0.5</td></tr>")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+
+
+
+    def test_36_actual_bls_implicit_5_plus_8_html_header_resolves_month(self):
+        # REAL September BLS HTML STRUCTURE, synthetic October values:
+        # 5 top-level TH + 8 TH in second row, *without* colspan/rowspan.
+        report = self.audit(body=bls_implicit_header_october())
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"], "0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_37_implicit_grouping_never_treats_nsa_as_sa(self):
+        body = bls_implicit_header_october().replace(
+            b"Seasonally adjusted 1-month percent change",
+            b"Unadjusted 12-month percent change")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_38_implicit_month_missing_or_duplicate_never_fallback_last(self):
+        original = bls_implicit_header_october()
+        for body in (
+            original.replace(
+                b"<th>Sept. to<br/>Oct.(p)</th>",
+                b"<th>Aug. to<br/>Sept.(p)</th>"),
+            original.replace(
+                b"<th>Aug. to<br/>Sept.(p)</th>",
+                b"<th>Sept. to<br/>Oct.(p)</th>"),
+            original.replace(b"Item<br/>code", b"Unknown<br/>code"),
+        ):
+            with self.subTest(body=body[:180]):
+                self.assertNotEqual(body, original, "mutation fixture must change")
+                report = self.audit(body=body)
+                self.assertEqual(report["reason"],
+                    "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+                self.safe(report)
+
+    def test_39_actual_bls_mixed_heading_row_no_header_confusion(self):
+        body = bls_implicit_header_october()
+        self.assertIn(b'<tr><th>Final Demand</th><td></td></tr>', body)
+        report = self.audit(body=body)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.safe(report)
+
+    def test_40_implicit_header_10_cols_row_11_cols_abstains(self):
+        body = bls_implicit_header_october().replace(
+            b"<td>0.4</td><td>0.5</td></tr>",
+            b"<td>0.4</td><td>9.9</td><td>0.5</td></tr>")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+
+
+def bls_like_multilevel_october():
+    """Synthetic table shaped after BLS Sep-2026 Table 1 header, not BLS data."""
+    html = raw().decode("utf-8")
+    old = ('<table><tr><th>Grouping</th><th>Commodity code</th><th></th>'
+           '<th>Weight</th><th>12-month unadjusted</th><th>Earlier</th>'
+           '<th>Sep to Oct SA</th></tr>')
+    new = (
+        '<table><tr><th rowspan="2">Grouping</th>'
+        '<th colspan="2">Commodity code</th>'
+        '<th rowspan="2">Relative importance Dec. 2025</th>'
+        '<th rowspan="2">Unadjusted 12-month percent change</th>'
+        '<th colspan="5">Seasonally adjusted 1-month percent change</th></tr>'
+        '<tr><th>Group code</th><th>Item code</th>'
+        '<th>May to June</th><th>June to July</th>'
+        '<th>July to Aug.</th><th>Aug. to Sept.</th>'
+        '<th>Sept. to Oct.</th></tr>')
+    if old not in html:
+        raise AssertionError("synthetic header fixture disappeared")
+    html = html.replace(old, new, 1)
+    # Preserve IDs FD/4 and FD/49104; add prior monthly cells for 10 columns.
+    html = html.replace(
+        '<td>100</td><td>n/a</td><td>0.4</td>',
+        '<td>100.000</td><td>4.6</td><td>0.1</td><td>0.2</td>'
+        '<td>0.3</td><td>0.4</td>')
+    return html.encode("utf-8")
+
+
+
+def bls_implicit_header_october():
+    """Exact top/sub-header COUNTS of BLS Sept-2026; test values invented."""
+    html = bls_like_multilevel_october().decode("utf-8")
+    old = (
+        '<table><tr><th rowspan="2">Grouping</th>'
+        '<th colspan="2">Commodity code</th>'
+        '<th rowspan="2">Relative importance Dec. 2025</th>'
+        '<th rowspan="2">Unadjusted 12-month percent change</th>'
+        '<th colspan="5">Seasonally adjusted 1-month percent change</th></tr>'
+        '<tr><th>Group code</th><th>Item code</th>'
+        '<th>May to June</th><th>June to July</th>'
+        '<th>July to Aug.</th><th>Aug. to Sept.</th>'
+        '<th>Sept. to Oct.</th></tr>')
+    new = (
+        '<table><caption>Table 1. Producer price index percentage changes and '
+        'weights for Final Demand-Intermediate Demand groupings, seasonally '
+        'adjusted [October 2026]</caption>'
+        '<thead><tr><th>Grouping</th><th>Commodity code</th>'
+        '<th>Relative<br/>Importance<br/>Dec.<br/>2025(1)</th>'
+        '<th>Unadjusted<br/>12-month<br/>percent<br/>change(2)</th>'
+        '<th>Seasonally adjusted 1-month percent change(2)</th></tr>'
+        '<tr><th>Group<br/>code</th><th>Item<br/>code</th>'
+        '<th>Oct. 2025<br/>to<br/>Oct. 2026(p)</th>'
+        '<th>May to<br/>June</th><th>June to<br/>July(p)</th>'
+        '<th>July to<br/>Aug.(p)</th><th>Aug. to<br/>Sept.(p)</th>'
+        '<th>Sept. to<br/>Oct.(p)</th></tr></thead><tbody>'
+        '<tr><th>Final Demand</th><td></td></tr>')
+    if old not in html:
+        raise AssertionError("explicit synthetic fixture changed")
+    html = html.replace(old, new, 1)
+    # Scope must come from the real HTML-style <caption> inside table,
+    # not an earlier heading outside the table.
+    html = html.replace(
+        '<h2>Table 1. Producer price index percentage changes and weights '
+        'for Final Demand-Intermediate Demand groupings, seasonally adjusted '
+        '[October 2026]</h2>', '', 1)
+    return html.encode("utf-8")
+
+
 
 if __name__ == '__main__':
     unittest.main()
