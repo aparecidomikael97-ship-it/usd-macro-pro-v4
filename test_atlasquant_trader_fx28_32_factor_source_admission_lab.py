@@ -26,6 +26,12 @@ from atlasquant_trader_fx28_policy_ppi_unified_readiness_lab import (
 from atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
     capture_oct2026_bls_original_once_lab as capture,
 )
+from atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab import (
+    capture_bls_cpi_u_nsa_original_once_lab as cpi_capture,
+)
+from test_atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab import (
+    Response as CpiResponse,
+)
 from test_atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
     MockResponse, START, FINISH,
 )
@@ -68,10 +74,22 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         fake.assert_called_once()
         return stored["archive_directory_basename"]
 
-    def run_it(self,*,ppi=None,at=NOW,claims=None,root=None):
+    def cpi(self):
+        transport=Mock(return_value=CpiResponse())
+        started=NOW-timedelta(minutes=2)
+        finished=started+timedelta(seconds=2)
+        timer=Mock(side_effect=[started,finished])
+        stored=cpi_capture(allow_one_get=True,local_appdata=self.tmp.name,
+                           open_url=transport,clock=timer)
+        self.assertTrue(stored["raw_original_bytes_retained_and_replayed_local_only"])
+        transport.assert_called_once()
+        return stored["archive_directory_basename"]
+
+    def run_it(self,*,ppi=None,cpi=None,at=NOW,claims=None,root=None):
         return inspect(
             local_appdata=self.tmp.name if root is None else root,
             decision_at_utc=at,ppi_archive_basename=ppi,
+            cpi_archive_basename=cpi,
             hypothetical_factors=claims)
 
     def guard(self,r):
@@ -359,6 +377,105 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         self.audited(left)
         self.assertEqual(left,right)
         self.assertEqual(a,self.claims())
+
+
+
+    def test_19_cpi_api_original_levels_use_one_us_inflation_documentary_slot(self):
+        cpi=self.cpi()
+        r=self.run_it(cpi=cpi)
+        self.audited(r)
+        self.assertEqual(r["locally_replayed_policy_issuer_count"],0)
+        self.assertEqual(r["locally_replayed_ppi_document_count"],0)
+        self.assertEqual(r["locally_replayed_cpi_u_nsa_document_count"],1)
+        self.assertEqual(r["cpi_u_nsa_oct2026_yoy_pct_documentary"],"3.185")
+        self.assertEqual(r["distinct_original_document_sha_claim_count"],1)
+        self.assertEqual(r["factor_slots_with_any_relevant_local_document"],1)
+        us=next(x for x in r["factor_slots"]
+                if x["currency"]=="USD" and x["category"]=="inflation_impact")
+        self.assertEqual(us["documentary_source_kind"],
+                         "BLS_CPI_U_NSA_OCT2026_YOY_LOCAL_CALCULATION_ONLY")
+        self.assertEqual(us["missing_model_input_reason"],
+                         "BLS_CPI_U_NSA_YOY_NOT_PRE_EVENT_CONSENSUS_OR_USD_IMPACT")
+        self.assertFalse(us["source_semantics_support_signed_factor"])
+        self.assertIsNone(r["calibrated_probability"])
+
+    def test_20_eight_banks_ppi_and_cpi_are_ten_sources_but_nine_slots(self):
+        self.banks(CURRENCIES)
+        ppi=self.ppi()
+        cpi=self.cpi()
+        result=self.run_it(ppi=ppi,cpi=cpi)
+        self.audited(result)
+        self.assertEqual(result["locally_replayed_policy_issuer_count"],8)
+        self.assertEqual(result["locally_replayed_ppi_document_count"],1)
+        self.assertEqual(result["locally_replayed_cpi_u_nsa_document_count"],1)
+        self.assertEqual(result["distinct_original_document_sha_claim_count"],10)
+        self.assertEqual(result["factor_slots_with_any_relevant_local_document"],9)
+        self.assertEqual(result["factor_slots_with_signed_impact_independently_admissible"],0)
+        self.assertFalse(result["experimental_score_execution_authorized"])
+
+    def test_21_ppi_stays_contextual_and_cpi_preferred_for_us_inflation(self):
+        ppi=self.ppi()
+        a=self.run_it(ppi=ppi)
+        cpi=self.cpi()
+        b=self.run_it(ppi=ppi,cpi=cpi)
+        self.audited(a)
+        self.audited(b)
+        us=lambda result:next(x for x in result["factor_slots"]
+                              if x["currency"]=="USD"
+                              and x["category"]=="inflation_impact")
+        self.assertEqual(us(a)["documentary_source_kind"],
+                         "BLS_PPI_OCT2026_ACTUAL_ONLY")
+        self.assertEqual(us(b)["documentary_source_kind"],
+                         "BLS_CPI_U_NSA_OCT2026_YOY_LOCAL_CALCULATION_ONLY")
+        self.assertNotEqual(us(a)["documentary_source_sha256_local_claim"],
+                            us(b)["documentary_source_sha256_local_claim"])
+        self.assertEqual(b["locally_replayed_ppi_document_count"],1)
+        self.assertIsNone(b["usd_strength_score"] if "usd_strength_score" in b else None)
+
+    def test_22_corrupt_cpi_original_excludes_cpi_without_excluding_ppi(self):
+        ppi=self.ppi()
+        cpi=self.cpi()
+        original=(Path(self.tmp.name)/"AtlasQuant"/"LAB"/
+                  "official_macro_receipts"/cpi/"original.json")
+        original.write_bytes(original.read_bytes()+b"\nunsafe")
+        report=self.run_it(ppi=ppi,cpi=cpi)
+        self.audited(report)
+        self.assertEqual(report["locally_replayed_cpi_u_nsa_document_count"],0)
+        self.assertEqual(report["locally_replayed_ppi_document_count"],1)
+        usd=next(s for s in report["factor_slots"]
+                 if s["currency"]=="USD" and s["category"]=="inflation_impact")
+        self.assertEqual(usd["documentary_source_kind"],
+                         "BLS_PPI_OCT2026_ACTUAL_ONLY")
+        self.assertIsNone(report["cpi_u_nsa_oct2026_yoy_pct_documentary"])
+
+    def test_23_cpi_archive_bad_name_or_future_receipt_remains_no_go(self):
+        cpi=self.cpi()
+        invalid=self.run_it(cpi="../"+cpi)
+        self.audited(invalid)
+        self.assertEqual(invalid["locally_replayed_cpi_u_nsa_document_count"],0)
+        self.assertEqual(invalid["factor_slots_with_signed_impact_independently_admissible"],0)
+        prior=self.run_it(cpi=cpi,at=NOW-timedelta(minutes=4))
+        self.audited(prior)
+        self.assertEqual(prior["locally_replayed_cpi_u_nsa_document_count"],0)
+        self.assertTrue(prior["hash_match_only_proves_local_byte_consistency"])
+
+    def test_24_source_calculation_even_if_cpi_sha_matches_claim_no_score(self):
+        cpi=self.cpi()
+        base=self.run_it(cpi=cpi)
+        self.audited(base)
+        usd=next(x for x in base["factor_slots"]
+                 if x["currency"]=="USD" and x["category"]=="inflation_impact")
+        sha=usd["documentary_source_sha256_local_claim"]
+        claims=self.claims()
+        for i,c in enumerate(claims):
+            if c.currency=="USD" and c.category=="inflation_impact":
+                claims[i]=F(**{**c.__dict__,"source_sha256_claim":sha})
+                break
+        matched=self.run_it(cpi=cpi,claims=claims)
+        self.audited(matched)
+        self.assertEqual(matched["hypothetical_claims_matching_local_original_sha_only"],1)
+        self.assertEqual(matched["factor_slots_with_signed_impact_independently_admissible"],0)
+        self.assertFalse(matched["real_directional_forecast_authorized"])
 
 
 if __name__=="__main__":
