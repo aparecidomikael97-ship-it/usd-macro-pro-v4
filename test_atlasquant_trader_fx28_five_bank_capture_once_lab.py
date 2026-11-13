@@ -189,12 +189,20 @@ class FivePolicyCollectorTests(unittest.TestCase):
         self.assertEqual(r["state"],"LAB_FX28_FIVE_SOURCE_CAPTURE_PARTIAL_OR_BLOCKED_NO_GO")
 
     def test_10_bad_root_prevents_any_http(self):
-        for bad in ("", ".", "relative", None):
+        for bad in ("", ".", "relative"):
             with self.subTest(root=bad):
                 r,calls=self.call(root=bad)
                 self.safe(r)
                 self.assertEqual(calls,0)
                 self.assertEqual(r["https_gets_attempted_or_started"],0)
+        # The helper uses None to mean "use the temp directory"; test a
+        # genuinely missing LOCALAPPDATA with a direct invocation.
+        with patch("atlasquant_trader_fx28_five_bank_capture_once_lab.replay") as spy:
+            missing=run(capture_missing=True,local_appdata=None,
+                        decision_clock=Clock(),steps=self.fake.build())
+        self.safe(missing)
+        spy.assert_not_called()
+        self.assertEqual(missing["https_gets_attempted_or_started"],0)
         self.assertEqual(self.fake.calls,[])
 
     def test_11_local_lab_dir_symlink_refused_before_any_network(self):
