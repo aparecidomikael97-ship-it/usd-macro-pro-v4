@@ -22,6 +22,8 @@ from typing import Any, Callable
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 from atlasquant_trader_fx28_five_bank_capture_once_lab import (
     SCHEMA as CAPTURE_SCHEMA,
+    MAX_LOCAL_CAPTURE_AGE,
+    _recent_local_capture_claim,
     collect_five_missing_policy_sources_once_lab,
 )
 from atlasquant_trader_fx28_policy_local_archive_replay_lab import (
@@ -58,6 +60,12 @@ def _base(reason: str, mode: str | None = None) -> dict[str, Any]:
         "per_pair": [],
         "local_policy_sources_checked_codes": [],
         "local_policy_sources_checked_count": 0,
+        "local_policy_recent_capture_claim_codes": [],
+        "local_policy_recent_capture_claim_count": 0,
+        "local_policy_checked_but_stale_or_unstamped_codes": [],
+        "pairs_with_two_recent_local_capture_claims": 0,
+        "recent_capture_max_age_hours_claim_only": 24,
+        "recent_capture_is_not_issuer_first_seen_or_current_economic_rate": True,
         "pairs_with_two_policy_sources_locally_checked": 0,
         "policy_sources_missing_or_rejected_codes": [],
         "suggested_next_collection_by_documentary_coverage": [],
@@ -202,6 +210,29 @@ def inspect_28pair_source_readiness_once_lab(
         out["reason"] = "FX28_SUMMARY_COUNTER_INVALID"
         return out
 
+    # An intact historical archive is NOT a fresh market data source.
+    # Reuse the very same strict 24h local-receipt claim as the existing
+    # five-bank collection gate, and require the actual issuer replay to
+    # have accepted the record. Even a recent claim is NOT real-time or PIT.
+    checked_status = report.get("currency_archive_status")
+    if type(checked_status) is not dict:
+        checked_status = {}
+    recent_claim_codes = sorted(
+        c for c in checked
+        if (type(checked_status.get(c)) is dict
+            and checked_status[c].get("status") ==
+                "LOCALLY_CHECKED_ONLY_NOT_SOURCE_ATTESTATION"
+            and _recent_local_capture_claim(
+                report=report, currency=c, at_utc=now))
+    )
+    recent_claims = set(recent_claim_codes)
+    checked_but_stale_or_unstamped = sorted(set(checked)-recent_claims)
+    two_recent = sum(
+        all(c in recent_claims for c in
+            (row["base_currency"], row["quote_currency"]))
+        for row in explained["per_pair"]
+    )
+
     # Small, reviewed caller-facing schema; not full original bytes/paths,
     # policy rates, broker accounts or unverified probability.
     safe_rows = [{
@@ -209,6 +240,17 @@ def inspect_28pair_source_readiness_once_lab(
         "base_currency": row["base_currency"],
         "quote_currency": row["quote_currency"],
         "local_policy_source_for_both": row["policy_originals_locally_checked"],
+        "both_policy_recent_capture_claims_only": all(
+            c in recent_claims for c in
+            (row["base_currency"], row["quote_currency"])),
+        "source_capture_recency_reason": (
+            "NO_COMPLETE_TWO_CURRENCY_POLICY_ORIGINALS"
+            if not row["policy_originals_locally_checked"] else
+            "BOTH_LOCAL_RECEIPTS_WITHIN_24H_CLAIM_ONLY_NOT_PIT"
+            if all(c in recent_claims for c in
+                   (row["base_currency"], row["quote_currency"])) else
+            "ONE_OR_BOTH_LOCAL_RECEIPT_TIMES_STALE_UNSTAMPED_OR_UNTRUSTED"
+        ),
         "missing_policy_currencies": row["missing_policy_currency_codes"],
         "rejected_policy_currencies": row["rejected_policy_currencies"],
         "why_wait_code": row["why_wait_code"],
@@ -224,6 +266,13 @@ def inspect_28pair_source_readiness_once_lab(
         "pairs_explained": 28, "per_pair": safe_rows,
         "local_policy_sources_checked_codes": sorted(checked),
         "local_policy_sources_checked_count": len(checked),
+        "local_policy_recent_capture_claim_codes": recent_claim_codes,
+        "local_policy_recent_capture_claim_count": len(recent_claim_codes),
+        "local_policy_checked_but_stale_or_unstamped_codes":
+            checked_but_stale_or_unstamped,
+        "pairs_with_two_recent_local_capture_claims": two_recent,
+        "recent_capture_max_age_hours_claim_only": int(
+            MAX_LOCAL_CAPTURE_AGE.total_seconds() // 3600),
         "pairs_with_two_policy_sources_locally_checked":
             explained["pairs_with_two_policy_sources_locally_checked"],
         "policy_sources_missing_or_rejected_codes": missing_codes,
