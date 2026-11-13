@@ -110,6 +110,9 @@ def _base(reason: str, *, horizon: str | None = None) -> dict[str, Any]:
         "currency_score_claims_reconciled": 0,
         "currency_scores_research_only": {},
         "conflicting_currency_codes": [],
+        "distinct_root_catalyst_claim_count": 0,
+        "shared_event_root_ids": [],
+        "pair_claims_are_independent_economic_events": False,
         "pairs": [{
             "pair": pair, "research_relative_label": "AGUARDAR",
             "hypothetical_points": None,
@@ -160,7 +163,12 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
     out = _base("INVALID_OR_DUPLICATE_FACTOR_CLAIMS", horizon=horizon)
 
     seen: dict[tuple[str, str], HypotheticalMacroFactorClaim] = {}
-    roots: set[str] = set()
+    # One real-world event may be relevant to several currencies,
+    # but must not be misrepresented as several INDEPENDENT releases.
+    # The same root can be reused only for the same factor/category,
+    # source digest and source timing, on a DIFFERENT currency.
+    roots: dict[str, tuple[str, str, datetime, datetime]] = {}
+    root_currencies: dict[str, set[str]] = {}
     for claim in claimed_factors:
         if (not isinstance(claim, HypotheticalMacroFactorClaim)
                 or claim.currency not in CURRENCIES
@@ -169,7 +177,6 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
                 or not -100 <= claim.signed_impact_points <= 100
                 or type(claim.event_root_id) is not str
                 or ROOT.fullmatch(claim.event_root_id) is None
-                or claim.event_root_id in roots
                 or type(claim.source_sha256_claim) is not str
                 or SHA64.fullmatch(claim.source_sha256_claim) is None):
             return out
@@ -183,8 +190,19 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
                     days=MAX_EVENT_AGE_DAYS[claim.category])
                 or (now - captured) > timedelta(hours=12)):
             return out
+        root_identity = (
+            claim.category, claim.source_sha256_claim, publication, captured)
+        original_identity = roots.get(claim.event_root_id)
+        if (original_identity is not None
+                and (original_identity != root_identity
+                     or claim.currency in root_currencies[claim.event_root_id])):
+            # Reject cross-category "independent" use of the same catalyst,
+            # issuer/hash/time collisions, and same-currency double counts.
+            out["reason"] = "REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR"
+            return out
+        roots[claim.event_root_id] = root_identity
+        root_currencies.setdefault(claim.event_root_id, set()).add(claim.currency)
         seen[key] = claim
-        roots.add(claim.event_root_id)
 
     if (len(seen) != 32 or set(seen) != {
             (currency, factor)
@@ -274,6 +292,10 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
         "currency_scores_research_only": {
             name: scores[name] for name in sorted(CURRENCIES)},
         "conflicting_currency_codes": sorted(conflicting),
+        "distinct_root_catalyst_claim_count": len(roots),
+        "shared_event_root_ids": sorted(
+            root for root, currencies in root_currencies.items()
+            if len(currencies) > 1),
         "pairs": rows,
         "hypothetical_labeled_pair_count": candidate_count,
         "abstained_pair_count": sum(
