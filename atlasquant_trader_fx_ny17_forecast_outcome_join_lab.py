@@ -21,6 +21,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx28_ny17_m15_source_claim_lab import (
+    has_exact_ny17_m15_endpoint_claim_lab,
+)
 from atlasquant_trader_fx_ny_rollover_lab import inspect_fx_ny_close_window_lab
 
 SCHEMA = "ATLASQUANT_TRADER_FX_NY17_FULL_FORECAST_OUTCOME_JOIN_LAB_V1"
@@ -144,6 +147,8 @@ def _blocked(reason: str) -> dict[str, Any]:
         "nominal_window_census_recomputed_locally": False,
         "range_precommitted_by_external_witness": False,
         "price_archive_source_independently_authenticated": False,
+        "native_mt5_d1_or_w1_as_ny17_outcome_permitted": False,
+        "all_documentary_completed_slots_claim_exact_m15_ny17_endpoints": False,
         "broker_session_calendar_independently_authenticated": False,
         "forecast_pre_event_witness_independently_authenticated": False,
         "model_and_macro_vintages_authenticated": False,
@@ -243,6 +248,10 @@ def inspect_ny17_full_forecast_outcome_join_lab(
             v = moves[pair]
             if not isinstance(v, dict):
                 out["reason"] = "INVALID_DOCUMENTARY_PRICE_ROW"
+                return out
+            if not has_exact_ny17_m15_endpoint_claim_lab(
+                    v, start_at_utc=start, end_at_utc=end):
+                out["reason"] = "M15_FROZEN_NY17_ENDPOINT_OR_SOURCE_CLAIM_MISSING"
                 return out
             opening = _price(v.get("start_open_documentary"))
             closing = _price(v.get("end_close_documentary"))
@@ -369,6 +378,7 @@ def inspect_ny17_full_forecast_outcome_join_lab(
         "rows_documentary": rows,
         "full_28fx_all_window_manifest_reconciled": True,
         "nominal_window_census_recomputed_locally": True,
+        "all_documentary_completed_slots_claim_exact_m15_ny17_endpoints": True,
     })
     return out
 
