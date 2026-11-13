@@ -161,7 +161,7 @@ class ECBPolicyReceiptTests(unittest.TestCase):
                 self.assertEqual(r["state"],"LAB_EUR_ECB_SDMX_RECEIPT_BLOCKED")
 
     def test_negative_nan_exponent_offscale_or_empty_rate_blocks(self):
-        for bad in ("NaN","Infinity","2e0","200.0","",2.5,"1.12345678"):
+        for bad in ("NaN","Infinity","2e0","200.0",""," 2.5","1.12345678"):
             with self.subTest(bad=bad):
                 vals=rows(); vals[-1]["OBS_VALUE"]=str(bad)
                 raw=encode(vals)
