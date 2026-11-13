@@ -41,6 +41,9 @@ def _base(reason: str) -> dict[str, Any]:
         "pairs_with_missing_or_rejected_policy_source": 0,
         "pairs_admitted_for_direction": 0,
         "per_pair": [],
+        "next_policy_sources_to_collect": [],
+        "source_priority_is_trade_recommendation": False,
+        "source_priority_measures_only_hypothetical_pair_documentary_coverage": True,
         "source_claim_independently_authenticated": False,
         "first_seen_macro_vintage_independently_authenticated": False,
         "policy_instruments_harmonized": False,
@@ -164,12 +167,41 @@ def explain_fx28_policy_wait_lab(*, archive_report: Any) -> dict[str, Any]:
             "operational_bias": "AGUARDAR",
             "trade_authorized": False,
         })
+    # How many *additional* two-source pairs would ONE not-yet-checked
+    # currency cover, assuming its archive is captured and locally accepted?
+    # Pure graph coverage; NOT source availability, economic impact, costs,
+    # priority of a bank announcement, or tradable currency strength.
+    next_sources = []
+    for currency in sorted(codes - ready):
+        prospective = [
+            pair for pair in OFFICIAL_PAIRS
+            if currency in split_pair(pair)
+            and any(other in ready for other in split_pair(pair)
+                    if other != currency)
+        ]
+        next_sources.append({
+            "currency": currency,
+            "current_source_state": (
+                "REJECTED_LOCAL_ARCHIVE" if currency in rejected
+                else "MISSING_LOCAL_ARCHIVE"
+            ),
+            "hypothetical_additional_two_policy_source_pairs": len(prospective),
+            "hypothetical_new_pairs": prospective,
+            "requires_issuer_bytes_and_receipt_validation": True,
+            "source_first_seen_independently_attested": False,
+            "direction_or_trade_enabled_by_this_capture": False,
+        })
+    next_sources.sort(key=lambda row: (
+        -row["hypothetical_additional_two_policy_source_pairs"],
+        row["currency"],
+    ))
     out.update({
         "state": "LAB_FX28_POLICY_WHY_WAIT_MATRIX_COMPLETE_NO_GO",
         "reason": "SOURCE_COVERAGE_DOCUMENTARY_ONLY_NO_AUTHENTICATED_BILATERAL_BIAS",
         "pairs_with_two_policy_sources_locally_checked": two,
         "pairs_with_missing_or_rejected_policy_source": len(OFFICIAL_PAIRS) - two,
         "per_pair": rows,
+        "next_policy_sources_to_collect": next_sources,
     })
     return out
 
