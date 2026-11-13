@@ -98,10 +98,10 @@ class Fx28PolicyWhyWaitTests(unittest.TestCase):
         self.assertEqual(out["pairs_with_two_policy_sources_locally_checked"],3)
         checked={row["pair"] for row in out["per_pair"]
                  if row["policy_originals_locally_checked"]}
-        self.assertEqual(checked,{"EURUSD","EURCAD","USDCAD"})
+        self.assertEqual(checked,{"EUR/USD","EUR/CAD","USD/CAD"})
         self.assertEqual(out["pairs_with_missing_or_rejected_policy_source"],25)
         self.assertEqual(next(row for row in out["per_pair"]
-                              if row["pair"]=="GBPJPY")["missing_policy_currency_codes"],
+                              if row["pair"]=="GBP/JPY")["missing_policy_currency_codes"],
                          ["GBP","JPY"])
 
     def test_03_all_eight_locally_checked_still_28_nontradable(self):
@@ -116,7 +116,7 @@ class Fx28PolicyWhyWaitTests(unittest.TestCase):
     def test_04_rejected_issuer_reason_retained_with_no_trade(self):
         out=explain(archive_report=snapshot(("USD","EUR"),{"JPY":"SHA_MISMATCH"}))
         self.safe(out)
-        row=next(r for r in out["per_pair"] if r["pair"]=="USDJPY")
+        row=next(r for r in out["per_pair"] if r["pair"]=="USD/JPY")
         self.assertEqual(row["why_wait_code"],"POLICY_ORIGINAL_REJECTED")
         self.assertEqual(row["rejected_policy_currencies"],{"JPY":"SHA_MISMATCH"})
         self.assertFalse(row["policy_originals_locally_checked"])
@@ -124,7 +124,7 @@ class Fx28PolicyWhyWaitTests(unittest.TestCase):
     def test_05_tampered_true_direction_source_coverage_rejected(self):
         rep=snapshot(("USD","EUR"))
         row=next(r for r in rep["pair_policy_source_coverage"]
-                 if r["pair"]=="EURUSD")
+                 if r["pair"]=="EUR/USD")
         row["fx_direction_admissible"]=True
         out=self.block(rep)
         self.assertEqual(out["reason"],"FX28_SOURCE_COVERAGE_CONTRADICTS_CURRENCY_PARTITION")
