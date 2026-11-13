@@ -40,6 +40,20 @@ class ClaimedPostReleaseHTTP:
     raw_sha256: str
 
 
+def _strict_span(attrs: list, name: str) -> int:
+    # Never infer a column when HTML declares malformed/duplicate spans.
+    values = [v for k, v in attrs if k == name]
+    if len(values) > 1:
+        raise ValueError("DUPLICATED_TABLE_SPAN")
+    raw = values[0] if values else "1"
+    if not isinstance(raw, str) or re.fullmatch(r"[1-9][0-9]?", raw) is None:
+        raise ValueError("INVALID_TABLE_SPAN")
+    value = int(raw)
+    if value > 32:
+        raise ValueError("OVERSIZED_TABLE_SPAN")
+    return value
+
+
 class _BlsTables(HTMLParser):
     """Record table captions/preceding heading and row cells (not page regex)."""
 
@@ -47,6 +61,11 @@ class _BlsTables(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.text_chunks: list[str] = []
         self.tables: list[tuple[str, list[tuple[str, ...]]]] = []
+        # Parallel table layout, retaining TH/TD and rowspan/colspan metadata.
+        self.table_layouts: list[list[tuple[tuple[str, str, int, int], ...]]] = []
+        self._active_layout: list[tuple[tuple[str, str, int, int], ...]] | None = None
+        self._row_layout: list[tuple[str, str, int, int]] | None = None
+        self._cell_layout: tuple[str, int, int] | None = None
         self._active: list[tuple[str, ...]] | None = None
         self._scope: str = ""
         self._row: list[str] | None = None
@@ -68,16 +87,20 @@ class _BlsTables(HTMLParser):
                 # PPI result. Never guess row or column boundaries.
                 raise ValueError("NESTED_TABLE")
             self._active = []
+            self._active_layout = []
             self._scope = " ".join(self._outside_since_last_table)[-1800:]
             self._outside_since_last_table = []
         elif tag == "tr" and self._active is not None:
             if self._row is not None:
                 raise ValueError("NESTED_ROW")
             self._row = []
+            self._row_layout = []
         elif tag in {"td", "th"} and self._row is not None:
             if self._cell is not None:
                 raise ValueError("NESTED_CELL")
             self._cell = []
+            self._cell_layout = (tag, _strict_span(attrs, "rowspan"),
+                                 _strict_span(attrs, "colspan"))
 
     def handle_data(self, data: str) -> None:
         if self._skip_depth:
@@ -100,17 +123,31 @@ class _BlsTables(HTMLParser):
         if tag in {"td", "th"} and self._cell is not None:
             if self._row is None:
                 raise ValueError("ORPHAN_CELL")
-            self._row.append(" ".join(" ".join(self._cell).split()))
+            cell_text = " ".join(" ".join(self._cell).split())
+            self._row.append(cell_text)
+            if self._row_layout is None or self._cell_layout is None:
+                raise ValueError("MISSING_TABLE_CELL_LAYOUT")
+            tag_name, row_span, col_span = self._cell_layout
+            self._row_layout.append((cell_text, tag_name, row_span, col_span))
             self._cell = None
+            self._cell_layout = None
         elif tag == "tr" and self._row is not None:
             if self._cell is not None:
                 raise ValueError("UNCLOSED_CELL")
             self._active.append(tuple(self._row))  # type: ignore[union-attr]
+            if self._active_layout is None or self._row_layout is None:
+                raise ValueError("MISSING_TABLE_ROW_LAYOUT")
+            self._active_layout.append(tuple(self._row_layout))
+            self._row_layout = None
             self._row = None
         elif tag == "table" and self._active is not None:
             if self._row is not None or self._cell is not None:
                 raise ValueError("UNCLOSED_TABLE")
+            if self._active_layout is None:
+                raise ValueError("MISSING_TABLE_LAYOUT")
             self.tables.append((" ".join(self._scope.split()), self._active))
+            self.table_layouts.append(self._active_layout)
+            self._active_layout = None
             self._active = None
 
 
@@ -162,22 +199,127 @@ _MONTH_TO_MONTH = re.compile(
 _SEASONAL = re.compile(r"\bsa\b|\bseasonally\s+adjusted\b", re.I)
 
 
-def _oct2026_sa_month_column(rows: list[tuple[str, ...]]) -> tuple[int, int] | None:
-    candidates: list[tuple[int, int]] = []
-    for cells in rows:
-        if len(cells) < 7 or cells[0].strip().casefold() != "grouping":
+def _bls_implicit_oct2026_sa_month_column(
+        layout_rows: list[tuple[tuple[str, str, int, int], ...]]
+        ) -> tuple[int, int] | None:
+    """Strictly recognize the *actual* BLS Table-1 implicit header layout.
+
+    The BLS September 2026 publication has five top-level <th> cells
+    (Grouping, Commodity code, Relative importance, Unadjusted 12-month,
+    Seasonally adjusted 1-month), eight <th> cells in its second row and
+    TEN physical data cells, WITHOUT rowspan/colspan HTML attributes.
+    The monthly month-span must be derived from the exact lower header,
+    never assumed to be the last number in the row.
+    This is a fixed known-source grammar, not a generic guess about widths.
+    """
+    if len(layout_rows) < 2:
+        return None
+    top, lower = layout_rows[:2]
+    if len(top) != 5 or len(lower) != 8:
+        return None
+    if any(tag != "th" or row_span != 1 or col_span != 1
+           for cells in (top, lower)
+           for _, tag, row_span, col_span in cells):
+        return None
+    parent = [" ".join(text.split()).casefold() for text, _, _, _ in top]
+    child = [" ".join(text.split()).casefold() for text, _, _, _ in lower]
+    if not (parent[0] == "grouping"
+            and parent[1] == "commodity code"
+            and "relative" in parent[2] and "importance" in parent[2]
+            and "unadjusted" in parent[3] and "12-month" in parent[3]
+            and "percent change" in parent[3]
+            and "seasonally adjusted" in parent[4]
+            and "1-month" in parent[4] and "percent change" in parent[4]):
+        return None
+    if not (child[0] == "group code" and child[1] == "item code"
+            and "to" in child[2] and "2026" in child[2]):
+        return None
+    # Index 3..7 of the lower header are the five SA monthly subcolumns;
+    # physical data index = lower index + 2 (two label/commodity columns).
+    monthly_children = child[3:]
+    if any("to" not in label or "2025" in label
+           for label in monthly_children):
+        return None
+    matches = [index for index, label in enumerate(monthly_children)
+               if _MONTH_TO_MONTH.search(label)]
+    if matches != [4]:
+        return None
+    return (3 + matches[0] + 2, 10)
+
+
+def _oct2026_sa_month_column(
+        layout_rows: list[tuple[tuple[str, str, int, int], ...]]
+        ) -> tuple[int, int] | None:
+    """Resolve a monthly column across real BLS multi-row TH headers.
+
+    Official BLS HTML uses either implicit two-row group labels without
+    colspan/rowspan attributes, or explicit spans; treat these as separate
+    strict grammars. Never guess from the last numeric cell.
+    """
+    implicit = _bls_implicit_oct2026_sa_month_column(layout_rows)
+    if implicit is not None:
+        return implicit
+    header_grid: list[tuple[str, ...]] = []
+    carry: dict[int, tuple[str, int]] = {}
+    for cells in layout_rows:
+        if not cells:
             continue
-        if len(cells) < 3 or cells[1].casefold() != "commodity code":
-            continue
-        positions = [
-            index for index, text in enumerate(cells)
-            if _MONTH_TO_MONTH.search(text) and _SEASONAL.search(text)
-            and "2025" not in text
-        ]
-        if len(positions) != 1:
+        if not any(tag == "th" for _, tag, _, _ in cells):
+            break
+        if any(tag != "th" for _, tag, _, _ in cells):
+            # In BLS real data, grouping/title rows may contain both
+            # <th> labels and <td> blanks after the header.
+            if not header_grid:
+                return None
+            break
+        populated = {idx: text for idx, (text, _) in carry.items()}
+        next_carry = {idx: (text, remaining - 1)
+                      for idx, (text, remaining) in carry.items()
+                      if remaining > 1}
+        pos = 0
+        for text, _, row_span, col_span in cells:
+            while pos in populated:
+                pos += 1
+            if pos + col_span > 32:
+                return None
+            for idx in range(pos, pos + col_span):
+                if idx in populated:
+                    return None
+                populated[idx] = text
+                if row_span > 1:
+                    next_carry[idx] = (text, row_span - 1)
+            pos += col_span
+        if not populated or len(populated) != max(populated) + 1:
             return None
-        candidates.append((positions[0], len(cells)))
-    return candidates[0] if len(candidates) == 1 else None
+        header_grid.append(tuple(populated[idx]
+                                 for idx in range(max(populated) + 1)))
+        if len(header_grid) > 10:
+            return None
+        carry = next_carry
+    if not header_grid or carry or any(len(row) != len(header_grid[0])
+                                        for row in header_grid):
+        return None
+    width = len(header_grid[0])
+    if not 7 <= width <= 32:
+        return None
+    labels = [" ".join(row[col] for row in header_grid)
+              for col in range(width)]
+    if "grouping" not in labels[0].casefold() or "commodity code" not in labels[1].casefold():
+        return None
+    candidates = [idx for idx, label in enumerate(labels)
+                  if _MONTH_TO_MONTH.search(label)
+                  and _SEASONAL.search(label)
+                  and "2025" not in label
+                  and idx >= 3]
+    if len(candidates) != 1:
+        return None
+    return (candidates[0], width)
+
+def _strip_bls_label_footnotes(label: str) -> str:
+    # Real BLS Table 1 includes superscript citations e.g. "(5)" in the
+    # FD/49104 row. Remove only trailing numbered footnotes, not words,
+    # before checking the full series name AND the FD commodity code.
+    return re.sub(r"(?:\s*\([0-9]{1,2}\))+\s*$", "", label).strip().casefold()
 
 
 def _extract_table_value(rows: list[tuple[str, ...]], exact_label: str,
@@ -186,7 +328,7 @@ def _extract_table_value(rows: list[tuple[str, ...]], exact_label: str,
     # identified Table-1 header and extraction from its SA MoM column only.
     matches: list[Decimal] = []
     for cells in rows:
-        if len(cells) < 3 or cells[0].casefold() != exact_label.casefold():
+        if len(cells) < 3 or _strip_bls_label_footnotes(cells[0]) != exact_label.casefold():
             continue
         if cells[1:3] != ("FD", code):
             continue
@@ -255,13 +397,14 @@ def inspect_ppi_oct2026_first_print_lab(*, raw_html: Any,
         return _empty("HEADLINE_PPI_PERCENT_INVALID")
     if action.lower() in {"decreased", "declined", "fell"}:
         headline = -headline
-    table1 = [rows for context, rows in doc.tables
+    table1 = [(rows, doc.table_layouts[index])
+              for index, (context, rows) in enumerate(doc.tables)
               if "Table 1." in context and "October 2026" in context
               and "seasonally adjusted" in context.lower()]
     if len(table1) != 1:
         return _empty("MONTHLY_SA_TABLE1_MISSING_OR_AMBIGUOUS")
-    rows = table1[0]
-    monthly_header = _oct2026_sa_month_column(rows)
+    rows, layout_rows = table1[0]
+    monthly_header = _oct2026_sa_month_column(layout_rows)
     if monthly_header is None:
         return _empty("MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
     month_col, header_columns = monthly_header
