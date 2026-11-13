@@ -245,8 +245,8 @@ def store_canonical_fx28_roster_once_lab(
         folder = _safe_local_folder(local_appdata)
         if folder is None:
             return out
-        path = folder.parent.parent
-        for part in ("LAB", _DIR):
+        path = Path(local_appdata)
+        for part in ("AtlasQuant", "LAB", _DIR):
             path = path / part
             if path.exists():
                 if path.is_symlink() or not path.is_dir():
