@@ -330,6 +330,30 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
                 self.assertEqual(report["state"], "LAB_PPI_FIRST_PRINT_BLOCKED")
                 self.safe(report)
 
+    def test_34_real_bls_style_core_49104_numbered_footnote_is_allowed(self):
+        body = bls_like_multilevel_october().replace(
+            b"Final demand less foods and energy</td>",
+            b"Final demand less foods and energy(5)</td>")
+        report = self.audit(body=body)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_35_footnote_does_not_permit_wrong_core_label_or_commodity(self):
+        original = bls_like_multilevel_october()
+        for candidate in (
+            original.replace(
+                b"Final demand less foods and energy</td>",
+                b"Final demand goods less foods and energy(5)</td>"),
+            original.replace(b"<td>49104</td>", b"<td>49116</td>"),
+        ):
+            with self.subTest(candidate=candidate[:160]):
+                report = self.audit(body=candidate)
+                self.assertEqual(report["reason"],
+                                 "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+                self.safe(report)
+
     def test_33_bls_like_header_with_misaligned_data_row_blocks(self):
         body = bls_like_multilevel_october().replace(
             b"<td>0.4</td><td>0.5</td></tr>",
