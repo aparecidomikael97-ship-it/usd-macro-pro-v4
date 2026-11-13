@@ -33,7 +33,7 @@ from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     CAMPAIGN_ID, _nominal_windows,
 )
 
-SCHEMA = "ATLASQUANT_TRADER_FX28_EXPERIMENTAL_MACRO_RELATIVE_SCORE_LAB_V1"
+SCHEMA = "ATLASQUANT_TRADER_FX28_EXPERIMENTAL_MACRO_RELATIVE_SCORE_LAB_V2"
 WEIGHTS: dict[str, int] = {
     "policy_expectations": 40,
     "inflation_impact": 20,
@@ -83,6 +83,8 @@ def _configuration_digest() -> str:
         "nominal_neutral_band": NEUTRAL_BAND,
         "weekly_additional_abstention_band": W1_ADDITIONAL_ABSTENTION_BAND,
         "earliest_snapshot_hours": WINDOW_MAX_EARLY_HOURS,
+        "shared_event_root_pair_veto": True,
+        "shared_event_root_pair_veto_version": "V1_ALWAYS_ABSTAIN_OVERLAPPING_ROOT",
     }
     return sha256(json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
@@ -112,10 +114,14 @@ def _base(reason: str, *, horizon: str | None = None) -> dict[str, Any]:
         "conflicting_currency_codes": [],
         "distinct_root_catalyst_claim_count": 0,
         "shared_event_root_ids": [],
+        "pair_shared_root_overlap_veto_count": 0,
+        "pair_shared_event_root_overlap_is_not_independent_factor": True,
         "pair_claims_are_independent_economic_events": False,
         "pairs": [{
             "pair": pair, "research_relative_label": "AGUARDAR",
             "hypothetical_points": None,
+            "shared_event_root_ids_for_both_legs": [],
+            "shared_event_root_overlap_veto": False,
             "reason": "NO_ADMISSIBLE_HYPOTHETICAL_MACRO_INPUT",
             "real_market_direction_authenticated": False,
             "trade_authorized": False,
@@ -247,10 +253,27 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
     pair_claims = []
     rows = []
     candidate_count = 0
+    overlapping_pair_count = 0
     for pair in OFFICIAL_PAIRS:
         base, quote = split_pair(pair)
         points = scores[base] - scores[quote]
-        if base in conflicting or quote in conflicting:
+        # One real-world news story can affect BOTH currencies of a pair.
+        # Do NOT mistake its two subjective impact labels for independent
+        # evidence. Without a fitted relative event-response model, their
+        # subtraction can produce an exaggerated apparent directional edge.
+        # Conservative quarantine affects only a pair with BOTH legs on
+        # the SAME root. Other 27 pairs are NOT suppressed automatically.
+        shared_roots = sorted(
+            root for root, currencies in root_currencies.items()
+            if base in currencies and quote in currencies
+        )
+        overlap_veto = bool(shared_roots)
+        overlapping_pair_count += int(overlap_veto)
+        if overlap_veto:
+            label, presented, reason = (
+                "AGUARDAR", None,
+                "SHARED_EVENT_ROOT_BOTH_CURRENCY_LEGS_NO_RELATIVE_CALIBRATION")
+        elif base in conflicting or quote in conflicting:
             label, presented, reason = (
                 "AGUARDAR", None, "CONFLICTING_STRONG_MACRO_COMPONENTS")
         elif horizon == "W1" and abs(points) <= W1_ADDITIONAL_ABSTENTION_BAND:
@@ -268,6 +291,8 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
         rows.append({
             "pair": pair, "research_relative_label": label,
             "hypothetical_points": presented, "reason": reason,
+            "shared_event_root_ids_for_both_legs": shared_roots,
+            "shared_event_root_overlap_veto": overlap_veto,
             "real_market_direction_authenticated": False,
             "trade_authorized": False,
         })
@@ -296,6 +321,7 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
         "shared_event_root_ids": sorted(
             root for root, currencies in root_currencies.items()
             if len(currencies) > 1),
+        "pair_shared_root_overlap_veto_count": overlapping_pair_count,
         "pairs": rows,
         "hypothetical_labeled_pair_count": candidate_count,
         "abstained_pair_count": sum(
