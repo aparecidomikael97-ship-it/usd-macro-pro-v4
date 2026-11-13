@@ -119,7 +119,7 @@ class BLSCpiUNSAOriginalArchiveTests(unittest.TestCase):
         r=self.call()
         self.safe(r)
         self.assertEqual(r["state"],
-                         "LAB_US_BLS_CPI_U_NSA_YOY_LOCAL_DOCUMENT_REPLAY_NO_GO")
+                         "LAB_US_BLS_CPI_U_NSA_MOM_LOCAL_DOCUMENT_REPLAY_NO_GO")
         self.assertTrue(r["raw_original_bytes_retained_and_replayed_local_only"])
         self.assertEqual(r["http_get_attempts"],1)
         self.assertEqual(r["file_writes_attempted"],2)
