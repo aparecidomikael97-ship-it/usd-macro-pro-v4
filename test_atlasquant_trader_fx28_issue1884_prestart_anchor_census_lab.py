@@ -97,7 +97,7 @@ class Issue1884PrestartCensusTests(unittest.TestCase):
         self.assertEqual(r["generic_calendar_or_audit_comments_ignored"],2)
         self.assertEqual(r["well_formed_hash_only_anchor_comments"],0)
         self.assertEqual(r["future_not_due_pair_slots"],672)
-        self.assertEqual(r["due_not_issued_with_independent_witness_pair_slots"],0)
+        self.assertEqual(r["due_without_independent_pre_event_witness_pair_slots"],0)
         self.assertEqual(r["first_d1_window_state"],"FUTURE_WINDOW_NOT_DUE")
         self.assertEqual(r["first_w1_window_state"],"FUTURE_WINDOW_NOT_DUE")
         self.assertTrue(r["all_672_slots_accounted_for"])
@@ -105,19 +105,19 @@ class Issue1884PrestartCensusTests(unittest.TestCase):
     def test_first_d1_w1_without_any_anchor_after_start_stays_56_due(self):
         r=self.check(now=POST_FIRST)
         self.safe(r)
-        self.assertEqual(r["due_not_issued_with_independent_witness_pair_slots"],56)
+        self.assertEqual(r["due_without_independent_pre_event_witness_pair_slots"],56)
         self.assertEqual(r["future_not_due_pair_slots"],616)
         self.assertEqual(r["first_d1_window_state"],
-                         "DUE_NOT_ISSUED_WITH_INDEPENDENT_WITNESS")
+                         "DUE_NO_INDEPENDENT_PRE_EVENT_WITNESS")
         self.assertEqual(r["first_w1_window_state"],
-                         "DUE_NOT_ISSUED_WITH_INDEPENDENT_WITNESS")
+                         "DUE_NO_INDEPENDENT_PRE_EVENT_WITNESS")
         self.assertEqual(len(r["window_states"]),24)
 
     def test_end_campaign_denominator_all_due_no_claims_not_accuracy(self):
         r=self.check(now=END)
         self.safe(r)
         self.assertEqual(r["future_not_due_pair_slots"],0)
-        self.assertEqual(r["due_not_issued_with_independent_witness_pair_slots"],672)
+        self.assertEqual(r["due_without_independent_pre_event_witness_pair_slots"],672)
         self.assertTrue(r["all_672_slots_accounted_for"])
         self.assertEqual(len(r["window_states"]),24)
 
@@ -153,7 +153,7 @@ class Issue1884PrestartCensusTests(unittest.TestCase):
                 r=self.check(comments=[c],now=POST_FIRST)
                 self.safe(r)
                 self.assertEqual(r["anchor_claims_late_or_edited"],1)
-                self.assertEqual(r["due_not_issued_with_independent_witness_pair_slots"],56)
+                self.assertEqual(r["due_without_independent_pre_event_witness_pair_slots"],56)
                 self.assertEqual(r["due_hash_anchor_claim_only_pair_slots"],28)
                 self.assertEqual(r["first_d1_window_state"],
                                  "DUE_ANCHOR_CLAIM_ONLY_NO_WITNESS")
