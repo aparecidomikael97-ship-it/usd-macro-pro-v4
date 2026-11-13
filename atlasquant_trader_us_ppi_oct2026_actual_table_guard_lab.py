@@ -199,17 +199,66 @@ _MONTH_TO_MONTH = re.compile(
 _SEASONAL = re.compile(r"\bsa\b|\bseasonally\s+adjusted\b", re.I)
 
 
+def _bls_implicit_oct2026_sa_month_column(
+        layout_rows: list[tuple[tuple[str, str, int, int], ...]]
+        ) -> tuple[int, int] | None:
+    """Strictly recognize the *actual* BLS Table-1 implicit header layout.
+
+    The BLS September 2026 publication has five top-level <th> cells
+    (Grouping, Commodity code, Relative importance, Unadjusted 12-month,
+    Seasonally adjusted 1-month), eight <th> cells in its second row and
+    TEN physical data cells, WITHOUT rowspan/colspan HTML attributes.
+    The monthly month-span must be derived from the exact lower header,
+    never assumed to be the last number in the row.
+    This is a fixed known-source grammar, not a generic guess about widths.
+    """
+    if len(layout_rows) < 2:
+        return None
+    top, lower = layout_rows[:2]
+    if len(top) != 5 or len(lower) != 8:
+        return None
+    if any(tag != "th" or row_span != 1 or col_span != 1
+           for cells in (top, lower)
+           for _, tag, row_span, col_span in cells):
+        return None
+    parent = [" ".join(text.split()).casefold() for text, _, _, _ in top]
+    child = [" ".join(text.split()).casefold() for text, _, _, _ in lower]
+    if not (parent[0] == "grouping"
+            and parent[1] == "commodity code"
+            and "relative" in parent[2] and "importance" in parent[2]
+            and "unadjusted" in parent[3] and "12-month" in parent[3]
+            and "percent change" in parent[3]
+            and "seasonally adjusted" in parent[4]
+            and "1-month" in parent[4] and "percent change" in parent[4]):
+        return None
+    if not (child[0] == "group code" and child[1] == "item code"
+            and "to" in child[2] and "2026" in child[2]):
+        return None
+    # Index 3..7 of the lower header are the five SA monthly subcolumns;
+    # physical data index = lower index + 2 (two label/commodity columns).
+    monthly_children = child[3:]
+    if any("to" not in label or "2025" in label
+           for label in monthly_children):
+        return None
+    matches = [index for index, label in enumerate(monthly_children)
+               if _MONTH_TO_MONTH.search(label)]
+    if matches != [4]:
+        return None
+    return (3 + matches[0] + 2, 10)
+
+
 def _oct2026_sa_month_column(
         layout_rows: list[tuple[tuple[str, str, int, int], ...]]
         ) -> tuple[int, int] | None:
     """Resolve a monthly column across real BLS multi-row TH headers.
 
-    BLS Table 1 has historically used a parent 'Seasonally adjusted
-    1-month percent change' over several monthly children. The October
-    child can read only 'Sept. to Oct.', while a separate parent marks it
-    SA. Expand spans to physical data columns; guessing the last cell is
-    forbidden. A standalone single-row header is also supported.
+    Official BLS HTML uses either implicit two-row group labels without
+    colspan/rowspan attributes, or explicit spans; treat these as separate
+    strict grammars. Never guess from the last numeric cell.
     """
+    implicit = _bls_implicit_oct2026_sa_month_column(layout_rows)
+    if implicit is not None:
+        return implicit
     header_grid: list[tuple[str, ...]] = []
     carry: dict[int, tuple[str, int]] = {}
     for cells in layout_rows:
@@ -218,7 +267,11 @@ def _oct2026_sa_month_column(
         if not any(tag == "th" for _, tag, _, _ in cells):
             break
         if any(tag != "th" for _, tag, _, _ in cells):
-            return None
+            # In BLS real data, grouping/title rows may contain both
+            # <th> labels and <td> blanks after the header.
+            if not header_grid:
+                return None
+            break
         populated = {idx: text for idx, (text, _) in carry.items()}
         next_carry = {idx: (text, remaining - 1)
                       for idx, (text, remaining) in carry.items()
