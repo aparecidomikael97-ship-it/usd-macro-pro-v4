@@ -78,6 +78,8 @@ def _base(reason: str) -> dict[str, Any]:
         "source_reader_was_called": False,
         "unified_source_audit_state": "NOT_CALLED",
         "policy_original_documents_locally_checked": 0,
+        "policy_originals_with_reproducible_source_hash_claims": 0,
+        "source_hash_ledger_is_local_only_not_issuer_pit": True,
         "policy_recent_local_capture_claims": 0,
         "ppi_oct2026_documentary_source_replayed": False,
         "ppi_post_event_context_not_pre_event_forecast": True,
@@ -240,6 +242,8 @@ def inspect_fx28_pre_window_source_gate_lab(
 
     out["policy_original_documents_locally_checked"] = report[
         "policy_source_documents_locally_checked"]
+    out["policy_originals_with_reproducible_source_hash_claims"] = report[
+        "policy_source_originals_with_reproducible_sha_claims"]
     out["policy_recent_local_capture_claims"] = report[
         "policy_source_recent_local_receipt_claims"]
     ppi_present = report["ppi_documentary_series_count"] == 3
@@ -274,6 +278,15 @@ def inspect_fx28_pre_window_source_gate_lab(
                     info["two_policy_originals_locally_checked"],
                 "policy_recent_local_receipt_claims_only":
                     info["two_policy_recent_local_receipt_claims"],
+                # These are reproducible hashes of original local bytes,
+                # NOT evidence that a pre-event forecast used them.
+                "policy_pair_evidence_sha256_local_claim":
+                    info["policy_pair_evidence_sha256_local_claim"],
+                "pair_document_bundle_sha256_local_claim":
+                    info["pair_full_document_bundle_sha256_local_claim"],
+                "ppi_one_shared_document_sha256_local_claim":
+                    info["ppi_single_document_sha256_in_bundle_if_usd"],
+                "source_digest_is_not_a_registered_forecast": True,
                 "ppi_as_signed_currency_factor": False,
                 "forecast_issued": False,
                 "forecast_sha_witness_posted": False,
