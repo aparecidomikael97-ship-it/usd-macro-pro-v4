@@ -191,6 +191,9 @@ class Ppi7M15OnlyTests(unittest.TestCase):
         self.api.specs["USDJPY"]["currency_base"]="EUR"
         self.blocked("SYMBOL_BASE_QUOTE_DIGITS_OR_POINT_INVALID")
         self.api.specs["USDJPY"]["currency_base"]="USD"
+        # Prior subcase called EURUSD's symbol_info twice. Reset the
+        # synthetic call counter so the next two calls model a change.
+        self.api._info_calls.clear()
         self.api.change_visibility=True
         self.blocked("SYMBOL_VISIBILITY_CHANGED_OR_UNKNOWN")
 
