@@ -33,7 +33,7 @@ from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     CAMPAIGN_ID, _nominal_windows,
 )
 
-SCHEMA = "ATLASQUANT_TRADER_FX28_EXPERIMENTAL_MACRO_RELATIVE_SCORE_LAB_V2"
+SCHEMA = "ATLASQUANT_TRADER_FX28_EXPERIMENTAL_MACRO_RELATIVE_SCORE_LAB_V3"
 WEIGHTS: dict[str, int] = {
     "policy_expectations": 40,
     "inflation_impact": 20,
@@ -85,6 +85,7 @@ def _configuration_digest() -> str:
         "earliest_snapshot_hours": WINDOW_MAX_EARLY_HOURS,
         "shared_event_root_pair_veto": True,
         "shared_event_root_pair_veto_version": "V1_ALWAYS_ABSTAIN_OVERLAPPING_ROOT",
+        "same_source_alias_different_event_roots_veto": True,
     }
     return sha256(json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
@@ -175,6 +176,13 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
     # source digest and source timing, on a DIFFERENT currency.
     roots: dict[str, tuple[str, str, datetime, datetime]] = {}
     root_currencies: dict[str, set[str]] = {}
+    # A label is not an identity: the same category, original bytes, and
+    # declared event/receipt times cannot silently be counted as two
+    # supposedly separate releases just by renaming event_root_id.
+    # Treat the identity as a WEAK caller claim, not issuer attestation.
+    root_by_claimed_source_identity: dict[
+        tuple[str, str, datetime, datetime], str
+    ] = {}
     for claim in claimed_factors:
         if (not isinstance(claim, HypotheticalMacroFactorClaim)
                 or claim.currency not in CURRENCIES
@@ -198,6 +206,12 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
             return out
         root_identity = (
             claim.category, claim.source_sha256_claim, publication, captured)
+        existing_root_for_bytes = root_by_claimed_source_identity.get(
+            root_identity)
+        if (existing_root_for_bytes is not None
+                and existing_root_for_bytes != claim.event_root_id):
+            out["reason"] = "SAME_SOURCE_BYTES_TWO_ROOT_ALIASES_NOT_INDEPENDENT"
+            return out
         original_identity = roots.get(claim.event_root_id)
         if (original_identity is not None
                 and (original_identity != root_identity
@@ -207,6 +221,7 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
             out["reason"] = "REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR"
             return out
         roots[claim.event_root_id] = root_identity
+        root_by_claimed_source_identity[root_identity] = claim.event_root_id
         root_currencies.setdefault(claim.event_root_id, set()).add(claim.currency)
         seen[key] = claim
 
