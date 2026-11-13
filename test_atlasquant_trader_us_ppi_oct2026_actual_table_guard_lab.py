@@ -207,6 +207,65 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.safe(r)
 
 
+    def test_23_missing_mom_column_header_never_uses_nsa_yoy_value(self):
+        b=raw().replace(b"<th>Sep to Oct SA</th>",
+                        b"<th>12-month unadjusted</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.assertIsNone(report["headline_final_demand_sa_mom_pct_body_claim"])
+        self.safe(report)
+
+    def test_24_reordered_columns_use_explicit_monthly_header_not_last_cell(self):
+        text=raw().decode("utf-8")
+        text=text.replace(
+            "<th>Earlier</th><th>Sep to Oct SA</th>",
+            "<th>Sep to Oct SA</th><th>12-month unadjusted</th>")
+        for v in ("0.5","0.2","0.9","9.8"):
+            text=text.replace(
+                "<td>0.4</td><td>"+v+"</td>",
+                "<td>"+v+"</td><td>9.9</td>")
+        report=self.audit(body=text.encode("utf-8"))
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"],"0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"],"0.2")
+        self.assertNotEqual(report["headline_final_demand_sa_mom_pct_body_claim"],"9.9")
+        self.safe(report)
+
+    def test_25_duplicated_october_sa_month_header_blocks_ambiguous_columns(self):
+        b=raw().replace(b"<th>Earlier</th>",
+                        b"<th>Sep to Oct SA</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_26_wrong_year_october_sa_month_header_rejected(self):
+        b=raw().replace(b"<th>Sep to Oct SA</th>",
+                        b"<th>Sep to Oct SA 2025</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_27_table_row_with_extra_unlabeled_numeric_cell_rejected(self):
+        b=raw().replace(
+            b"<td>4</td><td>100</td><td>n/a</td><td>0.4</td><td>0.5</td></tr>",
+            b"<td>4</td><td>100</td><td>n/a</td><td>0.4</td><td>9.9</td><td>0.5</td></tr>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+    def test_28_same_release_still_requires_october_2026_not_any_annual_headline(self):
+        b=raw().replace(b"<th>Sep to Oct SA</th>",
+                        b"<th>Sep to Oct NSA annual change</th>")
+        report=self.audit(body=b)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
     def test_21_forged_actual_report_has_no_provenance(self):
         candidate=self.audit().copy()
         candidate['source_sha256']=None
