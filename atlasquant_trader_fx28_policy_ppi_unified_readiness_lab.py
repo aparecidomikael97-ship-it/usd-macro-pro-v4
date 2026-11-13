@@ -25,7 +25,8 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_fx28_28pair_source_readiness_manual_lab import (
@@ -204,6 +205,16 @@ def inspect_fx28_policy_ppi_readiness_lab(
             or not local_appdata
             or type(ppi_archive_basename) not in (str, type(None))
             or ppi_archive_basename == ""):
+        return out
+    try:
+        root = Path(local_appdata)
+        if (not root.is_absolute() or not root.is_dir()
+                or any(x.is_symlink() for x in (root, *root.parents))
+                or any((root / sub).is_symlink() for sub in (
+                    "AtlasQuant", "AtlasQuant/LAB",
+                    "AtlasQuant/LAB/official_macro_receipts"))):
+            return out
+    except (OSError, TypeError, ValueError, RuntimeError):
         return out
 
     # The policy auditor can be BLOCKED when there is no folder. Do not
