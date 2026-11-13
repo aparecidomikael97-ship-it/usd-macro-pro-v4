@@ -62,6 +62,18 @@ def _base(reason: str) -> dict[str, Any]:
         "m15_rows_examined": 0, "window_m15_rows_found": 0,
         "window_expected_m15_rows": None,
         "first_mismatch_index": None,
+        "first_expected_m15_open_present": None,
+        "last_expected_m15_open_present": None,
+        "first_observed_m15_open_utc": None,
+        "last_observed_m15_open_utc": None,
+        "first_observed_delay_minutes": None,
+        "last_observed_early_minutes": None,
+        "missing_expected_m15_slots": None,
+        "missing_at_start_consecutive_m15_slots": None,
+        "missing_at_end_consecutive_m15_slots": None,
+        "missing_interior_m15_slots": None,
+        "missing_m15_classification": None,
+        "m15_boundary_input_integrity_valid": False,
         "window_coverage": None,
         "price_window_start_open_documentary": None,
         "price_window_end_close_documentary": None,
@@ -213,6 +225,24 @@ def inspect_mt5_m15_archive_ny17_join_lab(
     )
     out["window_expected_m15_rows"] = covered["m15_expected_candle_count"]
     out["first_mismatch_index"] = covered["first_mismatch_index"]
+    # Preserve provenance-neutral endpoint diagnostics even on a blocked
+    # archive. Never attach a return or claim an observed direction if
+    # the first, last or any interior M15 bar is missing.
+    for field in (
+        "first_expected_m15_open_present",
+        "last_expected_m15_open_present",
+        "first_observed_m15_open_utc",
+        "last_observed_m15_open_utc",
+        "first_observed_delay_minutes",
+        "last_observed_early_minutes",
+        "missing_expected_m15_slots",
+        "missing_at_start_consecutive_m15_slots",
+        "missing_at_end_consecutive_m15_slots",
+        "missing_interior_m15_slots",
+        "missing_m15_classification",
+        "m15_boundary_input_integrity_valid",
+    ):
+        out[field] = covered[field]
     if covered["state"] != TARGET_STATE:
         out["reason"] = "M15_NY17_COVERAGE_" + covered["reason"]
         return out
