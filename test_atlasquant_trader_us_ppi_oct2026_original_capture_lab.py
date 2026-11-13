@@ -83,6 +83,9 @@ class BLSOriginalPpiCaptureTests(unittest.TestCase):
         self.assertIsNone(result["usd_directional_bias"])
         self.assertIsNone(result["calibrated_probability"])
         self.assertTrue(result["post_event_retrieval_not_pre_event_forecast"])
+        self.assertTrue(result["ppi_monthly_core_and_ex_trade_are_distinct_series"])
+        self.assertFalse(result["consensus_pretended_from_bls_actual"])
+        self.assertEqual(result["documentary_series_count"],len(result["documentary_series"]))
         self.assertEqual(result["new_cost_brl"],0)
 
     def test_01_default_no_explicit_permission_is_zero_network_and_files(self):
@@ -326,6 +329,114 @@ class BLSOriginalPpiCaptureTests(unittest.TestCase):
         self.assertTrue(report["raw_bytes_and_receipt_replayed"])
         self.assertTrue(report["ppi_can_feed_research_only"])
         self.assertFalse(report["post_event_retrieval_not_pre_event_forecast"] is False)
+
+
+    def test_21_same_source_sha_reconstructs_three_distinct_monthly_sa_values(self):
+        result=self.call()
+        self.safe(result)
+        self.assertEqual(result["documentary_series_count"],3)
+        self.assertTrue(result["actuals_reconstructed_from_exact_local_bytes"])
+        self.assertTrue(result["ppi_monthly_core_and_ex_trade_are_distinct_series"])
+        self.assertFalse(result["consensus_pretended_from_bls_actual"])
+        series=result["documentary_series"]
+        self.assertEqual([x["fd_commodity_code"] for x in series],
+                         ["4","49104","49116"])
+        self.assertEqual([x["actual_pct_local_documentary_claim"] for x in series],
+                         ["0.5","0.2","0.9"])
+        self.assertEqual([x["reference_period"] for x in series],
+                         ["2026-10"]*3)
+        self.assertTrue(all(x["comparison_period"]=="2026-09" for x in series))
+        self.assertTrue(all(x["seasonal_adjustment"]=="SA" for x in series))
+        self.assertTrue(all(x["change_type"]=="MONTH_OVER_MONTH" for x in series))
+        self.assertTrue(all(x["unit"]=="PERCENT_CHANGE" for x in series))
+        self.assertTrue(all(x["actual_body_sha256"]==
+                            result["raw_document_sha256"] for x in series))
+        self.assertTrue(all(x["pre_event_consensus_pct"] is None for x in series))
+        self.assertTrue(all(x["surprise_percentage_points"] is None for x in series))
+        self.assertTrue(all(x["economic_impact_points"] is None for x in series))
+        self.assertTrue(all(not x["issuer_first_seen_independently_attested"]
+                            for x in series))
+        self.assertFalse(result["ppi_can_feed_fx28_directional_model"])
+
+    def test_22_realistic_three_table_values_are_only_a_synthetic_fixture(self):
+        simulated=raw(head="0.3",core="0.3",extra="0.5")
+        report=self.call(read=Mock(return_value=MockResponse(body=simulated)))
+        self.safe(report)
+        self.assertTrue(report["raw_bytes_and_receipt_replayed"])
+        self.assertEqual([x["actual_pct_local_documentary_claim"]
+                          for x in report["documentary_series"]],
+                         ["0.3","0.3","0.5"])
+        self.assertIsNone(report["documentary_series"][2]["surprise_percentage_points"])
+        self.assertIsNone(report["usd_directional_bias"])
+        self.assertIsNone(report["calibrated_probability"])
+
+    def test_23_fd49116_missing_blocks_before_any_file_write(self):
+        missing=raw().replace(b"<td>49116</td>",b"<td>49117</td>")
+        report=self.call(read=Mock(return_value=MockResponse(body=missing)))
+        self.safe(report)
+        self.assertEqual(report["state"],"LAB_US_PPI_OCT2026_ORIGINAL_CAPTURE_BLOCKED")
+        self.assertEqual(report["reason"],"OFFICIAL_BLS_BYTES_TABLE1_OR_TIME_NOT_ACCEPTED")
+        self.assertEqual(report["capture_get_attempts"],1)
+        self.assertFalse(report["directory_created_once"])
+        self.assertEqual(report["source_file_writes_attempted"],0)
+        self.assertEqual(report["documentary_series_count"],0)
+        self.assertFalse((Path(self.temp.name)/"AtlasQuant").exists())
+
+    def test_24_repeated_fd49116_row_is_ambiguous_and_blocks(self):
+        original=raw()
+        segment=(b"<tr><td>Final demand less foods, energy, and trade services"
+                 b"</td><td>FD</td><td>49116</td><td>100</td>"
+                 b"<td>n/a</td><td>0.4</td><td>0.9</td></tr>")
+        self.assertIn(segment,original)
+        duplicate=original.replace(segment,segment+segment)
+        result=self.call(read=Mock(return_value=MockResponse(body=duplicate)))
+        self.safe(result)
+        self.assertEqual(result["reason"],"OFFICIAL_BLS_BYTES_TABLE1_OR_TIME_NOT_ACCEPTED")
+        self.assertFalse(result["raw_bytes_and_receipt_replayed"])
+        self.assertFalse(result["directory_created_once"])
+
+    def test_25_extrade_wrong_full_label_blocks_even_matching_fd_code(self):
+        forged=raw().replace(
+            b"Final demand less foods, energy, and trade services",
+            b"Final demand less foods and energy, and mislabeled services")
+        result=self.call(read=Mock(return_value=MockResponse(body=forged)))
+        self.safe(result)
+        self.assertEqual(result["state"],"LAB_US_PPI_OCT2026_ORIGINAL_CAPTURE_BLOCKED")
+        self.assertEqual(result["source_file_writes_attempted"],0)
+
+    def test_26_replayed_second_pass_matches_initial_three_series_without_network(self):
+        first=self.call()
+        second=replay(local_appdata=self.temp.name,
+                      archive_basename=first["archive_directory_basename"],
+                      observed_at_utc=FINISH+timedelta(hours=1))
+        self.safe(second)
+        self.assertEqual(first["documentary_series"],second["documentary_series"])
+        self.assertEqual(first["raw_document_sha256"],second["raw_document_sha256"])
+        self.assertEqual(self.read.call_count,1)
+        self.assertEqual(second["capture_get_attempts"],0)
+
+    def test_27_byte_tampering_removes_all_typed_values_instead_of_partial(self):
+        first=self.call()
+        location=self.folder(first)/"original.html"
+        location.write_bytes(raw()+b"forged")
+        second=replay(local_appdata=self.temp.name,
+                      archive_basename=first["archive_directory_basename"],
+                      observed_at_utc=FINISH)
+        self.safe(second)
+        self.assertEqual(second["documentary_series"],[])
+        self.assertEqual(second["documentary_series_count"],0)
+        self.assertFalse(second["actuals_reconstructed_from_exact_local_bytes"])
+        self.assertFalse(second["ppi_can_feed_research_only"])
+
+    def test_28_pre_event_clock_rejected_before_any_bls_values(self):
+        report=replay(local_appdata=self.temp.name,
+                      archive_basename="US_BLS_PPI_OCT2026_20261113T140002Z_"+
+                                       "f"*12,
+                      observed_at_utc=RELEASE_UTC-timedelta(seconds=1))
+        self.safe(report)
+        self.assertEqual(report["documentary_series_count"],0)
+        self.assertEqual(report["capture_get_attempts"],0)
+
 
 if __name__=="__main__":
     unittest.main()
