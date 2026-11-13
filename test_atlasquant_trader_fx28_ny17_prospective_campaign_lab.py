@@ -4,6 +4,9 @@ from datetime import datetime, timedelta, timezone
 import unittest
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx28_ny17_m15_source_claim_lab import (
+    expected_ny17_m15_endpoint_claim_lab,
+)
 from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     FROZEN_START_UTC, FROZEN_END_UTC, EXPECTED_PAIR_HORIZON_SLOTS,
     CALENDAR_ISSUE, _nominal_windows, inspect_frozen_fx28_ny17_campaign_lab as inspect,
@@ -49,6 +52,8 @@ def make_roster(horizon: str, *, missing: dict[int, set[str]] | None = None):
                     "end_close_documentary": "1.0010",
                     "change_bps_documentary": "10.0000",
                     "direction_documentary": "UP",
+                    **expected_ny17_m15_endpoint_claim_lab(
+                        start_at_utc=start, end_at_utc=end),
                 } for pair in OFFICIAL_PAIRS if pair not in blocked
             },
         })
@@ -161,6 +166,40 @@ class Ny17FrozenCampaignBoundaryTests(unittest.TestCase):
         report = self.audit(w=w)
         self.assertEqual(report["reason"], "W1_MISSING_SWAPPED_OR_NONCANONICAL_SESSION")
         self.safe(report)
+
+    def test_native_w1_or_d1_source_claim_cannot_be_used_in_campaign(self):
+        for violation in ("W1", "D1", "missing", "native_true", "ny17_wrong_close"):
+            with self.subTest(violation=violation):
+                w = deepcopy(self.w)
+                v = w["windows"][0]["price_movements_documentary_by_pair"][
+                    OFFICIAL_PAIRS[0]]
+                if violation in ("W1", "D1"):
+                    v["source_timeframe_claim"] = violation
+                elif violation == "missing":
+                    v.pop("source_timeframe_claim")
+                elif violation == "native_true":
+                    v["native_mt5_d1_or_w1_used_as_endpoint"] = True
+                else:
+                    v["expected_last_m15_open_utc"] = (
+                        datetime.fromisoformat(v["expected_last_m15_open_utc"])
+                        + timedelta(hours=2)).isoformat()
+                result = self.audit(w=w)
+                self.safe(result)
+                self.assertEqual(
+                    result["reason"], "W1_PER_PAIR_MISSING_PRICE_DIAGNOSTICS")
+                self.assertFalse(
+                    result["all_documentary_completed_slots_claim_exact_m15_ny17_endpoints"])
+
+    def test_d1_endpoints_also_required_to_avoid_mixed_denominators(self):
+        d = deepcopy(self.d)
+        row = d["windows"][0]["price_movements_documentary_by_pair"][
+            OFFICIAL_PAIRS[0]]
+        row["expected_first_m15_open_utc"] = (
+            datetime.fromisoformat(row["expected_first_m15_open_utc"])
+            + timedelta(minutes=15)).isoformat()
+        result = self.audit(d=d)
+        self.safe(result)
+        self.assertEqual(result["reason"], "D1_PER_PAIR_MISSING_PRICE_DIAGNOSTICS")
 
     def test_corrupted_movement_direction_must_not_count_even_with_672_claimed(self):
         d = deepcopy(self.d)
