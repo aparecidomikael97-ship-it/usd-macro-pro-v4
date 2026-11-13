@@ -262,13 +262,20 @@ def _oct2026_sa_month_column(
         return None
     return (candidates[0], width)
 
+def _strip_bls_label_footnotes(label: str) -> str:
+    # Real BLS Table 1 includes superscript citations e.g. "(5)" in the
+    # FD/49104 row. Remove only trailing numbered footnotes, not words,
+    # before checking the full series name AND the FD commodity code.
+    return re.sub(r"(?:\s*\([0-9]{1,2}\))+\s*$", "", label).strip().casefold()
+
+
 def _extract_table_value(rows: list[tuple[str, ...]], exact_label: str,
                          code: str, month_col: int, header_columns: int) -> Decimal | None:
     # Require exact group and commodity code, same number of cells as the
     # identified Table-1 header and extraction from its SA MoM column only.
     matches: list[Decimal] = []
     for cells in rows:
-        if len(cells) < 3 or cells[0].casefold() != exact_label.casefold():
+        if len(cells) < 3 or _strip_bls_label_footnotes(cells[0]) != exact_label.casefold():
             continue
         if cells[1:3] != ("FD", code):
             continue
