@@ -8,6 +8,9 @@ import unittest
 from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx28_ny17_m15_source_claim_lab import (
+    expected_ny17_m15_endpoint_claim_lab,
+)
 from atlasquant_trader_fx_ny17_forecast_outcome_join_lab import (
     Ny17ForecastClaim, inspect_ny17_full_forecast_outcome_join_lab as join,
 )
@@ -50,6 +53,8 @@ def roster(*, horizon="D1", days=(8,), outcome="UP"):
                     "end_close_documentary": close,
                     "change_bps_documentary": bps,
                     "direction_documentary": outcome,
+                    **expected_ny17_m15_endpoint_claim_lab(
+                        start_at_utc=start, end_at_utc=end),
                 }
                 for pair in OFFICIAL_PAIRS
             },
@@ -119,6 +124,47 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
         self.assertTrue(r["research_only"])
         self.assertFalse(r["range_precommitted_by_external_witness"])
 
+    def test_weekly_native_w1_cannot_join_even_if_price_bps_match(self):
+        for bad in ("W1", "D1", "native_true", "missing", "wrong_end"):
+            with self.subTest(bad=bad):
+                r = roster(horizon="W1", days=(8,))
+                first = r["windows"][0]["price_movements_documentary_by_pair"][
+                    OFFICIAL_PAIRS[0]]
+                if bad in ("W1", "D1"):
+                    first["source_timeframe_claim"] = bad
+                elif bad == "native_true":
+                    first["native_mt5_d1_or_w1_used_as_endpoint"] = True
+                elif bad == "missing":
+                    first.pop("expected_last_m15_open_utc")
+                else:
+                    first["expected_last_m15_open_utc"] = (
+                        datetime.fromisoformat(first["expected_last_m15_open_utc"])
+                        + timedelta(hours=2)).isoformat()
+                result = audit(r=r, c=claims(r))
+                self.safe(result)
+                self.assertEqual(
+                    result["reason"],
+                    "M15_FROZEN_NY17_ENDPOINT_OR_SOURCE_CLAIM_MISSING")
+                self.assertEqual(result["rows_documentary"], [])
+
+    def test_daily_native_d1_and_early_start_cannot_join(self):
+        for bad in ("D1", "wrong_start"):
+            with self.subTest(bad=bad):
+                r = roster()
+                first = r["windows"][0]["price_movements_documentary_by_pair"][
+                    OFFICIAL_PAIRS[-1]]
+                if bad == "D1":
+                    first["source_timeframe_claim"] = "D1"
+                else:
+                    first["expected_first_m15_open_utc"] = (
+                        datetime.fromisoformat(first["expected_first_m15_open_utc"])
+                        + timedelta(minutes=15)).isoformat()
+                result = audit(r=r, c=claims(r))
+                self.safe(result)
+                self.assertEqual(
+                    result["reason"],
+                    "M15_FROZEN_NY17_ENDPOINT_OR_SOURCE_CLAIM_MISSING")
+
     def test_full_28_pair_one_day_claims_join_without_accuracy(self):
         r = audit()
         self.assertEqual(r["state"],
@@ -142,12 +188,12 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
                           abstain_reason="UNVERIFIED_SOURCE")
         data[1] = replace(data[1], direction_claim="DOWN")
         price["windows"][0]["price_movements_documentary_by_pair"][
-            OFFICIAL_PAIRS[2]] = {
+            OFFICIAL_PAIRS[2]].update({
             "start_open_documentary": "1.0000",
             "end_close_documentary": "1.0000",
             "change_bps_documentary": "0.0000",
             "direction_documentary": "FLAT",
-        }
+        })
         report = audit(price, data)
         self.assertEqual(report["declared_abstentions"], 1)
         self.assertEqual(report["directional_claims"], 27)
@@ -229,12 +275,12 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
     def test_extreme_price_ratio_is_blocked_without_decimal_exception(self):
         price = roster()
         price["windows"][0]["price_movements_documentary_by_pair"][
-            OFFICIAL_PAIRS[5]] = {
+            OFFICIAL_PAIRS[5]].update({
                 "start_open_documentary": "0.000000000001",
                 "end_close_documentary": "999999999.999999",
                 "change_bps_documentary": "10.0000",
                 "direction_documentary": "UP",
-            }
+            })
         report = audit(price)
         self.assertEqual(report["state"],
                          "LAB_NY17_FORECAST_OUTCOME_JOIN_BLOCKED")
