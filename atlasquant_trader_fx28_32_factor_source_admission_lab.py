@@ -261,7 +261,7 @@ def inspect_fx28_32_factor_source_admission_lab(
         and cpi_report.get("series_id") == "CUUR0000SA0"
         and cpi_report.get("seasonal_adjustment") == "NSA"
         and cpi_report.get("target_month") == "2026-10"
-        and cpi_report.get("base_month") == "2025-10"
+        and cpi_report.get("base_month") == "2026-09"
         and type(cpi_report.get("raw_body_sha256")) is str
         and _SHA.fullmatch(cpi_report["raw_body_sha256"]) is not None
         and type(cpi_report.get("calculated_mom_nsa_pct_documentary")) is str)
