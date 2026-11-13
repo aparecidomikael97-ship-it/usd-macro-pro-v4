@@ -145,6 +145,21 @@ class Fx28PolicyWhyWaitTests(unittest.TestCase):
                         rep["pair_policy_source_coverage"][0]))
                 self.block(rep)
 
+    def test_06b_integer_one_or_zero_cannot_masquerade_as_bool(self):
+        for flag, value in (
+            ("both_policy_sources_locally_checked", 1),
+            ("fx_direction_admissible", 0),
+            ("cpi_both_currencies_authenticated", 0),
+        ):
+            with self.subTest(flag=flag):
+                rep=snapshot(("EUR","USD"))
+                row=next(r for r in rep["pair_policy_source_coverage"]
+                         if r["pair"]=="EUR/USD")
+                row[flag]=value
+                self.assertEqual(
+                    self.block(rep)["reason"],
+                    "FX28_SOURCE_COVERAGE_CONTRADICTS_CURRENCY_PARTITION")
+
     def test_07_counters_cannot_be_independently_inflated(self):
         for key in ("currencies_with_local_original_bytes_validated",
                     "pairs_with_both_policy_originals_locally_checked",
