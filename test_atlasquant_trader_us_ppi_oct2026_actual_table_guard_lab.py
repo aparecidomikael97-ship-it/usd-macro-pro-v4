@@ -185,6 +185,44 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.assertEqual(r['reason'],'PRE_EVENT_CONSENSUS_CONFLICT')
         self.safe(r)
 
+    def test_41_both_sources_rewritten_consensus_cannot_forge_surprise(self):
+        # Same fake numbers on both sides used to pass equality even when
+        # they did not match the pre-event locked value. The SHA claim is
+        # deliberately left unchanged to simulate hindsight manipulation.
+        for changed in ({"headline_consensus_mom_pct": "0.7"},
+                        {"core_consensus_mom_pct": "0.8"},
+                        {"headline_consensus_mom_pct": "0.3",
+                         "core_consensus_mom_pct": "0.7"}):
+            with self.subTest(changed=changed):
+                a, b = td(), te()
+                a.update(changed)
+                b.update(changed)
+                report = compare(actual=self.audit(), td_snapshot=a,
+                                 te_snapshot=b)
+                self.assertEqual(report["reason"],
+                                 "PRE_EVENT_FROZEN_CONSENSUS_VALUES_CHANGED")
+                self.assertIsNone(report["headline_vs_td_pre_event_diff_pp"])
+                self.assertIsNone(report["core_vs_td_pre_event_diff_pp"])
+                self.safe(report)
+
+    def test_42_te_private_forecast_cannot_replace_consensus_benchmark(self):
+        a, b = td(), te()
+        a["headline_consensus_mom_pct"] = b["headline_te_own_forecast_mom_pct"]
+        b["headline_consensus_mom_pct"] = b["headline_te_own_forecast_mom_pct"]
+        report = compare(actual=self.audit(), td_snapshot=a, te_snapshot=b)
+        self.assertEqual(report["reason"],
+                         "PRE_EVENT_FROZEN_CONSENSUS_VALUES_CHANGED")
+        self.safe(report)
+
+    def test_43_original_pre_event_consensus_still_computes_research_only(self):
+        report = compare(actual=self.audit(), td_snapshot=td(),
+                         te_snapshot=te())
+        self.assertEqual(report["state"],
+                         "LAB_PPI_RESEARCH_SURPRISE_ONLY_UNATTESTED")
+        self.assertEqual(report["headline_vs_td_pre_event_diff_pp"], "0.1")
+        self.assertEqual(report["core_vs_td_pre_event_diff_pp"], "-0.1")
+        self.safe(report)
+
     def test_17_bad_source_actual_not_accepted_to_join(self):
         r=compare(actual=self.audit(body=raw(include_table=False)),td_snapshot=td(),te_snapshot=te())
         self.assertEqual(r['reason'],'NO_ACCEPTED_FIRST_PRINT_CANDIDATE')
