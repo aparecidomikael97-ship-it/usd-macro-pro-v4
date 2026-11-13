@@ -124,6 +124,47 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
         self.assertTrue(r["research_only"])
         self.assertFalse(r["range_precommitted_by_external_witness"])
 
+    def test_weekly_native_w1_cannot_join_even_if_price_bps_match(self):
+        for bad in ("W1", "D1", "native_true", "missing", "wrong_end"):
+            with self.subTest(bad=bad):
+                r = roster(horizon="W1", days=(8,))
+                first = r["windows"][0]["price_movements_documentary_by_pair"][
+                    OFFICIAL_PAIRS[0]]
+                if bad in ("W1", "D1"):
+                    first["source_timeframe_claim"] = bad
+                elif bad == "native_true":
+                    first["native_mt5_d1_or_w1_used_as_endpoint"] = True
+                elif bad == "missing":
+                    first.pop("expected_last_m15_open_utc")
+                else:
+                    first["expected_last_m15_open_utc"] = (
+                        datetime.fromisoformat(first["expected_last_m15_open_utc"])
+                        + timedelta(hours=2)).isoformat()
+                result = audit(r=r, c=claims(r))
+                self.safe(result)
+                self.assertEqual(
+                    result["reason"],
+                    "M15_FROZEN_NY17_ENDPOINT_OR_SOURCE_CLAIM_MISSING")
+                self.assertEqual(result["rows_documentary"], [])
+
+    def test_daily_native_d1_and_early_start_cannot_join(self):
+        for bad in ("D1", "wrong_start"):
+            with self.subTest(bad=bad):
+                r = roster()
+                first = r["windows"][0]["price_movements_documentary_by_pair"][
+                    OFFICIAL_PAIRS[-1]]
+                if bad == "D1":
+                    first["source_timeframe_claim"] = "D1"
+                else:
+                    first["expected_first_m15_open_utc"] = (
+                        datetime.fromisoformat(first["expected_first_m15_open_utc"])
+                        + timedelta(minutes=15)).isoformat()
+                result = audit(r=r, c=claims(r))
+                self.safe(result)
+                self.assertEqual(
+                    result["reason"],
+                    "M15_FROZEN_NY17_ENDPOINT_OR_SOURCE_CLAIM_MISSING")
+
     def test_full_28_pair_one_day_claims_join_without_accuracy(self):
         r = audit()
         self.assertEqual(r["state"],
