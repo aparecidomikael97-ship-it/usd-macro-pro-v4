@@ -248,7 +248,7 @@ class Issue1884PrestartCensusTests(unittest.TestCase):
         self.assertEqual(r["reason"],"COMMENT_TIMESTAMP_CLAIMS_INCOHERENT")
 
     def test_bad_comments_or_clock_block_without_losing_governance(self):
-        for cs in (None,{"body":"bad"},[None],[{"id":1,"body":None}]):
+        for cs in (42,{"body":"bad"},[None],[{"id":1,"body":None}]):
             r=self.check(comments=cs)
             self.safe(r)
             self.assertEqual(r["state"],"LAB_ISSUE1884_ANCHOR_CENSUS_BLOCKED")
