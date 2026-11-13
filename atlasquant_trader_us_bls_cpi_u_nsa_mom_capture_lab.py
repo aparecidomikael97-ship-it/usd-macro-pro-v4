@@ -42,6 +42,13 @@ RELEASE_UTC = datetime(2026, 11, 10, 13, 30, tzinfo=timezone.utc)
 OFFICIAL_MISSING_BASE_EXPLANATION = (
     "OCT2025_CPIU_INDEX_UNAVAILABLE_DUE_TO_2025_APPROPRIATIONS_LAPSE"
 )
+# Independently researched from BLS archived Oct 2026 first release,
+# Table 1 "All items" (unadjusted index), Nov 10 2026.
+# An index comparison proves numerical CONSISTENCY with this page only.
+# It cannot prove the HTTP bytes' origin, receipt first-seen, or vintage.
+ARCHIVED_RELEASE_URL = "https://www.bls.gov/news.release/archives/cpi_11102026.htm"
+ARCHIVED_SEP2026_CPI_U_NSA_INDEX = Decimal("336.940")
+ARCHIVED_OCT2026_CPI_U_NSA_INDEX = Decimal("337.511")
 MAX_BYTES = 200_000
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _VAL = re.compile(r"(?:0|[1-9][0-9]{0,3})(?:\.[0-9]{1,3})?\Z")
@@ -103,6 +110,13 @@ def _base(reason: str) -> dict[str, Any]:
         "calculated_mom_nsa_pct_documentary": None,
         "calculated_yoy_pct_documentary": None,
         "calculation_is_not_official_bls_published_mom": True,
+        "bls_archived_first_print_reference_url": ARCHIVED_RELEASE_URL,
+        "bls_archived_sep2026_cpi_u_nsa_index": str(
+            ARCHIVED_SEP2026_CPI_U_NSA_INDEX),
+        "bls_archived_oct2026_cpi_u_nsa_index": str(
+            ARCHIVED_OCT2026_CPI_U_NSA_INDEX),
+        "local_api_index_levels_match_bls_archived_first_print": False,
+        "release_index_crosscheck_not_issuer_or_first_seen_authentication": True,
         "raw_body_sha256": None,
         "archive_directory_basename": None,
         "raw_original_bytes_retained_and_replayed_local_only": False,
@@ -201,11 +215,17 @@ def _parse_original(body: Any, now: Any) -> dict[str, Any] | None:
                * Decimal(100)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
         if not mom.is_finite() or not -100 < mom < 100:
             return None
+        matches_first_print_archive = (
+            values[TARGET] == ARCHIVED_OCT2026_CPI_U_NSA_INDEX
+            and values[PREVIOUS] == ARCHIVED_SEP2026_CPI_U_NSA_INDEX
+        )
         return {
             "index_target_level_documentary": format(values[TARGET], "f"),
             "index_base_level_documentary": format(values[PREVIOUS], "f"),
             "calculated_mom_nsa_pct_documentary": format(mom, "f"),
             "calculated_yoy_pct_documentary": None,
+            "local_api_index_levels_match_bls_archived_first_print":
+                matches_first_print_archive,
         }
     except (ValueError, UnicodeError, OverflowError, TypeError,
             InvalidOperation, RecursionError, ZeroDivisionError):
