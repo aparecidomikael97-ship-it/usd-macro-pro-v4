@@ -26,10 +26,10 @@ from atlasquant_trader_fx28_policy_ppi_unified_readiness_lab import (
 from atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
     capture_oct2026_bls_original_once_lab as capture,
 )
-from atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab import (
+from atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab import (
     capture_bls_cpi_u_nsa_original_once_lab as cpi_capture,
 )
-from test_atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab import (
+from test_atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab import (
     Response as CpiResponse,
 )
 from test_atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
@@ -387,15 +387,15 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         self.assertEqual(r["locally_replayed_policy_issuer_count"],0)
         self.assertEqual(r["locally_replayed_ppi_document_count"],0)
         self.assertEqual(r["locally_replayed_cpi_u_nsa_document_count"],1)
-        self.assertEqual(r["cpi_u_nsa_oct2026_yoy_pct_documentary"],"3.185")
+        self.assertEqual(r["cpi_u_nsa_oct2026_mom_pct_documentary"],"0.310")
         self.assertEqual(r["distinct_original_document_sha_claim_count"],1)
         self.assertEqual(r["factor_slots_with_any_relevant_local_document"],1)
         us=next(x for x in r["factor_slots"]
                 if x["currency"]=="USD" and x["category"]=="inflation_impact")
         self.assertEqual(us["documentary_source_kind"],
-                         "BLS_CPI_U_NSA_OCT2026_YOY_LOCAL_CALCULATION_ONLY")
+                         "BLS_CPI_U_NSA_OCT2026_MOM_LOCAL_CALCULATION_ONLY")
         self.assertEqual(us["missing_model_input_reason"],
-                         "BLS_CPI_U_NSA_YOY_NOT_PRE_EVENT_CONSENSUS_OR_USD_IMPACT")
+                         "BLS_CPI_U_NSA_MOM_NOT_PRE_EVENT_CONSENSUS_OR_USD_IMPACT")
         self.assertFalse(us["source_semantics_support_signed_factor"])
         self.assertIsNone(r["calibrated_probability"])
 
@@ -426,7 +426,7 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         self.assertEqual(us(a)["documentary_source_kind"],
                          "BLS_PPI_OCT2026_ACTUAL_ONLY")
         self.assertEqual(us(b)["documentary_source_kind"],
-                         "BLS_CPI_U_NSA_OCT2026_YOY_LOCAL_CALCULATION_ONLY")
+                         "BLS_CPI_U_NSA_OCT2026_MOM_LOCAL_CALCULATION_ONLY")
         self.assertNotEqual(us(a)["documentary_source_sha256_local_claim"],
                             us(b)["documentary_source_sha256_local_claim"])
         self.assertEqual(b["locally_replayed_ppi_document_count"],1)
@@ -446,7 +446,7 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
                  if s["currency"]=="USD" and s["category"]=="inflation_impact")
         self.assertEqual(usd["documentary_source_kind"],
                          "BLS_PPI_OCT2026_ACTUAL_ONLY")
-        self.assertIsNone(report["cpi_u_nsa_oct2026_yoy_pct_documentary"])
+        self.assertIsNone(report["cpi_u_nsa_oct2026_mom_pct_documentary"])
 
     def test_23_cpi_archive_bad_name_or_future_receipt_remains_no_go(self):
         cpi=self.cpi()
