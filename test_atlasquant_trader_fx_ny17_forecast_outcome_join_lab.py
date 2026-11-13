@@ -188,12 +188,12 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
                           abstain_reason="UNVERIFIED_SOURCE")
         data[1] = replace(data[1], direction_claim="DOWN")
         price["windows"][0]["price_movements_documentary_by_pair"][
-            OFFICIAL_PAIRS[2]] = {
+            OFFICIAL_PAIRS[2]].update({
             "start_open_documentary": "1.0000",
             "end_close_documentary": "1.0000",
             "change_bps_documentary": "0.0000",
             "direction_documentary": "FLAT",
-        }
+        })
         report = audit(price, data)
         self.assertEqual(report["declared_abstentions"], 1)
         self.assertEqual(report["directional_claims"], 27)
@@ -275,12 +275,12 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
     def test_extreme_price_ratio_is_blocked_without_decimal_exception(self):
         price = roster()
         price["windows"][0]["price_movements_documentary_by_pair"][
-            OFFICIAL_PAIRS[5]] = {
+            OFFICIAL_PAIRS[5]].update({
                 "start_open_documentary": "0.000000000001",
                 "end_close_documentary": "999999999.999999",
                 "change_bps_documentary": "10.0000",
                 "direction_documentary": "UP",
-            }
+            })
         report = audit(price)
         self.assertEqual(report["state"],
                          "LAB_NY17_FORECAST_OUTCOME_JOIN_BLOCKED")
