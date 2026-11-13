@@ -245,19 +245,14 @@ def inspect_fx28_32_factor_source_admission_lab(
                 reason = ("POLICY_RATE_IS_NOT_FORWARD_RATE_EXPECTATIONS"
                           if has_rate else "NO_LOCAL_POLICY_RATE_SOURCE")
                 kind = "POLICY_RATE_ACTUAL_NOT_EXPECTATIONS" if has_rate else None
-                recent = currency in source[
-                    "policy_source_byte_sha_lineage_by_currency"] and (
-                        currency in source.get(
-                            "policy_source_byte_sha_lineage_by_currency", {}))
             elif category == "inflation_impact":
                 documentary_sha = ppi if currency == "USD" else None
                 reason = ("BLS_PPI_ACTUAL_NOT_CPI_SURPRISE_OR_CURRENCY_EFFECT"
                           if currency == "USD" and ppi is not None else
                           "NO_CURRENCY_CPI_SURPRISE_WITH_PRE_EVENT_CONSENSUS")
                 kind = "BLS_PPI_OCT2026_ACTUAL_ONLY" if documentary_sha else None
-                recent = False
             elif category == "activity_impact":
-                documentary_sha, kind, recent = None, None, False
+                documentary_sha, kind = None, None
                 reason = "NO_ACTIVITY_SURPRISE_WITH_INDEPENDENT_PIT_CONSENSUS"
             else:
                 documentary_sha, kind, recent = None, None, False
