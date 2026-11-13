@@ -28,8 +28,11 @@ from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     ClaimedPostReleaseHTTP, MAX_BYTES, OFFICIAL_URL, RELEASE_UTC,
     inspect_ppi_oct2026_first_print_lab,
 )
+from atlasquant_trader_us_ppi_oct2026_macro_context_lab import (
+    _extract_ex_trade_actual_from_same_table1,
+)
 
-SCHEMA = "ATLASQUANT_TRADER_US_PPI_OCT2026_BLS_ORIGINAL_CAPTURE_LAB_V1"
+SCHEMA = "ATLASQUANT_TRADER_US_PPI_OCT2026_BLS_ORIGINAL_CAPTURE_LAB_V2"
 RECEIPT_SCHEMA = "ATLASQUANT_US_PPI_OCT2026_BLS_LOCAL_RECEIPT_V1"
 _ACCEPTED = "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED"
 _ARCHIVE = re.compile(r"US_BLS_PPI_OCT2026_(20[0-9]{6}T[0-9]{6}Z)_([0-9a-f]{12})\Z")
@@ -82,6 +85,11 @@ def _base(reason: str) -> dict[str, Any]:
         "archive_directory_basename": None,
         "raw_document_bytes": 0,
         "raw_document_sha256": None,
+        "documentary_series": [],
+        "documentary_series_count": 0,
+        "actuals_reconstructed_from_exact_local_bytes": False,
+        "ppi_monthly_core_and_ex_trade_are_distinct_series": True,
+        "consensus_pretended_from_bls_actual": False,
         "raw_bytes_and_receipt_replayed": False,
         "source_original_locally_retained_claim_only": False,
         "directory_created_once": False,
@@ -188,7 +196,12 @@ def _check_bytes(body: Any, receipt: Any, asof: Any) -> dict[str, Any] | None:
             or report.get("trade_authorized") is not False
             or report.get("publishable") is not False):
         return None
-    return report
+    # FD/49116 is a SEPARATE ex-trade-services core, NOT FD/49104.
+    # Require the unique original Table-1 row before any disk write.
+    ex_trade = _extract_ex_trade_actual_from_same_table1(body)
+    if ex_trade is None or not ex_trade.is_finite():
+        return None
+    return {**report, "_ex_trade_only_for_local_replay": str(ex_trade)}
 
 
 def replay_oct2026_bls_original_capture_lab(
@@ -231,12 +244,42 @@ def replay_oct2026_bls_original_capture_lab(
         report = _check_bytes(body, meta, observed_at_utc)
         if report is None:
             return out
+        # Source-bound values are read from the VERIFIED local original,
+        # never from a caller-supplied dict or the journalist consensus.
+        # This is documentary post-release data, not an impact score.
+        parsed = (
+            ("4", "Final demand",
+             report["headline_final_demand_sa_mom_pct_body_claim"]),
+            ("49104", "Final demand less foods and energy",
+             report["core_ex_food_energy_sa_mom_pct_body_claim"]),
+            ("49116", "Final demand less foods, energy, and trade services",
+             report["_ex_trade_only_for_local_replay"]),
+        )
+        series = [{
+            "issuer": "BLS", "country": "US",
+            "series_label": label, "fd_commodity_code": code,
+            "reference_period": "2026-10",
+            "comparison_period": "2026-09",
+            "change_type": "MONTH_OVER_MONTH",
+            "seasonal_adjustment": "SA",
+            "unit": "PERCENT_CHANGE",
+            "actual_pct_local_documentary_claim": value,
+            "actual_body_sha256": sha256(body).hexdigest(),
+            "pre_event_consensus_pct": None,
+            "surprise_percentage_points": None,
+            "economic_impact_points": None,
+            "issuer_first_seen_independently_attested": False,
+            "pre_event_consensus_independently_attested": False,
+        } for code, label, value in parsed]
         out.update({
             "state": "LAB_US_PPI_OCT2026_BLS_RAW_BYTES_REPLAYED_LOCAL_ONLY_NO_GO",
             "reason": "RAW_BLS_CANDIDATE_DOCUMENT_WITH_LOCAL_SHA_NOT_FIRST_SEEN",
             "archive_directory_basename": archive_basename,
             "raw_document_bytes": len(body),
             "raw_document_sha256": sha256(body).hexdigest(),
+            "documentary_series": series,
+            "documentary_series_count": len(series),
+            "actuals_reconstructed_from_exact_local_bytes": True,
             "raw_bytes_and_receipt_replayed": True,
             "source_original_locally_retained_claim_only": True,
             "ppi_can_feed_research_only": True,
