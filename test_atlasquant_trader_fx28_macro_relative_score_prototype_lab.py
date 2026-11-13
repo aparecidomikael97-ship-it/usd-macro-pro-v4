@@ -250,5 +250,71 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                 self.assertFalse(r["prospective_forecast_witnessed"])
 
 
+
+    def test_18_same_news_root_usable_for_usd_and_eur_without_double_count(self):
+        factors=samples(values={"USD":70,"EUR":-20})
+        usd=next(x for x in factors
+                 if x.currency=="USD" and x.category=="inflation_impact")
+        index=next(i for i,x in enumerate(factors)
+                   if x.currency=="EUR" and x.category=="inflation_impact")
+        factors[index]=replace(factors[index], event_root_id=usd.event_root_id)
+        out=self.execute(inputs=factors)
+        self.safe(out)
+        self.assertEqual(out["state"],"LAB_FX28_HYPOTHETICAL_MACRO_SCORE_COHERENT_NO_GO")
+        self.assertEqual(out["distinct_root_catalyst_claim_count"],31)
+        self.assertEqual(out["shared_event_root_ids"],[usd.event_root_id])
+        self.assertEqual(out["currency_score_claims_reconciled"],8)
+        self.assertIsNone(out["calibrated_probability"])
+
+    def test_19_shared_root_conflicting_sha_is_not_same_document(self):
+        factors=samples()
+        usd=next(x for x in factors
+                 if x.currency=="USD" and x.category=="inflation_impact")
+        index=next(i for i,x in enumerate(factors)
+                   if x.currency=="EUR" and x.category=="inflation_impact")
+        factors[index]=replace(factors[index], event_root_id=usd.event_root_id,
+                               source_sha256_claim="b"*64)
+        out=self.blocked(inputs=factors)
+        self.assertEqual(out["reason"],"REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
+
+    def test_20_same_root_cross_category_rejected_not_independent(self):
+        factors=samples()
+        usd=next(x for x in factors
+                 if x.currency=="USD" and x.category=="inflation_impact")
+        index=next(i for i,x in enumerate(factors)
+                   if x.currency=="EUR" and x.category=="activity_impact")
+        factors[index]=replace(factors[index],event_root_id=usd.event_root_id)
+        out=self.blocked(inputs=factors)
+        self.assertEqual(out["reason"],"REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
+
+    def test_21_shared_root_wrong_publication_or_capture_is_blocked(self):
+        for field in ("event_published_at_utc","source_locally_captured_at_utc"):
+            with self.subTest(field=field):
+                factors=samples()
+                usd=next(x for x in factors
+                         if x.currency=="USD" and x.category=="inflation_impact")
+                index=next(i for i,x in enumerate(factors)
+                           if x.currency=="EUR" and x.category=="inflation_impact")
+                factors[index]=replace(
+                    factors[index],event_root_id=usd.event_root_id,
+                    **{field:getattr(usd,field)-timedelta(seconds=1)})
+                out=self.blocked(inputs=factors)
+                self.assertEqual(out["reason"],"REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
+
+    def test_22_shared_root_order_independent_without_false_accuracy(self):
+        factors=samples(values={"USD":55,"EUR":-40})
+        usd=next(x for x in factors
+                 if x.currency=="USD" and x.category=="inflation_impact")
+        index=next(i for i,x in enumerate(factors)
+                   if x.currency=="EUR" and x.category=="inflation_impact")
+        factors[index]=replace(factors[index],event_root_id=usd.event_root_id)
+        x=self.execute(inputs=factors)
+        y=self.execute(inputs=list(reversed(factors)))
+        self.safe(x);self.safe(y)
+        self.assertEqual(x,y)
+        self.assertEqual(x["distinct_root_catalyst_claim_count"],31)
+        self.assertFalse(x["pair_claims_are_independent_economic_events"])
+
+
 if __name__=="__main__":
     unittest.main()
