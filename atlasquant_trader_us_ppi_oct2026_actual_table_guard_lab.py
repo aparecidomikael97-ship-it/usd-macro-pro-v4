@@ -14,6 +14,14 @@ from html.parser import HTMLParser
 import re
 from typing import Any
 
+# These values and digests were frozen in the independent pre-event PPI
+# reaction contract. Do not allow caller-provided "consensus snapshots" to
+# redefine the benchmark merely by reusing the same SHA claim.
+from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
+    TD_PRE_EVENT_HTML_SHA256, TE_PRE_EVENT_HTML_SHA256,
+    PRE_EVENT_HEADLINE_CONSENSUS_MOM, PRE_EVENT_CORE_CONSENSUS_MOM,
+)
+
 SCHEMA = "ATLASQUANT_TRADER_US_PPI_OCT2026_ACTUAL_TABLE_GUARD_LAB_V1"
 OFFICIAL_URL = "https://www.bls.gov/news.release/archives/ppi_11132026.htm"
 OFFICIAL_SCHEDULE = "https://www.bls.gov/schedule/news_release/ppi.htm"
@@ -447,9 +455,9 @@ def compare_ppi_actual_to_frozen_consensus_lab(*, actual: Any,
         return _empty("MISSING_PRE_EVENT_SNAPSHOTS")
     expected = (
         (td_snapshot, "LAB_PRE_EVENT_PPI_CONSENSUS_ARCHIVED_LOCAL_NO_TRADE",
-         "source_body_sha256", "5f9d9eb128e5a3763ec6a3081bee7ba8c248a665a9d50e0ee132e9cbe037a42a"),
+         "source_body_sha256", TD_PRE_EVENT_HTML_SHA256),
         (te_snapshot, "LAB_TE_PRE_EVENT_CONSENSUS_AND_OWN_FORECAST_DISTINGUISHED",
-         "source_sha256", "175c163514590db8e2ddd651f0c9865bd2eed298211f92072549233f670e23c0"),
+         "source_sha256", TE_PRE_EVENT_HTML_SHA256),
     )
     for item, state, field, digest in expected:
         if item.get("state") != state or item.get(field) != digest:
@@ -464,6 +472,13 @@ def compare_ppi_actual_to_frozen_consensus_lab(*, actual: Any,
         c_actual = _decimal(actual["core_ex_food_energy_sa_mom_pct_body_claim"])
         if None in (h_consensus, c_consensus, h_actual, c_actual):
             return _empty("PPI_METRIC_NUMBER_INVALID")
+        # Both sources can be rewritten to the same false "consensus" while
+        # keeping their self-asserted SHA fields unchanged. Compare against
+        # the independent module's frozen pre-event numbers, not just against
+        # each other. This guards research arithmetic, NOT source provenance.
+        if (h_consensus != Decimal(PRE_EVENT_HEADLINE_CONSENSUS_MOM)
+                or c_consensus != Decimal(PRE_EVENT_CORE_CONSENSUS_MOM)):
+            return _empty("PRE_EVENT_FROZEN_CONSENSUS_VALUES_CHANGED")
     except (KeyError, TypeError, InvalidOperation):
         return _empty("PPI_METRIC_FIELD_MISSING_OR_INVALID")
     out = _empty("ARITHMETIC_DOCUMENTARY_NOT_DIRECTION_OR_PROBABILITY",
