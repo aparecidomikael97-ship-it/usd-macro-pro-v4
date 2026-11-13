@@ -19,7 +19,7 @@ import json
 import os
 from typing import Any
 
-from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
+from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     CAMPAIGN_ID, CALENDAR_ISSUE, EXPECTED_PAIR_HORIZON_SLOTS,
     FROZEN_START_UTC, FROZEN_END_UTC, _nominal_windows,
@@ -135,6 +135,12 @@ def _trusted_factor_audit(r: Any) -> bool:
             or not 0 <= counts[3] <= 10
             or not 0 <= counts[4] <= 9):
         return False
+    if (counts[4] != counts[0] + int(counts[1] > 0 or counts[2] > 0)
+            or counts[3] > sum(counts[:3])
+            or (counts[2] == 1 and
+                (r.get("cpi_reference_archive_reconciled_with_local_api_levels") is not True
+                 or r.get("cpi_local_replay_original_but_archived_index_levels_disagree") is not False))):
+        return False
     factors, pairs = r.get("factor_slots"), r.get("pairs")
     if type(factors) is not list or type(pairs) is not list:
         return False
@@ -157,6 +163,8 @@ def _trusted_factor_audit(r: Any) -> bool:
         return False
     for i, row in enumerate(pairs):
         if (type(row) is not dict or row.get("pair") != OFFICIAL_PAIRS[i]
+                or row.get("base_currency") != split_pair(row["pair"])[0]
+                or row.get("quote_currency") != split_pair(row["pair"])[1]
                 or row.get("forecast_direction") is not None
                 or row.get("calibrated_probability") is not None
                 or row.get("trade_authorized") is not False
