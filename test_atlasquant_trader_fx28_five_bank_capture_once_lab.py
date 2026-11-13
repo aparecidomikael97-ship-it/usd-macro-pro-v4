@@ -15,14 +15,21 @@ UTC = timezone.utc
 START = datetime(2026, 11, 13, 15, 50, tzinfo=UTC)
 
 
-def archive(*, checked=(), missing_folder=False):
+def archive(*, checked=(), missing_folder=False, at=None, undated=()):
     good = set(checked)
+    # Fake locally stamped receipts; never issuer-published timestamps.
+    stamp = at if at is not None else "2026-11-13T15:00:00Z"
     return {
         "state": ("LAB_FX28_POLICY_ARCHIVE_PARTIAL_OR_REJECTED_NO_GO"
                   if not missing_folder else "LAB_FX28_POLICY_ARCHIVE_REPLAY_BLOCKED"),
         "reason": ("ARCHIVE_MISSING_REJECTED_OR_NOT_YET_CAPTURED"
                    if not missing_folder else "LOCAL_ISSUER_ARCHIVE_FOLDER_MISSING"),
         "currencies_locally_checked": sorted(good),
+        "currency_archive_status": {
+            c: {"selected_local_capture_utc_claim":
+                (None if c in undated else stamp)}
+            for c in good
+        },
         "pairs_with_both_policy_originals_locally_checked":
             len(good)*(len(good)-1)//2,
     }
@@ -266,6 +273,95 @@ class FivePolicyCollectorTests(unittest.TestCase):
         self.assertEqual(r["https_gets_attempted_or_started"],0)
         self.assertEqual(self.fake.calls,[])
         self.assertEqual(r["state"],"LAB_FX28_FIVE_SOURCE_CAPTURE_LOCAL_REPLAY_ONLY_NO_GO")
+
+    def test_19_stale_but_valid_source_is_not_skipped(self):
+        before=archive(checked=("GBP","JPY"),
+                       at="2026-11-11T15:50:00Z")
+        after=archive(checked=_ORDER)
+        report,_=self.call(before=before,after=after)
+        self.safe(report)
+        self.assertIn("GBP",report["previously_checked_but_stale_or_undated_codes"])
+        self.assertIn("JPY",report["previously_checked_but_stale_or_undated_codes"])
+        self.assertEqual(report["https_gets_attempted_or_started"],5)
+        self.assertIn(("get","GBP"),self.fake.calls)
+        self.assertIn(("get","JPY"),self.fake.calls)
+        self.assertEqual(report["recent_local_capture_claim_count_after_run"],5)
+        self.assertEqual(report["recent_two_source_pair_coverage_after_run"],10)
+
+    def test_20_just_under_24h_can_skip_but_older_cannot(self):
+        before=archive(checked=("GBP",),
+                       at="2026-11-12T15:50:00Z")
+        r,_=self.call(before=before)
+        self.safe(r)
+        self.assertEqual(r["currency_results"]["GBP"],
+                         "SKIPPED_ALREADY_LOCALLY_CHECKED")
+        self.assertNotIn(("get","GBP"),self.fake.calls)
+        self.fake=FakeSteps()
+        old=archive(checked=("GBP",),
+                    at="2026-11-12T15:49:59Z")
+        r,_=self.call(before=old)
+        self.safe(r)
+        self.assertIn(("get","GBP"),self.fake.calls)
+        self.assertIn("GBP",r["previously_checked_but_stale_or_undated_codes"])
+
+    def test_21_missing_local_capture_claim_is_not_fresh(self):
+        before=archive(checked=("CHF",),undated=("CHF",))
+        r,_=self.call(before=before)
+        self.safe(r)
+        self.assertIn(("get","CHF"),self.fake.calls)
+        self.assertIn("CHF",r["previously_checked_but_stale_or_undated_codes"])
+
+    def test_22_future_local_stamp_cannot_trigger_skip(self):
+        before=archive(checked=("NZD",),
+                       at="2026-11-13T16:00:00Z")
+        r,_=self.call(before=before)
+        self.safe(r)
+        self.assertIn(("get","NZD"),self.fake.calls)
+        self.assertEqual(r["https_gets_attempted_or_started"],5)
+
+    def test_23_recent_counts_never_promote_stale_post_run_sources(self):
+        before=archive(checked=_ORDER)
+        after=archive(checked=_ORDER,
+                      at="2026-11-10T15:50:00Z")
+        r,_=self.call(before=before,after=after)
+        self.safe(r)
+        self.assertEqual(r["https_gets_attempted_or_started"],0)
+        self.assertEqual(r["replayed_currency_count_after_run"],5)
+        self.assertEqual(r["recent_local_capture_claim_count_after_run"],0)
+        self.assertEqual(r["recent_two_source_pair_coverage_after_run"],0)
+        self.assertEqual(r["state"],
+                         "LAB_FX28_FIVE_SOURCE_CAPTURE_PARTIAL_OR_BLOCKED_NO_GO")
+        self.assertEqual(r["reason"],
+                         "LOCAL_CAPTURE_FRESHNESS_CLAIM_MISSING_OR_STALE")
+
+    def test_24_partially_recent_after_replay_fails_completion(self):
+        before=archive(checked=_ORDER)
+        after=archive(checked=_ORDER,
+                      undated=("AUD",))
+        r,_=self.call(before=before,after=after)
+        self.safe(r)
+        self.assertEqual(r["recent_local_capture_claim_count_after_run"],4)
+        self.assertEqual(r["recent_two_source_pair_coverage_after_run"],6)
+        self.assertEqual(r["state"],
+                         "LAB_FX28_FIVE_SOURCE_CAPTURE_PARTIAL_OR_BLOCKED_NO_GO")
+        self.assertEqual(r["currency_results"]["AUD"],
+                         "SKIPPED_ALREADY_LOCALLY_CHECKED")
+        self.assertEqual(r["reason"],
+                         "LOCAL_CAPTURE_FRESHNESS_CLAIM_MISSING_OR_STALE")
+
+    def test_25_corrupt_capture_stamp_never_skips_or_falsifies_fresh(self):
+        for bad in ("2026-02-30T15:50:00Z",
+                    "2026-11-13T25:50:00Z",
+                    "2026-11-13T15:50:00",
+                    True,"future","2026-11-13T15:50:00+00:00"):
+            with self.subTest(bad=bad):
+                self.fake=FakeSteps()
+                report,_=self.call(
+                    before=archive(checked=("GBP",),at=bad))
+                self.safe(report)
+                self.assertIn(("get","GBP"),self.fake.calls)
+                self.assertIn(
+                    "GBP",report["previously_checked_but_stale_or_undated_codes"])
 
     def test_18_finish_later_than_preflight_but_before_postclock_is_valid(self):
         self.fake=FakeSteps()
