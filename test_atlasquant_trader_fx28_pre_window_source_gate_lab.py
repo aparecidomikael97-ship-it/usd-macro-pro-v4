@@ -270,7 +270,7 @@ class PreWindowFX28SourceVetoTests(unittest.TestCase):
                 self.assertEqual(r["state"],
                                  "LAB_FX28_PREWINDOW_SOURCE_GATE_BLOCKED_NO_GO")
                 self.assertFalse(r["source_reader_was_called"])
-        for bad in (None,True,42):
+        for bad in (True,42, "relative"):
             with self.subTest(root=bad):
                 r=self.run_it(root=bad)
                 self.safe(r)
