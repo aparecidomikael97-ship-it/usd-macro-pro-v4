@@ -32,6 +32,10 @@ from atlasquant_trader_fx28_policy_local_archive_replay_lab import (
 from atlasquant_trader_fx28_policy_why_wait_matrix_lab import (
     explain_fx28_policy_wait_lab,
 )
+from atlasquant_trader_fx28_source_lineage_lab import (
+    extract_checked_policy_source_lineage_lab,
+    build_pair_source_lineage_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_FX28_28PAIR_SOURCE_READINESS_MANUAL_LAB_V1"
 _MODES = frozenset(("audit", "capture_missing"))
@@ -60,6 +64,9 @@ def _base(reason: str, mode: str | None = None) -> dict[str, Any]:
         "per_pair": [],
         "local_policy_sources_checked_codes": [],
         "local_policy_sources_checked_count": 0,
+        "local_policy_source_lineage_by_currency": {},
+        "local_policy_sources_with_reproducible_byte_hashes": 0,
+        "pairs_with_two_original_source_hashes": 0,
         "local_policy_recent_capture_claim_codes": [],
         "local_policy_recent_capture_claim_count": 0,
         "local_policy_checked_but_stale_or_unstamped_codes": [],
@@ -226,6 +233,10 @@ def inspect_28pair_source_readiness_once_lab(
                 report=report, currency=c, at_utc=now))
     )
     recent_claims = set(recent_claim_codes)
+    # SHA lineage exists ONLY for originals that passed the actual issuer
+    # archive reader. The manifest's local timestamp is NOT publisher PIT.
+    lineage = extract_checked_policy_source_lineage_lab(
+        archive_report=report, inspected_at_utc=now)
     checked_but_stale_or_unstamped = sorted(set(checked)-recent_claims)
     two_recent = sum(
         all(c in recent_claims for c in
@@ -237,6 +248,18 @@ def inspect_28pair_source_readiness_once_lab(
     # policy rates, broker accounts or unverified probability.
     safe_rows = [{
         "pair": row["pair"],
+        "base_policy_original_sha256_local_claim":
+            build_pair_source_lineage_lab(
+                pair=row["pair"], policy_ledger=lineage
+            )["base_policy_original_sha256_local_claim"],
+        "quote_policy_original_sha256_local_claim":
+            build_pair_source_lineage_lab(
+                pair=row["pair"], policy_ledger=lineage
+            )["quote_policy_original_sha256_local_claim"],
+        "complete_policy_pair_source_digest_local_only":
+            build_pair_source_lineage_lab(
+                pair=row["pair"], policy_ledger=lineage
+            )["complete_policy_pair_source_digest_local_only"],
         "base_currency": row["base_currency"],
         "quote_currency": row["quote_currency"],
         "local_policy_source_for_both": row["policy_originals_locally_checked"],
@@ -266,6 +289,13 @@ def inspect_28pair_source_readiness_once_lab(
         "pairs_explained": 28, "per_pair": safe_rows,
         "local_policy_sources_checked_codes": sorted(checked),
         "local_policy_sources_checked_count": len(checked),
+        "local_policy_source_lineage_by_currency": lineage,
+        "local_policy_sources_with_reproducible_byte_hashes": len(lineage),
+        "pairs_with_two_original_source_hashes": sum(
+            build_pair_source_lineage_lab(
+                pair=row["pair"], policy_ledger=lineage
+            )["both_policy_original_hashes_available"]
+            for row in rows),
         "local_policy_recent_capture_claim_codes": recent_claim_codes,
         "local_policy_recent_capture_claim_count": len(recent_claim_codes),
         "local_policy_checked_but_stale_or_unstamped_codes":
