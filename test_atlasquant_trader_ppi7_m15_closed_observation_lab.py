@@ -10,7 +10,9 @@ from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     EVENT_UTC, USD_FX, BASELINE_OPEN_UTC,
 )
 from atlasquant_trader_ppi7_m15_closed_observation_lab import (
-    M15_CLOSE_UTC, observe_ppi7_closed_m15_lab as observe,
+    M15_CLOSE_UTC, H1_CLOSE_UTC, H4_CLOSE_UTC,
+    observe_ppi7_closed_m15_lab as observe,
+    observe_ppi7_closed_horizon_lab as observe_horizon,
 )
 
 TERMINAL = r"C:\Program Files\MetaTrader 5\terminal64.exe"
@@ -68,7 +70,19 @@ class FakeMT5:
 
     def copy_rates_range(self, sym, timeframe, start, end):
         self.calls.append(("copy_rates_range", sym, timeframe, start, end))
-        return deepcopy(self.history[sym])
+        # The real API returns one record per 15-minute bar in the range.
+        # Generate SYNTHETIC intervening bars only when testing H1/H4.
+        rows = deepcopy(self.history[sym])
+        if end > EVENT_UTC:
+            last = rows[-1]
+            current = int(EVENT_UTC.timestamp()) + 900
+            until = int(end.timestamp())
+            while current <= until:
+                row = deepcopy(last)
+                row["time"] = current
+                rows.append(row)
+                current += 900
+        return rows
 
     def shutdown(self):
         self.calls.append(("shutdown",))
@@ -220,6 +234,138 @@ class Ppi7M15OnlyTests(unittest.TestCase):
         r=self.call(when=M15_CLOSE_UTC+timedelta(hours=5))
         self.safe(r)
         self.assertEqual(r["horizon_observed"],"M15_ONLY")
+
+
+    def test_15_h1_before_1430_utc_no_mt5_access(self):
+        for when in (M15_CLOSE_UTC, H1_CLOSE_UTC - timedelta(microseconds=1)):
+            with self.subTest(now=when):
+                report = observe_horizon(
+                    self.api, terminal_path=TERMINAL,
+                    clock=lambda when=when: when, horizon="H1")
+                self.assertEqual(report["reason"], "H1_WINDOW_NOT_YET_CLOSED")
+                self.assertEqual(report["state"], "LAB_WAIT_PPI7_H1_CLOSE")
+                self.assertFalse(report["trade_authorized"])
+                self.assertIsNone(report["usd_normalized_horizon_bps_by_pair"])
+        self.assertEqual(self.api.calls, [])
+
+    def test_16_h1_five_closed_bars_all_seven_without_h4_promotion(self):
+        report = observe_horizon(
+            self.api, terminal_path=TERMINAL, clock=lambda: H1_CLOSE_UTC,
+            horizon="H1")
+        self.assertEqual(report["state"],
+                         "LAB_PPI7_CLOSED_H1_DOCUMENTARY_OBSERVATION_NO_GO")
+        self.assertEqual(report["horizon_observed"], "H1_ONLY")
+        self.assertEqual(report["validated_m15_candles"], 35)
+        self.assertEqual(report["validated_symbols"], 7)
+        self.assertTrue(report["h1_window_closed_and_observed"])
+        self.assertFalse(report["h4_window_closed_and_observed"])
+        self.assertIsNone(report["usd_normalized_m15_bps_by_pair"])
+        self.assertEqual(len(report["usd_normalized_horizon_bps_by_pair"]), 7)
+        self.assertEqual(report["independent_economic_events_observed"], 1)
+        self.assertFalse(report["trade_authorized"])
+        self.assertIsNone(report["calibrated_probability"])
+        self.assertEqual(report["files_written"], 0)
+        self.assertTrue(all(
+            c[4] == H1_CLOSE_UTC - timedelta(minutes=15)
+            for c in self.api.calls if c[0] == "copy_rates_range"
+        ))
+
+    def test_17_h4_only_after_1730_utc_and_exact_17_bars(self):
+        early = observe_horizon(
+            self.api, terminal_path=TERMINAL,
+            clock=lambda: H4_CLOSE_UTC - timedelta(microseconds=1), horizon="H4")
+        self.assertEqual(early["reason"], "H4_WINDOW_NOT_YET_CLOSED")
+        self.assertEqual(self.api.calls, [])
+        report = observe_horizon(
+            self.api, terminal_path=TERMINAL,
+            clock=lambda: H4_CLOSE_UTC, horizon="H4")
+        self.assertEqual(report["state"],
+                         "LAB_PPI7_CLOSED_H4_DOCUMENTARY_OBSERVATION_NO_GO")
+        self.assertEqual(report["horizon_observed"], "H4_ONLY")
+        self.assertEqual(report["validated_m15_candles"], 119)
+        self.assertTrue(report["h4_window_closed_and_observed"])
+        self.assertFalse(report["h1_window_closed_and_observed"])
+        self.assertFalse(report["trade_authorized"])
+        self.assertTrue(all(
+            c[4] == H4_CLOSE_UTC - timedelta(minutes=15)
+            for c in self.api.calls if c[0] == "copy_rates_range"
+        ))
+
+    def test_18_h1_missing_intermediate_candle_blocks_whole_cohort(self):
+        class MissingIntermediate(FakeMT5):
+            def copy_rates_range(self, sym, timeframe, start, end):
+                rows = super().copy_rates_range(sym, timeframe, start, end)
+                if sym == "USDCHF" and end > EVENT_UTC:
+                    rows.pop(2)
+                return rows
+        api = MissingIntermediate()
+        report = observe_horizon(
+            api, terminal_path=TERMINAL,
+            clock=lambda: H1_CLOSE_UTC, horizon="H1")
+        self.assertEqual(report["reason"], "REQUIRE_EXACT_5_M15_CANDLES")
+        self.assertEqual(report["failed_symbol"], "USDCHF")
+        self.assertIsNone(report["usd_normalized_horizon_bps_by_pair"])
+        self.assertEqual(report["independent_economic_events_observed"], 0)
+        self.assertFalse(report["trade_authorized"])
+
+    def test_19_h4_wrong_intermediate_epoch_rejected_not_interpolated(self):
+        class WrongEpoch(FakeMT5):
+            def copy_rates_range(self, sym, timeframe, start, end):
+                rows = super().copy_rates_range(sym, timeframe, start, end)
+                if sym == "EURUSD" and end > H1_CLOSE_UTC:
+                    rows[7]["time"] += 1
+                return rows
+        api = WrongEpoch()
+        report = observe_horizon(
+            api, terminal_path=TERMINAL,
+            clock=lambda: H4_CLOSE_UTC, horizon="H4")
+        self.assertEqual(report["reason"], "M15_EPOCH_DUPLICATE_GAP_OR_WRONG_TIMEZONE")
+        self.assertEqual(report["failed_symbol"], "EURUSD")
+        self.assertIsNone(report["usd_normalized_horizon_bps_by_pair"])
+        self.assertFalse(report["trade_authorized"])
+
+    def test_20_extra_open_candle_after_cutoff_blocks(self):
+        class ExtraBar(FakeMT5):
+            def copy_rates_range(self, sym, timeframe, start, end):
+                rows = super().copy_rates_range(sym, timeframe, start, end)
+                if sym == "USDCAD" and end > EVENT_UTC:
+                    extra = deepcopy(rows[-1])
+                    extra["time"] += 900
+                    rows.append(extra)
+                return rows
+        report = observe_horizon(
+            ExtraBar(), terminal_path=TERMINAL,
+            clock=lambda: H1_CLOSE_UTC, horizon="H1")
+        self.assertEqual(report["reason"], "REQUIRE_EXACT_5_M15_CANDLES")
+        self.assertIsNone(report["usd_normalized_horizon_bps_by_pair"])
+        self.assertFalse(report["trade_authorized"])
+
+    def test_21_unsupported_horizon_never_contacts_broker(self):
+        for horizon in ("M5", "H2", "M1", "H6", "", None, 4):
+            with self.subTest(horizon=horizon):
+                report = observe_horizon(
+                    self.api, terminal_path=TERMINAL,
+                    clock=lambda: H4_CLOSE_UTC, horizon=horizon)
+                self.assertEqual(report["reason"], "UNSUPPORTED_HORIZON")
+                self.assertFalse(report["trade_authorized"])
+        self.assertEqual(self.api.calls, [])
+
+    def test_22_4_hour_report_does_not_auto_enable_trades_or_bias(self):
+        report = observe_horizon(
+            self.api, terminal_path=TERMINAL,
+            clock=lambda: H4_CLOSE_UTC + timedelta(hours=1), horizon="H4")
+        for flag in ("trade_authorized", "publishable", "live_alert_allowed",
+                     "worker_enabled", "scheduler_enabled",
+                     "data_from_terminal_independently_authenticated",
+                     "ppi_release_first_print_independently_authenticated",
+                     "execution_bidask_spread_slippage_verified"):
+            self.assertFalse(report[flag])
+        self.assertIsNone(report["directional_forecast"])
+        self.assertIsNone(report["historical_out_of_sample_accuracy"])
+        self.assertIsNone(report["calibrated_probability"])
+        self.assertEqual(report["operational_bias"], "AGUARDAR")
+        self.assertEqual(report["independent_economic_events_observed"], 1)
+
 
 
 if __name__=="__main__":
