@@ -306,7 +306,7 @@ class BLSCpiUNSAOriginalArchiveTests(unittest.TestCase):
 
     def test_19_default_cli_no_hidden_get(self):
         with patch(
-            "atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab.capture_bls_cpi_u_nsa_original_once_lab"
+            "atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab.capture_bls_cpi_u_nsa_original_once_lab"
         ) as called:
             output=io.StringIO()
             with redirect_stdout(output):
