@@ -613,7 +613,10 @@ class SwissCoverageTests(unittest.TestCase):
         self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 21, "1": 7, "2": 0})
         self.assertFalse(pair(r)["quote_annual_inflation_rate_present"])
         self.assertIn("ANNUAL_RATE_DENOMINATOR_MISSING", pair(r)["comparison_blockers"])
-        self.assert_no_trading(r)
+        self.assertEqual(r["operational_bias"], "AGUARDAR")
+        self.assertIsNone(r["fx_bias"])
+        self.assertFalse(r["trade_authorized"])
+        self.assertFalse(r["publishable"])
 
 if __name__ == "__main__":
     unittest.main()
