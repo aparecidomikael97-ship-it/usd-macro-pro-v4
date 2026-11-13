@@ -265,14 +265,21 @@ def build_g8_numeric_inflation_coverage_lab(
     for symbol in OFFICIAL_PAIRS:
         base, quote = split_pair(symbol)
         b, q = currencies[base], currencies[quote]
-        numeric_sides = int(b["status"] in (OBSERVED, SUPPLIED_TEXT)) + int(
-            q["status"] in (OBSERVED, SUPPLIED_TEXT))
+        # A raw CPI index is not yet an annual CPI rate. In particular,
+        # Oct-2026 US CPI-U lacks the October-2025 all-items denominator.
+        # Count an inflation side ONLY when its annual rate is present.
+        b_rate = b["status"] in (OBSERVED, SUPPLIED_TEXT) and b["rate_yoy_percent_claim"] is not None
+        q_rate = q["status"] in (OBSERVED, SUPPLIED_TEXT) and q["rate_yoy_percent_claim"] is not None
+        numeric_sides = int(b_rate) + int(q_rate)
         counts[numeric_sides] += 1
         blockers = []
         if b["status"] not in (OBSERVED, SUPPLIED_TEXT):
             blockers.append("BASE_INFLATION_DATA_MISSING")
         if q["status"] not in (OBSERVED, SUPPLIED_TEXT):
             blockers.append("QUOTE_INFLATION_DATA_MISSING")
+        if ((b["status"] in (OBSERVED, SUPPLIED_TEXT) and not b_rate)
+                or (q["status"] in (OBSERVED, SUPPLIED_TEXT) and not q_rate)):
+            blockers.append("ANNUAL_RATE_DENOMINATOR_MISSING")
         same_month = None
         same_period = None
         frequencies_aligned = None
@@ -301,6 +308,8 @@ def build_g8_numeric_inflation_coverage_lab(
         pairs.append({
             "pair": symbol, "base": base, "quote": quote,
             "numeric_observation_sides": numeric_sides,
+            "base_annual_inflation_rate_present": bool(b_rate),
+            "quote_annual_inflation_rate_present": bool(q_rate),
             "base_latest_month": b["observation_month"],
             "quote_latest_month": q["observation_month"],
             "base_latest_period": b["observation_period"],
