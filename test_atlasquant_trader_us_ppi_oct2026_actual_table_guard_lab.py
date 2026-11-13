@@ -146,6 +146,62 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.assertEqual(r['headline_final_demand_sa_mom_pct_body_claim'],'-0.4')
         self.safe(r)
 
+    def test_44_official_was_unchanged_october_text_maps_to_zero_not_missing(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"],
+                         "0.0")
+        self.safe(report)
+
+    def test_45_unchanged_statement_must_match_table_zero(self):
+        body = raw(head="0.2", headline_table="0.2").replace(
+            b"increased 0.2 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+    def test_46_conflicting_unchanged_and_increased_headlines_block(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted, but "
+            b"The Producer Price Index for final demand increased 0.0 "
+            b"percent in October, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "HEADLINE_PPI_MONTHLY_TEXT_NOT_EXACTLY_IDENTIFIED")
+        self.safe(report)
+
+    def test_47_unverified_unchanged_wording_in_other_month_rejected(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in September, seasonally adjusted",
+        )
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "HEADLINE_PPI_MONTHLY_TEXT_NOT_EXACTLY_IDENTIFIED")
+        self.safe(report)
+
+    def test_48_zero_change_still_research_only_consensus_difference(self):
+        body = raw(head="0.0", headline_table="0.0").replace(
+            b"increased 0.0 percent in October, seasonally adjusted",
+            b"was unchanged in October, seasonally adjusted",
+        )
+        joined = compare(actual=self.audit(body=body),
+                         td_snapshot=td(), te_snapshot=te())
+        self.assertEqual(joined["state"],
+                         "LAB_PPI_RESEARCH_SURPRISE_ONLY_UNATTESTED")
+        self.assertEqual(joined["headline_vs_td_pre_event_diff_pp"], "-0.4")
+        self.safe(joined)
+
     def test_12_tampering_body_without_hash_detected(self):
         b=raw()
         r=self.audit(body=b+b'X',rec=receipt(b))
