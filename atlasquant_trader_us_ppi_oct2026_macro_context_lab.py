@@ -4,10 +4,13 @@ This bridge re-runs the EXISTING official Table-1 bytes+receipt parser and
 two locked pre-event consensus guards. It does NOT accept standalone caller
 actual numbers, calculated surprises or a supposed 'PASS' dict.
 
-Only two EXACT homogeneous series are accepted here:
+Three distinct exact BLS Table 1 series are accepted:
   - PPI final demand, October 2026, month-on-month, SA
   - PPI final demand less foods and energy, October 2026, MoM, SA
-NOT final demand ex foods/energy/TRADE SERVICES. That is a different series.
+  - PPI final demand less foods, energy AND TRADE SERVICES, Oct 2026, MoM SA
+Only the first two have locked, locally checked consensus documents here.
+The third returns an ACTUAL ONLY; lacking a locally frozen pre-event consensus,
+it never calculates or fabricates an ex-trade surprise or FX impact.
 
 No rate / consensus assumptions are baked in except those frozen by the
 pre-event guard. Event comparisons are in percentage POINTS, not percent
@@ -28,12 +31,13 @@ from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     OFFICIAL_URL, RELEASE_UTC,
     inspect_ppi_oct2026_first_print_lab,
     compare_ppi_actual_to_frozen_consensus_lab,
+    _BlsTables, _oct2026_sa_month_column, _extract_table_value,
 )
 from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     PRE_EVENT_HEADLINE_CONSENSUS_MOM, PRE_EVENT_CORE_CONSENSUS_MOM,
 )
 
-SCHEMA = "ATLASQUANT_TRADER_US_PPI_OCT2026_TYPED_MACRO_CONTEXT_LAB_V1"
+SCHEMA = "ATLASQUANT_TRADER_US_PPI_OCT2026_TYPED_MACRO_CONTEXT_LAB_V2"
 STATE = "LAB_US_PPI_OCT2026_DOCUMENTARY_SURPRISE_CONTEXT_NO_GO"
 
 
@@ -47,6 +51,8 @@ def _base(reason: str) -> dict[str, Any]:
         "reference_period": "2026-10",
         "series": [],
         "headline_core_concordance_claim": None,
+        "ex_trade_consensus_locally_locked": False,
+        "ex_trade_surprise_computed": False,
         "pre_event_consensus_locked_locally": False,
         "actual_raw_html_checked_against_local_sha": False,
         "issuer_source_independently_authenticated": False,
@@ -70,6 +76,42 @@ def _base(reason: str) -> dict[str, Any]:
 def _sign(value: Decimal) -> str:
     return "ABOVE_CONSENSUS" if value > 0 else (
         "BELOW_CONSENSUS" if value < 0 else "AT_CONSENSUS")
+
+
+def _extract_ex_trade_actual_from_same_table1(raw_html: bytes) -> Decimal | None:
+    """Extract FD/49116 from the SAME original BLS bytes, not an alias of 49104.
+
+    The existing first-print guard already authenticated only LOCAL hash and
+    source shape, not issuer origin or first-seen. This is a second strict
+    semantic extraction, not a new network request or provenance witness.
+    """
+    try:
+        decoded = raw_html.decode("utf-8", "surrogateescape")
+        doc = _BlsTables()
+        doc.feed(decoded)
+        doc.close()
+        if (doc._active is not None or doc._row is not None
+                or doc._cell is not None):
+            return None
+        table1 = [
+            (rows, doc.table_layouts[i])
+            for i, (context, rows) in enumerate(doc.tables)
+            if "Table 1." in context and "October 2026" in context
+            and "seasonally adjusted" in context.lower()
+        ]
+        if len(table1) != 1:
+            return None
+        rows, layout = table1[0]
+        header = _oct2026_sa_month_column(layout)
+        if header is None:
+            return None
+        month_col, header_columns = header
+        return _extract_table_value(
+            rows, "Final demand less foods, energy, and trade services",
+            "49116", month_col, header_columns)
+    except (UnicodeError, TypeError, ValueError, OverflowError,
+            RecursionError):
+        return None
 
 
 def inspect_oct2026_us_ppi_macro_context_lab(
@@ -131,6 +173,11 @@ def inspect_oct2026_us_ppi_macro_context_lab(
     except (KeyError, TypeError, ValueError, InvalidOperation, OverflowError):
         out["reason"] = "PPI_VALUE_OR_CAPTURE_CLAIM_INVALID"
         return out
+    ex_trade = _extract_ex_trade_actual_from_same_table1(raw_bls_html)
+    if ex_trade is None or not ex_trade.is_finite():
+        out["reason"] = "EX_TRADE_FD_49116_MONTHLY_SA_SOURCE_MISSING_OR_AMBIGUOUS"
+        return out
+
     signals = (_sign(h_surprise), _sign(c_surprise))
     if signals[0] == signals[1] == "AT_CONSENSUS":
         concordance = "BOTH_AT_CONSENSUS"
@@ -166,6 +213,19 @@ def inspect_oct2026_us_ppi_macro_context_lab(
                 "pre_event_consensus_pct_documentary_claim": str(c_consensus),
                 "surprise_percentage_points": str(c_surprise),
                 "surprise_relative_to_consensus": signals[1],
+                "issuer_first_seen_independently_attested": False,
+            },
+            {
+                "id": "PPI_FINAL_DEMAND_EX_FOOD_ENERGY_TRADE_SERVICES_MOM_SA",
+                "reference_period": "2026-10", "measure": "MOM",
+                "seasonal_adjustment": "SA",
+                "unit": "PERCENT_CHANGE",
+                "bls_final_demand_commodity_code": "49116",
+                "actual_pct_documentary_claim": str(ex_trade),
+                "pre_event_consensus_pct_documentary_claim": None,
+                "surprise_percentage_points": None,
+                "surprise_relative_to_consensus":
+                    "NOT_COMPUTED_NO_LOCALLY_LOCKED_EX_TRADE_CONSENSUS",
                 "issuer_first_seen_independently_attested": False,
             },
         ],
