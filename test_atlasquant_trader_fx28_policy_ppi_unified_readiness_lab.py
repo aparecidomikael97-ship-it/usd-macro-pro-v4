@@ -406,5 +406,103 @@ class Fx28BankAndPPIOfflineBridgeTests(unittest.TestCase):
         self.assertEqual(r["ppi_documentary_series_count"],0)
 
 
+
+    def test_21_blS_public_oct2026_first_print_three_values_reconciled(self):
+        # The mock files themselves remain synthetic. This check uses
+        # independently read PUBLIC BLS 2026-11-13 Table 1 numbers:
+        # FD/4 +0.3, FD/49104 +0.3, FD/49116 +0.5, all MoM SA.
+        self.banks_on_disk(CURRENCIES)
+        folder=self.ppi_on_disk()
+        out=self.run_it(ppi=folder)
+        self.complete(out)
+        self.assertEqual(out["ppi_first_print_reference_url"],
+            "https://www.bls.gov/news.release/archives/ppi_11132026.htm")
+        self.assertEqual(out["ppi_public_first_print_sa_oct2026_pct_by_fd_code"],
+            {"4":"0.3","49104":"0.3","49116":"0.5"})
+        self.assertTrue(out["ppi_local_original_matches_public_first_print_values"])
+        self.assertFalse(out["ppi_local_replay_valid_but_first_print_values_disagree"])
+        self.assertTrue(out["ppi_public_first_print_numeric_crosscheck_not_authentication"])
+        self.assertEqual(out["ppi_documentary_series_count"],3)
+        self.assertEqual(out["ppi_direct_usd_leg_pairs_with_source_replayed"],7)
+        self.assertFalse(out["bls_first_seen_independently_authenticated"])
+        self.assertFalse(out["trade_authorized"])
+
+    def test_22_replayed_syntactically_valid_unofficial_headline_is_quarantined(self):
+        self.banks_on_disk(CURRENCIES)
+        name=self.ppi_on_disk(body=raw(head="0.4",core="0.3",extra="0.5"))
+        out=self.run_it(ppi=name)
+        self.complete(out)
+        self.assertEqual(out["policy_source_documents_locally_checked"],8)
+        self.assertEqual(out["policy_pairs_with_two_originals"],28)
+        self.assertTrue(out["ppi_local_replay_valid_but_first_print_values_disagree"])
+        self.assertFalse(out["ppi_local_original_matches_public_first_print_values"])
+        self.assertEqual(out["ppi_documentary_series_count"],0)
+        self.assertIsNone(out["ppi_source_raw_sha256"])
+        self.assertEqual(out["ppi_direct_usd_leg_pairs_with_source_replayed"],0)
+        self.assertTrue(all(row["ppi_single_document_sha256_in_bundle_if_usd"]
+                            is None for row in out["per_pair"]))
+        self.assertFalse(out["model_calibrated_for_fx28"])
+
+    def test_23_two_core_definitions_are_not_interchangeable(self):
+        self.banks_on_disk(("USD","EUR","CAD"))
+        for headline,core,extra in (
+            ("0.3","0.4","0.5"),    # wrong ex-foods-energy 49104
+            ("0.3","0.3","0.4"),    # wrong ex-trade 49116
+            ("0.4","0.3","0.3"),    # wrong headline + wrong ex-trade
+        ):
+            with self.subTest(values=(headline,core,extra)):
+                ppi=self.ppi_on_disk(
+                    body=raw(head=headline,core=core,extra=extra))
+                r=self.run_it(ppi=ppi)
+                self.complete(r)
+                self.assertTrue(r[
+                    "ppi_local_replay_valid_but_first_print_values_disagree"])
+                self.assertEqual(r["ppi_documentary_series_count"],0)
+                self.assertEqual(r["policy_pairs_with_two_originals"],3)
+                self.assertFalse(r["ppi_can_be_fx28_directional_factor"])
+
+    def test_24_equivalent_decimal_representation_is_not_false_rejection(self):
+        self.banks_on_disk(CURRENCIES)
+        ppi=self.ppi_on_disk(body=raw(
+            head="0.30",core="0.30",extra="0.50"))
+        result=self.run_it(ppi=ppi)
+        self.complete(result)
+        self.assertTrue(result["ppi_local_original_matches_public_first_print_values"])
+        self.assertEqual(result["ppi_documentary_series_count"],3)
+        self.assertEqual(result["ppi_direct_usd_leg_pairs_with_source_replayed"],7)
+        self.assertFalse(result["historical_macro_point_in_time_authenticated"])
+
+    def test_25_missing_ppi_and_stale_banks_never_use_public_values_as_bytes(self):
+        self.banks_on_disk(CURRENCIES)
+        result=self.run_it(at=NOW+timedelta(days=2))
+        self.complete(result)
+        self.assertEqual(result["policy_source_recent_local_receipt_claims"],0)
+        self.assertEqual(result["ppi_source_replay_state"],"NOT_REQUESTED")
+        self.assertFalse(result["ppi_local_original_matches_public_first_print_values"])
+        self.assertEqual(result["ppi_documentary_series_count"],0)
+        self.assertIsNone(result["ppi_source_raw_sha256"])
+        self.assertEqual(result["ppi_direct_usd_leg_pairs_with_source_replayed"],0)
+        self.assertEqual(result["ppi_public_first_print_sa_oct2026_pct_by_fd_code"],
+            {"4":"0.3","49104":"0.3","49116":"0.5"})
+
+    def test_26_seven_usd_legs_share_exactly_one_reconciled_ppi_source(self):
+        self.banks_on_disk(CURRENCIES)
+        ppi=self.ppi_on_disk()
+        r=self.run_it(ppi=ppi)
+        self.complete(r)
+        accepted=[x for x in r["per_pair"]
+                  if x["ppi_direct_usd_issuer_leg_documentary_context_replayed"]]
+        self.assertEqual(len(accepted),7)
+        self.assertEqual({x["ppi_single_document_sha256_in_bundle_if_usd"]
+                          for x in accepted},{r["ppi_source_raw_sha256"]})
+        self.assertFalse(any(x["ppi_counts_as_independent_issuer_catalyst_for_this_pair"]
+                             for x in accepted))
+        self.assertEqual(r["ppi_documentary_series_count"],3)
+        self.assertTrue(all(row["pre_event_consensus_pct"] is None
+                            for row in r["ppi_documentary_series"]))
+        self.assertIsNone(r["economic_impact_points"])
+        self.assertIsNone(r["directional_bias"])
+
+
 if __name__=="__main__":
     unittest.main()
