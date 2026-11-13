@@ -37,6 +37,9 @@ from atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
     SCHEMA as PPI_REPORT_SCHEMA,
     replay_oct2026_bls_original_capture_lab,
 )
+from atlasquant_trader_fx28_source_lineage_lab import (
+    build_pair_source_lineage_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_FX28_POLICY_PPI_UNIFIED_READINESS_LAB_V1"
 _ACCEPTED_POLICY = "LAB_FX28_28PAIR_MANUAL_SOURCE_READINESS_NO_GO"
@@ -76,6 +79,10 @@ def _base(reason: str) -> dict[str, Any]:
         "policy_source_audit_reason": None,
         "policy_source_documents_locally_checked": 0,
         "policy_source_recent_local_receipt_claims": 0,
+        "policy_source_byte_sha_lineage_by_currency": {},
+        "policy_source_originals_with_reproducible_sha_claims": 0,
+        "policy_pairs_with_two_source_digest_claims": 0,
+        "source_hashes_are_local_checksum_not_external_authentication": True,
         "policy_pairs_with_two_originals": 0,
         "policy_pairs_with_two_recent_local_receipt_claims": 0,
         "policy_source_integrity_checked_not_first_seen": True,
@@ -235,6 +242,12 @@ def inspect_fx28_policy_ppi_readiness_lab(
                 policy["local_policy_sources_checked_count"],
             "policy_source_recent_local_receipt_claims":
                 policy["local_policy_recent_capture_claim_count"],
+            "policy_source_byte_sha_lineage_by_currency":
+                policy["local_policy_source_lineage_by_currency"],
+            "policy_source_originals_with_reproducible_sha_claims":
+                policy["local_policy_sources_with_reproducible_byte_hashes"],
+            "policy_pairs_with_two_source_digest_claims":
+                policy["pairs_with_two_original_source_hashes"],
             "policy_pairs_with_two_originals":
                 policy["pairs_with_two_policy_sources_locally_checked"],
             "policy_pairs_with_two_recent_local_receipt_claims":
@@ -282,6 +295,11 @@ def inspect_fx28_policy_ppi_readiness_lab(
                    if raw is not None else [])
         rejected = (raw["rejected_policy_currencies"]
                     if raw is not None else {})
+        origin = build_pair_source_lineage_lab(
+            pair=pair,
+            policy_ledger=out["policy_source_byte_sha_lineage_by_currency"],
+            ppi_original_sha256=out["ppi_source_raw_sha256"] if ppi_ok else None,
+        )
         if not policy_ok:
             reason = "POLICY_ARCHIVE_UNAVAILABLE_OR_UNVERIFIED"
         elif not pair_policy:
@@ -296,6 +314,19 @@ def inspect_fx28_policy_ppi_readiness_lab(
             "quote_currency": quote,
             "two_policy_originals_locally_checked": pair_policy,
             "two_policy_recent_local_receipt_claims": pair_recent,
+            "both_original_policy_sha256_claims_present":
+                origin["both_policy_original_hashes_available"],
+            "policy_pair_evidence_sha256_local_claim":
+                origin["complete_policy_pair_source_digest_local_only"],
+            "pair_full_document_bundle_sha256_local_claim":
+                origin["source_document_bundle_sha256_local_only"],
+            "policy_source_original_base_sha256_local_claim":
+                origin["base_policy_original_sha256_local_claim"],
+            "policy_source_original_quote_sha256_local_claim":
+                origin["quote_policy_original_sha256_local_claim"],
+            "ppi_single_document_sha256_in_bundle_if_usd":
+                origin["direct_usd_ppi_context_sha256_local_claim"],
+            "pair_source_sha_does_not_authenticate_issuer_or_PIT": True,
             "policy_missing_currency_codes": missing,
             "policy_rejected_currency_codes": rejected,
             "ppi_direct_usd_issuer_leg": usd,
