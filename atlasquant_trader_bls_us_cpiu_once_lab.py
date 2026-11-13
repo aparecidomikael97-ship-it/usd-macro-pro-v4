@@ -28,6 +28,10 @@ MAX_BYTES = 128 * 1024
 _MONTH = re.compile(r"M(0[1-9]|1[0-2])$")
 _YEAR = re.compile(r"20[0-9]{2}$")
 _INDEX = re.compile(r"[0-9]{1,4}(?:\.[0-9]{1,4})?$")
+# BLS October 2026 CPI-U all-items YoY is NOT published: no index
+# CUUR0000SA0 for October 2025 after appropriations lapse.
+# Official: https://www.bls.gov/cpi/notices/2026/12m-changes-202610.htm
+KNOWN_NOT_PUBLISHED_CPI_U_ALL_ITEMS_MONTHS = frozenset({"2025-10"})
 
 
 def _blocked(reason: str, *, attempted: bool = False) -> dict[str, Any]:
@@ -48,6 +52,19 @@ def _blocked(reason: str, *, attempted: bool = False) -> dict[str, Any]:
     }
 
 
+def _reject_duplicated_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    checked: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in checked:
+            raise ValueError("DUPLICATED_BLS_JSON_PROPERTY")
+        checked[key] = value
+    return checked
+
+
+def _reject_nonfinite_json(raw: str) -> None:
+    raise ValueError("NONFINITE_BLS_JSON_TOKEN")
+
+
 def parse_current_bls_cpiu_lab(raw: Any, *, observed_at_utc: datetime) -> dict[str, Any]:
     """Pure parser; caller-supplied text is never publisher-authenticated."""
     if (not isinstance(observed_at_utc, datetime)
@@ -57,7 +74,8 @@ def parse_current_bls_cpiu_lab(raw: Any, *, observed_at_utc: datetime) -> dict[s
     if not isinstance(raw, bytes) or not 1 <= len(raw) <= MAX_BYTES:
         return _blocked("INVALID_RESPONSE_BYTES")
     try:
-        obj = json.loads(raw)
+        obj = json.loads(raw, object_pairs_hook=_reject_duplicated_json_keys,
+                         parse_constant=_reject_nonfinite_json)
     except (ValueError, UnicodeDecodeError, TypeError, OverflowError):
         return _blocked("INVALID_JSON")
     if not isinstance(obj, dict) or obj.get("status") != "REQUEST_SUCCEEDED":
@@ -133,6 +151,11 @@ def parse_current_bls_cpiu_lab(raw: Any, *, observed_at_utc: datetime) -> dict[s
                 return _blocked("BLS_MISSING_AVERAGE_OR_LATEST_VALUE")
             missing_months.append(month)
             continue
+        if not is_annual_average and month in KNOWN_NOT_PUBLISHED_CPI_U_ALL_ITEMS_MONTHS:
+            # The target series is CUUR0000SA0. A supplied numeric Oct 2025
+            # value contradicts the BLS notice; reject, even if its SHA
+            # matches a caller-created response. The "-" sentinel above is OK.
+            return _blocked("BLS_OCT2025_CPI_U_ALL_ITEMS_INDEX_NOT_PUBLISHED")
         if is_annual_average:
             # BLS documents M13 as an ANNUAL AVERAGE, not month 13.
             # Never use it as an inflation month or YoY denominator.
@@ -159,6 +182,8 @@ def parse_current_bls_cpiu_lab(raw: Any, *, observed_at_utc: datetime) -> dict[s
     previous = f"{int(recent[:4])-1:04d}-{recent[5:]}"
     comparable = previous in months
     pct = None
+    if recent == "2026-10" and comparable:
+        return _blocked("BLS_OCT2026_ANNUAL_ALL_ITEMS_RATE_NOT_PUBLISHED")
     if comparable:
         latest_index = Decimal(months[recent]["cpiu_index"])
         older_index = Decimal(months[previous]["cpiu_index"])
@@ -184,6 +209,8 @@ def parse_current_bls_cpiu_lab(raw: Any, *, observed_at_utc: datetime) -> dict[s
         "derived_yoy_percent_from_same_month_indices": pct,
         "derived_yoy_not_direct_official_bls_release_claim": True,
         "missing_comparable_month_yields_no_yoy": not comparable,
+        "oct2026_headline_yoy_officially_unavailable": recent == "2026-10",
+        "oct2025_all_items_baseline_must_not_be_invented": True,
         "no_api_release_timestamps_available": True,
         "raw_snapshot_archive_path": None,
     })

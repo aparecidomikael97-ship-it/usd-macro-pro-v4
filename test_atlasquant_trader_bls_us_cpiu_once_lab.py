@@ -303,5 +303,50 @@ class UsBlsCpiuLabTests(unittest.TestCase):
                 self.assertFalse(out["trade_authorized"])
 
 
+
+    def test_october_2025_all_items_numeric_denominator_is_forged_even_if_hash_matches(self):
+        # The issuer has not published CUUR0000SA0 for October 2025.
+        # It is wrong to compute Oct 2026 YoY with an invented monthly index.
+        x = fixture()
+        x["Results"]["series"][0]["data"] = [
+            row(2026, "M10", "342.000", latest=True),
+            row(2026, "M09", "336.940"),
+            row(2025, "M10", "325.000"),
+            row(2025, "M09", "324.800"),
+        ]
+        out = parse(raw(x), observed_at_utc=NOW)
+        self.assertEqual(out["state"], "LAB_BLOCKED")
+        self.assertEqual(out["reason"],
+                         "BLS_OCT2025_CPI_U_ALL_ITEMS_INDEX_NOT_PUBLISHED")
+        self.assertFalse(out["trade_authorized"])
+
+    def test_actual_october_2025_missing_sentinel_leaves_oct2026_yoy_none(self):
+        x = fixture()
+        x["Results"]["series"][0]["data"] = [
+            row(2026, "M10", "342.000", latest=True),
+            row(2026, "M09", "336.940"),
+            row(2025, "M10", "-"),
+            row(2025, "M09", "324.800"),
+        ]
+        out = parse(raw(x), observed_at_utc=NOW)
+        self.assertEqual(out["state"], "LAB_CURRENT_US_BLS_CPIU_INDEX_QUARANTINED")
+        self.assertEqual(out["latest_period"], "2026-10")
+        self.assertIsNone(out["derived_yoy_percent_from_same_month_indices"])
+        self.assertEqual(out["explicit_missing_months_from_api_sentinel"], ["2025-10"])
+        self.assertTrue(out["oct2026_headline_yoy_officially_unavailable"])
+        self.assertTrue(out["missing_comparable_month_yields_no_yoy"])
+        self.assertFalse(out["trade_authorized"])
+
+    def test_duplicate_provider_json_fields_or_nonfinite_json_are_rejected(self):
+        for body in (
+            b'{"status":"REQUEST_SUCCEEDED","status":"REQUEST_FAILED"}',
+            b'{"status":"REQUEST_SUCCEEDED","responseTime":NaN}',
+            b'{"status":"REQUEST_SUCCEEDED","Results":{"series":[{"seriesID":"CUUR0000SA0","data":[{"year":"2026","period":"M09","value":"336.940","value":"999.999"}]}]}}',
+        ):
+            with self.subTest(body=body):
+                out = parse(body, observed_at_utc=NOW)
+                self.assertEqual(out["state"], "LAB_BLOCKED")
+                self.assertEqual(out["reason"], "INVALID_JSON")
+
 if __name__ == "__main__":
     unittest.main()
