@@ -388,11 +388,16 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
     def test_38_implicit_month_missing_or_duplicate_never_fallback_last(self):
         original = bls_implicit_header_october()
         for body in (
-            original.replace(b"Sept. to Oct.", b"Aug. to Sept."),
-            original.replace(b"Aug. to Sept.", b"Sept. to Oct."),
+            original.replace(
+                b"<th>Sept. to<br/>Oct.(p)</th>",
+                b"<th>Aug. to<br/>Sept.(p)</th>"),
+            original.replace(
+                b"<th>Aug. to<br/>Sept.(p)</th>",
+                b"<th>Sept. to<br/>Oct.(p)</th>"),
             original.replace(b"Item<br/>code", b"Unknown<br/>code"),
         ):
             with self.subTest(body=body[:180]):
+                self.assertNotEqual(body, original, "mutation fixture must change")
                 report = self.audit(body=body)
                 self.assertEqual(report["reason"],
                     "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
