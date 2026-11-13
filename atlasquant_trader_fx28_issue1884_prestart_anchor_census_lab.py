@@ -100,7 +100,7 @@ def _base(reason:str)->dict[str,Any]:
         "generic_calendar_or_audit_comments_ignored":0,
         "well_formed_hash_only_anchor_comments":0,
         "future_not_due_pair_slots":0,
-        "due_not_issued_with_independent_witness_pair_slots":0,
+        "due_without_independent_pre_event_witness_pair_slots":0,
         "due_hash_anchor_claim_only_pair_slots":0,
         "future_hash_anchor_claim_only_pair_slots":0,
         "anchor_claims_missing_server_timestamps":0,
@@ -225,7 +225,7 @@ def inspect_fx28_issue1884_prestart_anchor_snapshot_lab(
                 state=("DUE_ANCHOR_CLAIM_ONLY_NO_WITNESS"
                        if is_due else "PRESTART_ANCHOR_CLAIM_ONLY_UNVERIFIED")
             else:
-                state=("DUE_NOT_ISSUED_WITH_INDEPENDENT_WITNESS"
+                state=("DUE_NO_INDEPENDENT_PRE_EVENT_WITNESS"
                        if is_due else "FUTURE_WINDOW_NOT_DUE")
             states.append({
                 "horizon":h,
@@ -244,7 +244,7 @@ def inspect_fx28_issue1884_prestart_anchor_snapshot_lab(
         "state":"LAB_ISSUE1884_672_SLOT_ANCHOR_CENSUS_NO_GO",
         "reason":"HASH_ONLY_COMMENTS_NEVER_INDEPENDENT_PRE_EVENT_FORECAST_PROOF",
         "future_not_due_pair_slots":future,
-        "due_not_issued_with_independent_witness_pair_slots":due,
+        "due_without_independent_pre_event_witness_pair_slots":due,
         "due_hash_anchor_claim_only_pair_slots":due_anchor,
         "future_hash_anchor_claim_only_pair_slots":future_anchor,
         "first_d1_window_state":states[0]["status"],
