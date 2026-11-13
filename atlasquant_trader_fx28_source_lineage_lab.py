@@ -94,7 +94,7 @@ def extract_checked_policy_source_lineage_lab(
         )
         captured = _time(stamp)
         if (type(digest) is not str or _SHA.fullmatch(digest) is None
-                or captured is None or captured > at
+                or digest == "0" * 64 or captured is None or captured > at
                 or type(entry.get("original_file_bytes")) is not int
                 or entry["original_file_bytes"] <= 0):
             continue
@@ -121,7 +121,7 @@ def build_pair_source_lineage_lab(
         "quote_policy_original_sha256_local_claim": None,
         "both_policy_original_hashes_available": False,
         "direct_usd_ppi_context_sha256_local_claim": None,
-        "ppI_shares_one_US_event_across_USD_pairs": True,
+        "ppi_is_one_shared_US_event_across_USD_pairs": True,
         "complete_policy_pair_source_digest_local_only": None,
         "source_document_bundle_sha256_local_only": None,
         "source_bundle_contains_predictive_signal": False,
@@ -144,7 +144,7 @@ def build_pair_source_lineage_lab(
         sha = row.get("source_original_sha256_local_claim")
         stamp = row.get("selected_capture_utc_local_claim")
         if (type(sha) is not str or _SHA.fullmatch(sha) is None
-                or _time(stamp) is None
+                or sha == "0" * 64 or _time(stamp) is None
                 or row.get("origin_pit_authenticated") != "false"):
             return result
         docs.append({"currency":currency, "body_sha256":sha,
