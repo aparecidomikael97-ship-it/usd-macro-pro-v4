@@ -30,7 +30,7 @@ def samples(*, values=None, conflict=None):
                 signed_impact_points=points,
                 event_published_at_utc=BEFORE-timedelta(hours=1),
                 source_locally_captured_at_utc=BEFORE-timedelta(minutes=10),
-                event_root_id=f"EVENT.{currency}.{factor}",
+                event_root_id=f"EVENT.{currency}.{factor.upper()}",
                 source_sha256_claim="a"*64,
             ))
     return claims
