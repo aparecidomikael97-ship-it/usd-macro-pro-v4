@@ -280,5 +280,93 @@ class PpiFirstPrintGuardTests(unittest.TestCase):
         self.assertEqual(r['reason'],'ACTUAL_DOCUMENT_PROVENANCE_CLAIM_INCOMPLETE')
         self.safe(r)
 
+
+    def test_29_bls_like_multilevel_table_header_october_is_resolved(self):
+        # The Sep-2026 official BLS Table 1 has top-level grouped seasonally
+        # adjusted columns and a second row with month-to-month spans.
+        # This is a REPRESENTATIVE synthetic HTML, not original BLS bytes.
+        report = self.audit(body=bls_like_multilevel_october())
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"], "0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_30_header_with_trailing_nsa_cannot_relabel_october_sa_value(self):
+        html = bls_like_multilevel_october().decode("utf-8")
+        html = html.replace(
+            '<th colspan="5">Seasonally adjusted 1-month percent change</th></tr>',
+            '<th colspan="5">Seasonally adjusted 1-month percent change</th>'
+            '<th rowspan="2">Unadjusted annual NSA value</th></tr>')
+        for value in ("0.5", "0.9", "0.2"):
+            html = html.replace('<td>0.4</td><td>' + value + '</td></tr>',
+                                '<td>0.4</td><td>' + value + '</td>'
+                                '<td>9.9</td></tr>')
+        report = self.audit(body=html.encode("utf-8"))
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["headline_final_demand_sa_mom_pct_body_claim"], "0.5")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"], "0.2")
+        self.safe(report)
+
+    def test_31_grouped_october_header_without_sa_parent_abstains(self):
+        body = bls_like_multilevel_october().replace(
+            b"Seasonally adjusted 1-month percent change",
+            b"Unadjusted 12-month percent change")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+        self.safe(report)
+
+    def test_32_multiple_month_labels_or_bad_span_abstains(self):
+        body = bls_like_multilevel_october()
+        duplicate = body.replace(b"<th>Aug. to Sept.</th>",
+                                 b"<th>Sept. to Oct.</th>")
+        for candidate in (duplicate,
+                          body.replace(b'colspan="5"', b'colspan="99"'),
+                          body.replace(b'rowspan="2"', b'rowspan="0"')):
+            with self.subTest(candidate=candidate[:130]):
+                report = self.audit(body=candidate)
+                self.assertEqual(report["state"], "LAB_PPI_FIRST_PRINT_BLOCKED")
+                self.safe(report)
+
+    def test_33_bls_like_header_with_misaligned_data_row_blocks(self):
+        body = bls_like_multilevel_october().replace(
+            b"<td>0.4</td><td>0.5</td></tr>",
+            b"<td>0.5</td></tr>")
+        report = self.audit(body=body)
+        self.assertEqual(report["reason"],
+                         "MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.safe(report)
+
+
+
+def bls_like_multilevel_october():
+    """Synthetic table shaped after BLS Sep-2026 Table 1 header, not BLS data."""
+    html = raw().decode("utf-8")
+    old = ('<table><tr><th>Grouping</th><th>Commodity code</th><th></th>'
+           '<th>Weight</th><th>12-month unadjusted</th><th>Earlier</th>'
+           '<th>Sep to Oct SA</th></tr>')
+    new = (
+        '<table><tr><th rowspan="2">Grouping</th>'
+        '<th colspan="2">Commodity code</th>'
+        '<th rowspan="2">Relative importance Dec. 2025</th>'
+        '<th rowspan="2">Unadjusted 12-month percent change</th>'
+        '<th colspan="5">Seasonally adjusted 1-month percent change</th></tr>'
+        '<tr><th>Group code</th><th>Item code</th>'
+        '<th>May to June</th><th>June to July</th>'
+        '<th>July to Aug.</th><th>Aug. to Sept.</th>'
+        '<th>Sept. to Oct.</th></tr>')
+    if old not in html:
+        raise AssertionError("synthetic header fixture disappeared")
+    html = html.replace(old, new, 1)
+    # Preserve IDs FD/4 and FD/49104; add prior monthly cells for 10 columns.
+    html = html.replace(
+        '<td>100</td><td>n/a</td><td>0.4</td>',
+        '<td>100.000</td><td>4.6</td><td>0.1</td><td>0.2</td>'
+        '<td>0.3</td><td>0.4</td>')
+    return html.encode("utf-8")
+
+
 if __name__ == '__main__':
     unittest.main()
