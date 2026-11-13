@@ -59,6 +59,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
                      "scheduler_enabled", "worker_enabled"):
             self.assertFalse(result[flag], flag)
         self.assertTrue(result["research_only"])
+        self.assertFalse(result["pair_claims_are_independent_economic_events"])
         self.assertEqual(result["new_cost_brl"], 0)
         self.assertEqual(result["file_writes"], 0)
         self.assertEqual(result["http_requests"], 0)
@@ -107,7 +108,7 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
         factors=samples()
         factors[1]=replace(factors[1],event_root_id=factors[0].event_root_id)
         self.assertEqual(self.blocked(inputs=factors)["reason"],
-                         "INVALID_OR_DUPLICATE_FACTOR_CLAIMS")
+                         "REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
 
     def test_04_missing_eighth_currency_factor_blocks_without_filling_zero(self):
         factors=samples()
