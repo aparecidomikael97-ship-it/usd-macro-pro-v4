@@ -277,5 +277,109 @@ class EightBankTrueCodepathEndToEndTests(unittest.TestCase):
         self.assertIn("GBP",report["policy_sources_missing_or_rejected_codes"])
         self.assertEqual(report["pairs_with_two_policy_sources_locally_checked"],21)
 
+
+    def test_16_true_archive_eight_fresh_local_receipt_claims_for_all_pairs(self):
+        self.fixtures(CURRENCIES)
+        report=self.run_it()
+        self.allowed(report)
+        self.assertEqual(report["local_policy_recent_capture_claim_codes"],
+                         sorted(CURRENCIES))
+        self.assertEqual(report["local_policy_recent_capture_claim_count"],8)
+        self.assertEqual(report["pairs_with_two_recent_local_capture_claims"],28)
+        self.assertEqual(report["local_policy_checked_but_stale_or_unstamped_codes"],[])
+        self.assertEqual(report["recent_capture_max_age_hours_claim_only"],24)
+        self.assertTrue(report["recent_capture_is_not_issuer_first_seen_or_current_economic_rate"])
+        self.assertTrue(all(x["both_policy_recent_capture_claims_only"]
+                            for x in report["per_pair"]))
+        self.assertTrue(all(x["source_capture_recency_reason"] ==
+            "BOTH_LOCAL_RECEIPTS_WITHIN_24H_CLAIM_ONLY_NOT_PIT"
+            for x in report["per_pair"]))
+        self.assertFalse(report["first_seen_pit_authenticated"])
+
+    def test_17_three_real_local_receipts_only_three_pairs_recent_claims(self):
+        self.fixtures(CODES)
+        report=self.run_it()
+        self.allowed(report)
+        self.assertEqual(report["local_policy_recent_capture_claim_codes"],
+                         ["CAD","EUR","USD"])
+        self.assertEqual(report["pairs_with_two_recent_local_capture_claims"],3)
+        pairs={x["pair"] for x in report["per_pair"]
+               if x["both_policy_recent_capture_claims_only"]}
+        self.assertEqual(pairs,{"EUR/USD","EUR/CAD","USD/CAD"})
+        self.assertTrue(all(x["why_wait_code"].startswith("POLICY_ORIGINAL")
+                            for x in report["per_pair"]))
+
+    def test_18_stale_historical_documents_never_called_fresh_claims(self):
+        self.fixtures(CURRENCIES)
+        # Clock passes the 24-hour local receipt age. Whether the
+        # issuer-specific parser continues to accept old archives is a
+        # separate, stricter issue; either way fresh=0 is mandatory.
+        later=NOW+timedelta(hours=48)
+        report=self.run_it(clock=lambda:later)
+        self.safe(report)
+        self.assertEqual(report["local_policy_recent_capture_claim_codes"],[])
+        self.assertEqual(report["local_policy_recent_capture_claim_count"],0)
+        self.assertEqual(report["pairs_with_two_recent_local_capture_claims"],0)
+        self.assertTrue(report["source_coverage_is_not_currency_strength"])
+        if report["state"]=="LAB_FX28_28PAIR_MANUAL_SOURCE_READINESS_NO_GO":
+            self.assertEqual(
+                report["local_policy_checked_but_stale_or_unstamped_codes"],
+                report["local_policy_sources_checked_codes"])
+            self.assertTrue(all(
+                not x["both_policy_recent_capture_claims_only"]
+                for x in report["per_pair"]))
+
+    def test_19_corrupting_latest_valid_receipt_drops_new_claim_coverage(self):
+        folder=self.fixtures(CURRENCIES)
+        meta=list(folder.glob("GBP_BOE_*.receipt.json"))
+        self.assertEqual(len(meta),1)
+        meta[0].write_text('{"status":200,"status":200}')
+        report=self.run_it()
+        self.allowed(report)
+        self.assertNotIn("GBP",report["local_policy_recent_capture_claim_codes"])
+        self.assertEqual(report["local_policy_recent_capture_claim_count"],7)
+        self.assertEqual(report["pairs_with_two_recent_local_capture_claims"],21)
+        self.assertEqual(report["pairs_with_two_policy_sources_locally_checked"],21)
+        self.assertTrue(all(
+            not row["both_policy_recent_capture_claims_only"]
+            for row in report["per_pair"] if "GBP" in row["pair"]))
+
+    def test_20_default_cli_real_3bank_files_exposes_recency_without_rates(self):
+        self.fixtures(CODES)
+        with patch.dict("os.environ",{"LOCALAPPDATA":self.temp.name}):
+            output=io.StringIO()
+            with redirect_stdout(output):
+                exit_code=main(["--audit"])
+        self.assertEqual(exit_code,0)
+        report=json.loads(output.getvalue())
+        self.allowed(report)
+        # Actual CLI clock at runtime is later than fixture clock; enough
+        # for structural checks, but age is the actual current date/time.
+        self.assertEqual(
+            report["local_policy_recent_capture_claim_count"],
+            len(report["local_policy_recent_capture_claim_codes"]))
+        self.assertLessEqual(
+            report["pairs_with_two_recent_local_capture_claims"],
+            report["pairs_with_two_policy_sources_locally_checked"])
+        self.assertTrue(report[
+            "recent_capture_is_not_issuer_first_seen_or_current_economic_rate"])
+        self.assertNotIn("current_live_fx_price",report)
+        self.assertNotIn("policy_rate",report)
+
+    def test_21_empty_archive_recency_cannot_fill_missing_eight_currencies(self):
+        self.fixtures()
+        report=self.run_it()
+        self.allowed(report)
+        self.assertEqual(report["local_policy_recent_capture_claim_codes"],[])
+        self.assertEqual(report["local_policy_checked_but_stale_or_unstamped_codes"],[])
+        self.assertEqual(report["pairs_with_two_recent_local_capture_claims"],0)
+        self.assertTrue(all(
+            not row["both_policy_recent_capture_claims_only"]
+            for row in report["per_pair"]))
+        self.assertTrue(all(row["source_capture_recency_reason"] ==
+            "NO_COMPLETE_TWO_CURRENCY_POLICY_ORIGINALS"
+            for row in report["per_pair"]))
+
+
 if __name__=="__main__":
     unittest.main()
