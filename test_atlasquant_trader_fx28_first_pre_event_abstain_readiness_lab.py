@@ -221,6 +221,21 @@ class FirstAbstainReadinessTests(unittest.TestCase):
                 self.assertEqual(
                     r["reason"], "CANONICAL_28_ABSTAIN_JSON_OR_DIGEST_INVALID")
 
+    def test_nonfinite_or_broken_forecast_json_is_rejected_safely(self):
+        for payload in (
+            '{"payload":NaN}',
+            '{"payload":Infinity}',
+            '{"payload":-Infinity}',
+            '{"pairs":[null]}',
+        ):
+            with self.subTest(payload=payload):
+                reports = deepcopy(self.good)
+                reports["D1"]["canonical_forecast_json_unposted"] = payload
+                r = self.check(reports=reports)
+                self.safety(r)
+                self.assertEqual(
+                    r["reason"], "CANONICAL_28_ABSTAIN_JSON_OR_DIGEST_INVALID")
+
     def test_horizon_swapped_or_first_window_shifted_blocks(self):
         reports = deepcopy(self.good)
         reports["W1"], reports["D1"] = reports["D1"], reports["W1"]
