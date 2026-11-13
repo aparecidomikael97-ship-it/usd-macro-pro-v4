@@ -33,6 +33,9 @@ from atlasquant_trader_fx28_policy_ppi_unified_readiness_lab import (
     SCHEMA as UNIFIED_SCHEMA,
     inspect_fx28_policy_ppi_readiness_lab,
 )
+from atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab import (
+    replay_bls_cpi_u_nsa_original_lab,
+)
 
 SCHEMA = "ATLASQUANT_FX28_SOURCE_BACKED_32_FACTOR_ADMISSION_LAB_V1"
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -74,6 +77,10 @@ def _blocked(reason: str) -> dict[str, Any]:
         "source_audit_reason": None,
         "locally_replayed_policy_issuer_count": 0,
         "locally_replayed_ppi_document_count": 0,
+        "locally_replayed_cpi_u_nsa_document_count": 0,
+        "cpi_u_nsa_oct2026_yoy_pct_documentary": None,
+        "cpi_u_nsa_is_not_pre_event_surprise": True,
+        "cpi_u_nsa_is_not_authenticated_first_print_vintage": True,
         "distinct_original_document_sha_claim_count": 0,
         "factor_slots_with_any_relevant_local_document": 0,
         "factor_slots_with_signed_impact_independently_admissible": 0,
@@ -188,6 +195,7 @@ def _trusted_unified(r: Any) -> bool:
 def inspect_fx28_32_factor_source_admission_lab(
     *, local_appdata: Any, decision_at_utc: Any,
     ppi_archive_basename: Any = None,
+    cpi_archive_basename: Any = None,
     hypothetical_factors: Any = None,
 ) -> dict[str, Any]:
     """Pure caller-side inspection except real read-only LOCAL archive replay."""
@@ -197,6 +205,8 @@ def inspect_fx28_32_factor_source_admission_lab(
             or not local_appdata
             or type(ppi_archive_basename) not in (str, type(None))
             or ppi_archive_basename == ""
+            or type(cpi_archive_basename) not in (str, type(None))
+            or cpi_archive_basename == ""
             or tuple(WEIGHTS) != _CATEGORIES
             or len(CURRENCIES) != 8 or len(OFFICIAL_PAIRS) != 28):
         return out
@@ -226,11 +236,42 @@ def inspect_fx28_32_factor_source_admission_lab(
         return out
     ledger = source["policy_source_byte_sha_lineage_by_currency"]
     ppi = source["ppi_source_raw_sha256"]
+    # The CPI-U official v1 index levels are a distinct US source from PPI.
+    # This is a read-only replay of already captured bytes, never a GET.
+    cpi_report = (
+        replay_bls_cpi_u_nsa_original_lab(
+            local_appdata=local_appdata,
+            archive_basename=cpi_archive_basename,
+            observed_at_utc=now,
+        ) if cpi_archive_basename is not None else None
+    )
+    cpi_ok = (type(cpi_report) is dict
+        and cpi_report.get("state") ==
+            "LAB_US_BLS_CPI_U_NSA_YOY_LOCAL_DOCUMENT_REPLAY_NO_GO"
+        and cpi_report.get("raw_original_bytes_retained_and_replayed_local_only")
+            is True
+        and cpi_report.get("source_first_seen_independently_attested") is False
+        and cpi_report.get("asof_historical_vintage_authenticated") is False
+        and cpi_report.get("independent_pre_release_consensus_authenticated")
+            is False
+        and cpi_report.get("trade_authorized") is False
+        and cpi_report.get("fx28_direction_authorized") is False
+        and cpi_report.get("calibrated_probability") is None
+        and cpi_report.get("series_id") == "CUUR0000SA0"
+        and cpi_report.get("seasonal_adjustment") == "NSA"
+        and cpi_report.get("target_month") == "2026-10"
+        and cpi_report.get("base_month") == "2025-10"
+        and type(cpi_report.get("raw_body_sha256")) is str
+        and _SHA.fullmatch(cpi_report["raw_body_sha256"]) is not None
+        and type(cpi_report.get("calculated_yoy_pct_documentary")) is str)
+    cpi_sha = cpi_report["raw_body_sha256"] if cpi_ok else None
     source_hashes = {
         doc["source_original_sha256_local_claim"] for doc in ledger.values()
     }
     if ppi is not None:
         source_hashes.add(ppi)
+    if cpi_sha is not None:
+        source_hashes.add(cpi_sha)
     slots = []
     matched = 0
     documented = 0
@@ -246,11 +287,19 @@ def inspect_fx28_32_factor_source_admission_lab(
                           if has_rate else "NO_LOCAL_POLICY_RATE_SOURCE")
                 kind = "POLICY_RATE_ACTUAL_NOT_EXPECTATIONS" if has_rate else None
             elif category == "inflation_impact":
-                documentary_sha = ppi if currency == "USD" else None
-                reason = ("BLS_PPI_ACTUAL_NOT_CPI_SURPRISE_OR_CURRENCY_EFFECT"
-                          if currency == "USD" and ppi is not None else
-                          "NO_CURRENCY_CPI_SURPRISE_WITH_PRE_EVENT_CONSENSUS")
-                kind = "BLS_PPI_OCT2026_ACTUAL_ONLY" if documentary_sha else None
+                documentary_sha = (
+                    cpi_sha if currency == "USD" and cpi_sha is not None
+                    else ppi if currency == "USD" else None)
+                reason = (
+                    "BLS_CPI_U_NSA_YOY_NOT_PRE_EVENT_CONSENSUS_OR_USD_IMPACT"
+                    if currency == "USD" and cpi_sha is not None else
+                    "BLS_PPI_ACTUAL_NOT_CPI_SURPRISE_OR_CURRENCY_EFFECT"
+                    if currency == "USD" and ppi is not None else
+                    "NO_CURRENCY_CPI_SURPRISE_WITH_PRE_EVENT_CONSENSUS")
+                kind = (
+                    "BLS_CPI_U_NSA_OCT2026_YOY_LOCAL_CALCULATION_ONLY"
+                    if currency == "USD" and cpi_sha is not None else
+                    "BLS_PPI_OCT2026_ACTUAL_ONLY" if documentary_sha else None)
             elif category == "activity_impact":
                 documentary_sha, kind = None, None
                 reason = "NO_ACTIVITY_SURPRISE_WITH_INDEPENDENT_PIT_CONSENSUS"
@@ -304,6 +353,9 @@ def inspect_fx28_32_factor_source_admission_lab(
         "pairs": rows,
         "locally_replayed_policy_issuer_count": len(ledger),
         "locally_replayed_ppi_document_count": int(ppi is not None),
+        "locally_replayed_cpi_u_nsa_document_count": int(cpi_sha is not None),
+        "cpi_u_nsa_oct2026_yoy_pct_documentary": (
+            cpi_report["calculated_yoy_pct_documentary"] if cpi_ok else None),
         "distinct_original_document_sha_claim_count": len(source_hashes),
         "factor_slots_with_any_relevant_local_document": documented,
         "hypothetical_claims_matching_local_original_sha_only": matched,
