@@ -30,7 +30,7 @@ from atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab import (
     capture_bls_cpi_u_nsa_original_once_lab as cpi_capture,
 )
 from test_atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab import (
-    Response as CpiResponse,
+    Response as CpiResponse, body as cpi_test_json,
 )
 from test_atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
     MockResponse, START, FINISH,
@@ -74,8 +74,14 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         fake.assert_called_once()
         return stored["archive_directory_basename"]
 
-    def cpi(self):
-        transport=Mock(return_value=CpiResponse())
+    def cpi(self,*,first_print_levels=True):
+        # The transport is MOCKED, but accepted observations are grounded
+        # in BLS archived Table 1 Oct 2026 first-print NSA indices.
+        # Alternate 324/323 tests an internally SHA-valid API-like payload
+        # that MUST NOT enter the USD macro evidence slot.
+        body = (cpi_test_json(v2026="337.511",vsep="336.940")
+                if first_print_levels else cpi_test_json())
+        transport=Mock(return_value=CpiResponse(content=body))
         started=NOW-timedelta(minutes=2)
         finished=started+timedelta(seconds=2)
         timer=Mock(side_effect=[started,finished])
@@ -387,7 +393,9 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         self.assertEqual(r["locally_replayed_policy_issuer_count"],0)
         self.assertEqual(r["locally_replayed_ppi_document_count"],0)
         self.assertEqual(r["locally_replayed_cpi_u_nsa_document_count"],1)
-        self.assertEqual(r["cpi_u_nsa_oct2026_mom_pct_documentary"],"0.310")
+        self.assertEqual(r["cpi_u_nsa_oct2026_mom_pct_documentary"],"0.169")
+        self.assertTrue(r["cpi_reference_archive_reconciled_with_local_api_levels"])
+        self.assertFalse(r["cpi_local_replay_original_but_archived_index_levels_disagree"])
         self.assertEqual(r["distinct_original_document_sha_claim_count"],1)
         self.assertEqual(r["factor_slots_with_any_relevant_local_document"],1)
         us=next(x for x in r["factor_slots"]
@@ -476,6 +484,54 @@ class Fx28TrueSourceFactorAdmissionTests(unittest.TestCase):
         self.assertEqual(matched["hypothetical_claims_matching_local_original_sha_only"],1)
         self.assertEqual(matched["factor_slots_with_signed_impact_independently_admissible"],0)
         self.assertFalse(matched["real_directional_forecast_authorized"])
+
+
+
+    def test_25_cpi_local_hash_valid_but_324_323_differs_from_archived_bls(self):
+        # A perfectly internally consistent local HTTP receipt is
+        # insufficient when its CPI first-print levels disagree with BLS.
+        cpi=self.cpi(first_print_levels=False)
+        r=self.run_it(cpi=cpi)
+        self.audited(r)
+        self.assertEqual(r["locally_replayed_cpi_u_nsa_document_count"],0)
+        self.assertFalse(r["cpi_reference_archive_reconciled_with_local_api_levels"])
+        self.assertTrue(r["cpi_local_replay_original_but_archived_index_levels_disagree"])
+        self.assertEqual(r["distinct_original_document_sha_claim_count"],0)
+        self.assertEqual(r["factor_slots_with_any_relevant_local_document"],0)
+        self.assertIsNone(r["cpi_u_nsa_oct2026_mom_pct_documentary"])
+        self.assertEqual(r["factor_slots_with_signed_impact_independently_admissible"],0)
+        self.assertFalse(r["experimental_score_execution_authorized"])
+
+    def test_26_ppi_not_inflated_by_disagreeing_cpi_local_indices(self):
+        ppi=self.ppi()
+        cpi=self.cpi(first_print_levels=False)
+        result=self.run_it(ppi=ppi,cpi=cpi)
+        self.audited(result)
+        self.assertTrue(result["cpi_local_replay_original_but_archived_index_levels_disagree"])
+        self.assertEqual(result["locally_replayed_ppi_document_count"],1)
+        self.assertEqual(result["locally_replayed_cpi_u_nsa_document_count"],0)
+        self.assertEqual(result["distinct_original_document_sha_claim_count"],1)
+        usd=next(x for x in result["factor_slots"]
+                 if x["currency"]=="USD" and x["category"]=="inflation_impact")
+        self.assertEqual(usd["documentary_source_kind"],
+                         "BLS_PPI_OCT2026_ACTUAL_ONLY")
+        self.assertIsNone(usd["signed_impact_points_admitted"])
+
+    def test_27_real_bls_archive_numbers_not_a_calibrated_usd_predictor(self):
+        self.banks(CURRENCIES)
+        ppi=self.ppi()
+        cpi=self.cpi(first_print_levels=True)
+        result=self.run_it(ppi=ppi,cpi=cpi)
+        self.audited(result)
+        self.assertTrue(result["cpi_reference_archive_reconciled_with_local_api_levels"])
+        self.assertFalse(result["issuer_identity_and_first_seen_independently_attested"])
+        self.assertFalse(result["historical_macro_point_in_time_authenticated"])
+        self.assertEqual(result["distinct_original_document_sha_claim_count"],10)
+        self.assertEqual(result["factor_slots_with_any_relevant_local_document"],9)
+        self.assertEqual(result["factor_slots_with_signed_impact_independently_admissible"],0)
+        self.assertIsNone(result["validated_direction_accuracy"])
+        self.assertIsNone(result["calibrated_probability"])
+        self.assertFalse(result["trade_authorized"])
 
 
 if __name__=="__main__":

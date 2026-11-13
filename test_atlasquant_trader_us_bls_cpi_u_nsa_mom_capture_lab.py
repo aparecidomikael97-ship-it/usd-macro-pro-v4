@@ -105,6 +105,12 @@ class BLSCpiUNSAOriginalArchiveTests(unittest.TestCase):
         self.assertTrue(r["calculation_is_not_official_bls_published_mom"])
         self.assertTrue(r["cpi_oct2026_yoy_unavailable_due_to_missing_oct2025"])
         self.assertIsNone(r["calculated_yoy_pct_documentary"])
+        self.assertEqual(
+            r["bls_archived_first_print_reference_url"],
+            "https://www.bls.gov/news.release/archives/cpi_11102026.htm")
+        self.assertEqual(r["bls_archived_sep2026_cpi_u_nsa_index"],"336.940")
+        self.assertEqual(r["bls_archived_oct2026_cpi_u_nsa_index"],"337.511")
+        self.assertTrue(r["release_index_crosscheck_not_issuer_or_first_seen_authentication"])
         self.assertEqual(r["new_cost_brl"],0)
 
     def test_01_default_explicit_optin_required_no_net_no_files(self):
@@ -393,6 +399,62 @@ class BLSCpiUNSAOriginalArchiveTests(unittest.TestCase):
         self.assertEqual(parsed["calculated_mom_nsa_pct_documentary"],"0.169")
         self.assertIsNone(parsed["calculated_yoy_pct_documentary"])
         self.assertNotEqual(parsed["calculated_mom_nsa_pct_documentary"],"0.4")
+
+
+
+    def test_27_valid_json_with_wrong_index_levels_does_not_match_archive(self):
+        source=body()  # 324/323, intentionally synthetic
+        parsed=_parse_original(source,END)
+        self.assertIsNotNone(parsed)
+        self.assertFalse(parsed["local_api_index_levels_match_bls_archived_first_print"])
+        archive=self.call()
+        self.safe(archive)
+        self.assertTrue(archive["raw_original_bytes_retained_and_replayed_local_only"])
+        self.assertFalse(archive["local_api_index_levels_match_bls_archived_first_print"])
+        self.assertEqual(archive["calculated_mom_nsa_pct_documentary"],"0.310")
+        self.assertFalse(archive["source_first_seen_independently_attested"])
+
+    def test_28_public_archived_bls_table1_levels_corroborrate_numbers_only(self):
+        source=body(v2026="337.511",vsep="336.940")
+        transport=Mock(return_value=Response(content=source))
+        report=self.call(get=transport)
+        transport.assert_called_once()
+        self.safe(report)
+        self.assertEqual(report["state"],
+                         "LAB_US_BLS_CPI_U_NSA_MOM_LOCAL_DOCUMENT_REPLAY_NO_GO")
+        self.assertTrue(report["local_api_index_levels_match_bls_archived_first_print"])
+        self.assertEqual(report["index_base_level_documentary"],"336.940")
+        self.assertEqual(report["index_target_level_documentary"],"337.511")
+        self.assertEqual(report["calculated_mom_nsa_pct_documentary"],"0.169")
+        self.assertIsNone(report["calculated_yoy_pct_documentary"])
+        self.assertFalse(report["asof_historical_vintage_authenticated"])
+        self.assertFalse(report["fx28_direction_authorized"])
+
+    def test_29_one_tenth_of_index_point_change_fails_archive_check(self):
+        true=body(v2026="337.511",vsep="336.940")
+        false=body(v2026="337.512",vsep="336.940")
+        self.assertTrue(_parse_original(
+            true,END)["local_api_index_levels_match_bls_archived_first_print"])
+        self.assertFalse(_parse_original(
+            false,END)["local_api_index_levels_match_bls_archived_first_print"])
+        self.assertNotEqual(sha256(true).hexdigest(),sha256(false).hexdigest())
+        transport=Mock(return_value=Response(content=false))
+        result=self.call(get=transport)
+        self.safe(result)
+        self.assertFalse(result["local_api_index_levels_match_bls_archived_first_print"])
+        self.assertTrue(result["raw_original_bytes_retained_and_replayed_local_only"])
+        self.assertFalse(result["trade_authorized"])
+
+    def test_30_readonly_replay_preserves_source_archive_corroborration_result(self):
+        source=body(v2026="337.511",vsep="336.940")
+        result=self.call(get=Mock(return_value=Response(content=source)))
+        checked=self.read(result,at=END+timedelta(minutes=30))
+        self.safe(checked)
+        self.assertTrue(checked["local_api_index_levels_match_bls_archived_first_print"])
+        self.assertEqual(checked["raw_body_sha256"],sha256(source).hexdigest())
+        self.assertEqual(checked["http_get_attempts"],0)
+        self.assertEqual(checked["file_writes_attempted"],0)
+        self.assertIsNone(checked["calibrated_probability"])
 
 
 if __name__=="__main__":

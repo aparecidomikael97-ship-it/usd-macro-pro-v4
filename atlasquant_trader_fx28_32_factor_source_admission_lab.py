@@ -78,6 +78,9 @@ def _blocked(reason: str) -> dict[str, Any]:
         "locally_replayed_policy_issuer_count": 0,
         "locally_replayed_ppi_document_count": 0,
         "locally_replayed_cpi_u_nsa_document_count": 0,
+        "cpi_local_replay_original_but_archived_index_levels_disagree": False,
+        "cpi_reference_archive_reconciled_with_local_api_levels": False,
+        "cpi_reference_archive_match_is_not_independent_first_seen": True,
         "cpi_u_nsa_oct2026_mom_pct_documentary": None,
         "cpi_u_nsa_is_not_pre_event_surprise": True,
         "cpi_u_nsa_oct2026_yoy_unavailable_missing_oct2025": True,
@@ -246,6 +249,9 @@ def inspect_fx28_32_factor_source_admission_lab(
             observed_at_utc=now,
         ) if cpi_archive_basename is not None else None
     )
+    cpi_original_replayed = (type(cpi_report) is dict
+        and cpi_report.get("raw_original_bytes_retained_and_replayed_local_only")
+            is True)
     cpi_ok = (type(cpi_report) is dict
         and cpi_report.get("state") ==
             "LAB_US_BLS_CPI_U_NSA_MOM_LOCAL_DOCUMENT_REPLAY_NO_GO"
@@ -258,6 +264,13 @@ def inspect_fx28_32_factor_source_admission_lab(
         and cpi_report.get("trade_authorized") is False
         and cpi_report.get("fx28_direction_authorized") is False
         and cpi_report.get("calibrated_probability") is None
+        and cpi_report.get("bls_archived_first_print_reference_url") ==
+            "https://www.bls.gov/news.release/archives/cpi_11102026.htm"
+        and cpi_report.get("local_api_index_levels_match_bls_archived_first_print")
+            is True
+        and cpi_report.get("release_index_crosscheck_not_issuer_or_first_seen_authentication")
+            is True
+        and cpi_report.get("calculated_yoy_pct_documentary") is None
         and cpi_report.get("series_id") == "CUUR0000SA0"
         and cpi_report.get("seasonal_adjustment") == "NSA"
         and cpi_report.get("target_month") == "2026-10"
@@ -355,6 +368,11 @@ def inspect_fx28_32_factor_source_admission_lab(
         "locally_replayed_policy_issuer_count": len(ledger),
         "locally_replayed_ppi_document_count": int(ppi is not None),
         "locally_replayed_cpi_u_nsa_document_count": int(cpi_sha is not None),
+        "cpi_local_replay_original_but_archived_index_levels_disagree": (
+            cpi_original_replayed
+            and cpi_report.get("local_api_index_levels_match_bls_archived_first_print")
+                is False),
+        "cpi_reference_archive_reconciled_with_local_api_levels": cpi_ok,
         "cpi_u_nsa_oct2026_mom_pct_documentary": (
             cpi_report["calculated_mom_nsa_pct_documentary"] if cpi_ok else None),
         "distinct_original_document_sha_claim_count": len(source_hashes),
