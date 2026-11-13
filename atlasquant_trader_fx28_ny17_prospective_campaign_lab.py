@@ -18,6 +18,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx28_ny17_m15_source_claim_lab import (
+    has_exact_ny17_m15_endpoint_claim_lab,
+)
 from atlasquant_trader_fx_ny17_forecast_outcome_join_lab import _price
 
 SCHEMA = "ATLASQUANT_TRADER_FX28_NY17_PROSPECTIVE_BOUNDARY_LAB_V1"
@@ -118,6 +121,8 @@ def _base(reason: str) -> dict[str, Any]:
         "calendar_github_timestamp_independently_verified_here": False,
         "pre_event_forecasts_witnessed": False,
         "broker_price_provenance_authenticated": False,
+        "native_mt5_d1_or_w1_as_ny17_outcome_permitted": False,
+        "all_documentary_completed_slots_claim_exact_m15_ny17_endpoints": False,
         "broker_trading_calendar_authenticated": False,
         "point_in_time_macro_authenticated": False,
         "out_of_sample_accuracy_validated": False,
@@ -203,6 +208,8 @@ def inspect_frozen_fx28_ny17_campaign_lab(
                     or set(movements) != set(OFFICIAL_PAIRS).difference(blocked)
                     or any(not isinstance(x, str) or not x for x in reasons.values())
                     or any(not _valid_documentary_price_movement(v)
+                           or not has_exact_ny17_m15_endpoint_claim_lab(
+                               v, start_at_utc=start, end_at_utc=end)
                            for v in movements.values())):
                 out["reason"] = horizon + "_PER_PAIR_MISSING_PRICE_DIAGNOSTICS"
                 return out
@@ -263,6 +270,7 @@ def inspect_frozen_fx28_ny17_campaign_lab(
         "unverifiable_pair_horizon_slots": EXPECTED_PAIR_HORIZON_SLOTS - total_complete,
         "per_horizon": per_horizon,
         "frozen_calendar_scope_matched_locally": True,
+        "all_documentary_completed_slots_claim_exact_m15_ny17_endpoints": True,
     })
     return out
 
