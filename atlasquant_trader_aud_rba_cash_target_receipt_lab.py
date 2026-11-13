@@ -164,7 +164,7 @@ def inspect_rba_cash_target_current_receipt_lab(
         amount=Decimal(raw_rate)
         effective=_date(mat.group("effective"))
         next_text=mat.group("next")
-        next_date=_date(next_text.split(", ",1)[1])
+        next_date=_date(next_text.split(",",1)[1].strip())
         if (PERCENT.fullmatch(raw_rate) is None or not amount.is_finite()
             or not Decimal("0")<=amount<=Decimal("30")
             or effective is None or next_date is None
