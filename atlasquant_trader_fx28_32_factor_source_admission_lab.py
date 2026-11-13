@@ -33,7 +33,7 @@ from atlasquant_trader_fx28_policy_ppi_unified_readiness_lab import (
     SCHEMA as UNIFIED_SCHEMA,
     inspect_fx28_policy_ppi_readiness_lab,
 )
-from atlasquant_trader_us_bls_cpi_u_nsa_yoy_capture_lab import (
+from atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab import (
     replay_bls_cpi_u_nsa_original_lab,
 )
 
@@ -78,8 +78,9 @@ def _blocked(reason: str) -> dict[str, Any]:
         "locally_replayed_policy_issuer_count": 0,
         "locally_replayed_ppi_document_count": 0,
         "locally_replayed_cpi_u_nsa_document_count": 0,
-        "cpi_u_nsa_oct2026_yoy_pct_documentary": None,
+        "cpi_u_nsa_oct2026_mom_pct_documentary": None,
         "cpi_u_nsa_is_not_pre_event_surprise": True,
+        "cpi_u_nsa_oct2026_yoy_unavailable_missing_oct2025": True,
         "cpi_u_nsa_is_not_authenticated_first_print_vintage": True,
         "distinct_original_document_sha_claim_count": 0,
         "factor_slots_with_any_relevant_local_document": 0,
@@ -247,7 +248,7 @@ def inspect_fx28_32_factor_source_admission_lab(
     )
     cpi_ok = (type(cpi_report) is dict
         and cpi_report.get("state") ==
-            "LAB_US_BLS_CPI_U_NSA_YOY_LOCAL_DOCUMENT_REPLAY_NO_GO"
+            "LAB_US_BLS_CPI_U_NSA_MOM_LOCAL_DOCUMENT_REPLAY_NO_GO"
         and cpi_report.get("raw_original_bytes_retained_and_replayed_local_only")
             is True
         and cpi_report.get("source_first_seen_independently_attested") is False
@@ -263,7 +264,7 @@ def inspect_fx28_32_factor_source_admission_lab(
         and cpi_report.get("base_month") == "2025-10"
         and type(cpi_report.get("raw_body_sha256")) is str
         and _SHA.fullmatch(cpi_report["raw_body_sha256"]) is not None
-        and type(cpi_report.get("calculated_yoy_pct_documentary")) is str)
+        and type(cpi_report.get("calculated_mom_nsa_pct_documentary")) is str)
     cpi_sha = cpi_report["raw_body_sha256"] if cpi_ok else None
     source_hashes = {
         doc["source_original_sha256_local_claim"] for doc in ledger.values()
@@ -291,13 +292,13 @@ def inspect_fx28_32_factor_source_admission_lab(
                     cpi_sha if currency == "USD" and cpi_sha is not None
                     else ppi if currency == "USD" else None)
                 reason = (
-                    "BLS_CPI_U_NSA_YOY_NOT_PRE_EVENT_CONSENSUS_OR_USD_IMPACT"
+                    "BLS_CPI_U_NSA_MOM_NOT_PRE_EVENT_CONSENSUS_OR_USD_IMPACT"
                     if currency == "USD" and cpi_sha is not None else
                     "BLS_PPI_ACTUAL_NOT_CPI_SURPRISE_OR_CURRENCY_EFFECT"
                     if currency == "USD" and ppi is not None else
                     "NO_CURRENCY_CPI_SURPRISE_WITH_PRE_EVENT_CONSENSUS")
                 kind = (
-                    "BLS_CPI_U_NSA_OCT2026_YOY_LOCAL_CALCULATION_ONLY"
+                    "BLS_CPI_U_NSA_OCT2026_MOM_LOCAL_CALCULATION_ONLY"
                     if currency == "USD" and cpi_sha is not None else
                     "BLS_PPI_OCT2026_ACTUAL_ONLY" if documentary_sha else None)
             elif category == "activity_impact":
@@ -354,8 +355,8 @@ def inspect_fx28_32_factor_source_admission_lab(
         "locally_replayed_policy_issuer_count": len(ledger),
         "locally_replayed_ppi_document_count": int(ppi is not None),
         "locally_replayed_cpi_u_nsa_document_count": int(cpi_sha is not None),
-        "cpi_u_nsa_oct2026_yoy_pct_documentary": (
-            cpi_report["calculated_yoy_pct_documentary"] if cpi_ok else None),
+        "cpi_u_nsa_oct2026_mom_pct_documentary": (
+            cpi_report["calculated_mom_nsa_pct_documentary"] if cpi_ok else None),
         "distinct_original_document_sha_claim_count": len(source_hashes),
         "factor_slots_with_any_relevant_local_document": documented,
         "hypothetical_claims_matching_local_original_sha_only": matched,
