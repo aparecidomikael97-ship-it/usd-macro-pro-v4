@@ -162,7 +162,7 @@ def inspect_boj_home_guideline_receipt_lab(
             or receipt["redirects_followed"] is not False
             or type(receipt["body_sha256"]) is not str
             or SHA.fullmatch(receipt["body_sha256"]) is None):
-        result["reason"] = "NONOFFICIAL_B0J_URL_OR_UNSAFE_TRANSPORT_CLAIM"
+        result["reason"] = "NONOFFICIAL_BOJ_URL_OR_UNSAFE_TRANSPORT_CLAIM"
         return result
     before = _utc(receipt["started_at_utc"])
     after = _utc(receipt["finished_at_utc"])
