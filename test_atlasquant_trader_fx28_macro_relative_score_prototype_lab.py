@@ -316,5 +316,124 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
         self.assertFalse(x["pair_claims_are_independent_economic_events"])
 
 
+
+    def test_23_shared_source_root_on_two_pair_legs_blocks_only_that_pair(self):
+        factors=samples(values={"USD":90,"EUR":-90})
+        shared=next(f for f in factors if f.currency=="USD"
+                    and f.category=="inflation_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="inflation_impact")
+        factors[i]=replace(factors[i],event_root_id=shared.event_root_id)
+        result=self.execute(inputs=factors)
+        self.safe(result)
+        self.assertEqual(result["state"],
+                         "LAB_FX28_HYPOTHETICAL_MACRO_SCORE_COHERENT_NO_GO")
+        self.assertEqual(result["pair_shared_root_overlap_veto_count"],1)
+        blocked=[r for r in result["pairs"]
+                 if r["shared_event_root_overlap_veto"]]
+        self.assertEqual([r["pair"] for r in blocked],["EUR/USD"])
+        self.assertEqual(blocked[0]["research_relative_label"],"AGUARDAR")
+        self.assertIsNone(blocked[0]["hypothetical_points"])
+        self.assertEqual(blocked[0]["reason"],
+            "SHARED_EVENT_ROOT_BOTH_CURRENCY_LEGS_NO_RELATIVE_CALIBRATION")
+        self.assertEqual(blocked[0]["shared_event_root_ids_for_both_legs"],
+                         [shared.event_root_id])
+        usd_jpy=next(r for r in result["pairs"] if r["pair"]=="USD/JPY")
+        self.assertFalse(usd_jpy["shared_event_root_overlap_veto"])
+        self.assertEqual(usd_jpy["research_relative_label"],"BASE_RELATIVE")
+        self.assertEqual(usd_jpy["hypothetical_points"],90)
+        self.assertIsNone(result["calibrated_probability"])
+
+    def test_24_three_currencies_with_one_root_block_three_pair_combinations(self):
+        factors=samples(values={"USD":85,"EUR":-45,"JPY":30})
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="policy_expectations")
+        for currency in ("EUR","JPY"):
+            i=next(i for i,f in enumerate(factors)
+                   if f.currency==currency
+                   and f.category=="policy_expectations")
+            factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        result=self.execute(inputs=factors)
+        self.safe(result)
+        self.assertEqual(result["distinct_root_catalyst_claim_count"],30)
+        self.assertEqual(result["shared_event_root_ids"],[usd.event_root_id])
+        self.assertEqual(result["pair_shared_root_overlap_veto_count"],3)
+        abstains={r["pair"] for r in result["pairs"]
+                  if r["shared_event_root_overlap_veto"]}
+        self.assertEqual(abstains,{"EUR/USD","USD/JPY","EUR/JPY"})
+        self.assertTrue(all(r["research_relative_label"]=="AGUARDAR"
+                            for r in result["pairs"] if r["pair"] in abstains))
+        self.assertEqual(result["currency_score_claims_reconciled"],8)
+        self.assertFalse(result["trade_authorized"])
+
+    def test_25_same_news_root_either_horizon_and_timezone_never_directional(self):
+        factors=samples(values={"USD":70,"EUR":-20})
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="inflation_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="inflation_impact")
+        factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        mt=timezone(timedelta(hours=-4))
+        shifted=[replace(f,
+            event_published_at_utc=f.event_published_at_utc.astimezone(mt),
+            source_locally_captured_at_utc=f.source_locally_captured_at_utc.astimezone(mt))
+            for f in factors]
+        for horizon in ("D1","W1"):
+            with self.subTest(horizon=horizon):
+                a=self.execute(inputs=factors,horizon=horizon)
+                b=self.execute(inputs=shifted,horizon=horizon,
+                               now=BEFORE.astimezone(mt),
+                               start=START.astimezone(mt))
+                self.safe(a)
+                self.assertEqual(a,b)
+                self.assertEqual(a["pair_shared_root_overlap_veto_count"],1)
+                eurusd=next(r for r in a["pairs"] if r["pair"]=="EUR/USD")
+                self.assertEqual(eurusd["research_relative_label"],"AGUARDAR")
+
+    def test_26_synthetic_shared_root_must_not_turn_into_provenance_or_score(self):
+        factors=samples(values={"USD":95,"EUR":-95})
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="inflation_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="inflation_impact")
+        factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        result=self.execute(inputs=factors)
+        self.safe(result)
+        self.assertFalse(result["inputs_are_authenticated_macro_sources"])
+        self.assertFalse(result["first_seen_independently_attested"])
+        self.assertFalse(result["prospective_forecast_witnessed"])
+        self.assertFalse(result["out_of_sample_accuracy_measured"])
+        self.assertIsNone(result["calibrated_probability"])
+        self.assertIsNone(result["directional_bias"])
+        self.assertEqual(result["operational_bias"],"AGUARDAR")
+        self.assertFalse(result["trade_authorized"])
+
+    def test_27_without_shared_root_normal_math_stays_unchanged(self):
+        result=self.execute(inputs=samples(values={"USD":80,"EUR":-50}))
+        self.safe(result)
+        self.assertEqual(result["pair_shared_root_overlap_veto_count"],0)
+        self.assertTrue(all(not r["shared_event_root_overlap_veto"]
+                            for r in result["pairs"]))
+        eurusd=next(r for r in result["pairs"] if r["pair"]=="EUR/USD")
+        self.assertEqual(eurusd["research_relative_label"],"QUOTE_RELATIVE")
+        self.assertEqual(eurusd["hypothetical_points"],-130)
+        self.assertEqual(eurusd["shared_event_root_ids_for_both_legs"],[])
+
+    def test_28_strong_opposite_macro_components_still_reject_direction(self):
+        factors=samples(values={"USD":90,"EUR":-70},conflict="USD")
+        usd=next(f for f in factors if f.currency=="USD"
+                 and f.category=="inflation_impact")
+        i=next(i for i,f in enumerate(factors)
+               if f.currency=="EUR" and f.category=="inflation_impact")
+        factors[i]=replace(factors[i],event_root_id=usd.event_root_id)
+        result=self.execute(inputs=factors)
+        self.safe(result)
+        self.assertEqual(result["pair_shared_root_overlap_veto_count"],1)
+        self.assertIn("USD",result["conflicting_currency_codes"])
+        eurusd=next(r for r in result["pairs"] if r["pair"]=="EUR/USD")
+        self.assertEqual(eurusd["research_relative_label"],"AGUARDAR")
+        self.assertIsNone(eurusd["hypothetical_points"])
+
+
 if __name__=="__main__":
     unittest.main()
