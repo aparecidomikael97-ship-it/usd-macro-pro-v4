@@ -124,6 +124,13 @@ def explain_fx28_policy_wait_lab(*, archive_report: Any) -> dict[str, Any]:
             or type(archive_report.get("pairs_lacking_at_least_one_policy_original")) is not int
             or archive_report["pairs_lacking_at_least_one_policy_original"] != len(OFFICIAL_PAIRS) - two
             or any(type(row) is not dict or set(row) != _ROW_KEYS
+                   or any(type(row.get(flag)) is not bool for flag in (
+                       "base_policy_original_locally_checked",
+                       "quote_policy_original_locally_checked",
+                       "both_policy_sources_locally_checked",
+                       "cpi_both_currencies_authenticated",
+                       "fx_direction_admissible",
+                   ))
                    or row != expected_by_pair.get(row.get("pair"))
                    for row in coverage)
             or len({row["pair"] for row in coverage if type(row) is dict}) != len(OFFICIAL_PAIRS)):
