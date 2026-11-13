@@ -104,9 +104,13 @@ class UsPpiTypedContextTests(unittest.TestCase):
         self.safe(r)
         self.assertEqual(r["headline_core_concordance_claim"],
                          "BOTH_SAME_SURPRISE_DIRECTION")
+        # Only the first TWO series have locally frozen consensus. The
+        # separate 49116 ex-trade measure has no admissible consensus.
         self.assertTrue(all(
             x["surprise_relative_to_consensus"]=="ABOVE_CONSENSUS"
-            for x in r["series"]))
+            for x in r["series"][:2]))
+        self.assertEqual(r["series"][2]["surprise_relative_to_consensus"],
+                         "NOT_COMPUTED_NO_LOCALLY_LOCKED_EX_TRADE_CONSENSUS")
         self.assertFalse(r["pre_event_prediction_was_recorded"])
 
     def test_04_both_at_consensus_are_not_one_trade(self):
