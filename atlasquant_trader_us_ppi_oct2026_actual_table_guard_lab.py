@@ -152,21 +152,51 @@ def _empty(reason: str, state: str = "LAB_PPI_FIRST_PRINT_BLOCKED") -> dict[str,
     }
 
 
-def _extract_table_value(rows: list[tuple[str, ...]], exact_label: str, code: str) -> Decimal | None:
-    # Require exact group name AND exact commodity code, not merely the number.
+# The last column of Table 1 need not be the MoM rate after a provider
+# layout change.  Read the exact Sep-to-Oct seasonally adjusted column by its
+# visible header; otherwise abstain rather than mistake year-on-year NSA,
+# prior-month or weight figures for the October 2026 SA monthly surprise.
+_MONTH_TO_MONTH = re.compile(
+    r"\\bsep(?:t(?:ember)?)?[.]?\\s+to\\s+oct(?:ober)?[.]?\\b", re.I
+)
+_SEASONAL = re.compile(r"\\bsa\\b|\\bseasonally\\s+adjusted\\b", re.I)
+
+
+def _oct2026_sa_month_column(rows: list[tuple[str, ...]]) -> tuple[int, int] | None:
+    candidates: list[tuple[int, int]] = []
+    for cells in rows:
+        if len(cells) < 7 or cells[0].strip().casefold() != "grouping":
+            continue
+        if len(cells) < 3 or cells[1].casefold() != "commodity code":
+            continue
+        positions = [
+            index for index, text in enumerate(cells)
+            if _MONTH_TO_MONTH.search(text) and _SEASONAL.search(text)
+            and "2025" not in text
+        ]
+        if len(positions) != 1:
+            return None
+        candidates.append((positions[0], len(cells)))
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _extract_table_value(rows: list[tuple[str, ...]], exact_label: str,
+                         code: str, month_col: int, header_columns: int) -> Decimal | None:
+    # Require exact group and commodity code, same number of cells as the
+    # identified Table-1 header and extraction from its SA MoM column only.
     matches: list[Decimal] = []
     for cells in rows:
-        if len(cells) < 6 or cells[0].casefold() != exact_label.casefold():
+        if len(cells) < 3 or cells[0].casefold() != exact_label.casefold():
             continue
         if cells[1:3] != ("FD", code):
             continue
-        last = _decimal(cells[-1])
-        if last is None:
+        if len(cells) != header_columns or month_col >= len(cells):
             return None
-        matches.append(last)
-    if len(matches) != 1:
-        return None
-    return matches[0]
+        monthly = _decimal(cells[month_col])
+        if monthly is None:
+            return None
+        matches.append(monthly)
+    return matches[0] if len(matches) == 1 else None
 
 
 def inspect_ppi_oct2026_first_print_lab(*, raw_html: Any,
@@ -231,8 +261,14 @@ def inspect_ppi_oct2026_first_print_lab(*, raw_html: Any,
     if len(table1) != 1:
         return _empty("MONTHLY_SA_TABLE1_MISSING_OR_AMBIGUOUS")
     rows = table1[0]
-    table_head = _extract_table_value(rows, "Final demand", "4")
-    table_core = _extract_table_value(rows, "Final demand less foods and energy", "49104")
+    monthly_header = _oct2026_sa_month_column(rows)
+    if monthly_header is None:
+        return _empty("MONTHLY_SA_TABLE1_COLUMN_HEADER_MISSING_OR_AMBIGUOUS")
+    month_col, header_columns = monthly_header
+    table_head = _extract_table_value(rows, "Final demand", "4",
+                                      month_col, header_columns)
+    table_core = _extract_table_value(rows, "Final demand less foods and energy", "49104",
+                                      month_col, header_columns)
     if table_head is None or table_core is None or table_head != headline:
         return _empty("MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
     out = _empty("LOCAL_DOCUMENTARY_BLS_PPI_TABLE1_EXTRACT_NOT_SOURCE_AUTHENTICATION",
