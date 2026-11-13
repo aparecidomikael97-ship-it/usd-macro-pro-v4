@@ -10,12 +10,16 @@ trading, calibrated probability, hindsight backfill, or paid data.
 """
 from __future__ import annotations
 
+import argparse
 from datetime import datetime, timezone
+import json
+import os
 from typing import Any
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 from atlasquant_trader_fx28_28pair_source_readiness_manual_lab import (
     SCHEMA as READINESS_SCHEMA,
+    inspect_28pair_source_readiness_once_lab,
 )
 from atlasquant_trader_fx28_ny17_forecast_witness_lab import (
     inspect_prospective_fx28_witness_census_lab,
@@ -220,6 +224,35 @@ def inspect_fx28_sunday_opening_preflight_lab(
         "required_actions": required,
     })
     return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Manual zero-network snapshot; no readings from GitHub or Pepperstone."""
+    parser = argparse.ArgumentParser(
+        description="NY17 FX28 pre-event lab preflight (no forecasts)")
+    parser.add_argument("--preflight", action="store_true",
+                        help="Read local policy archive only; never post signals")
+    flags = parser.parse_args(argv)
+    if not flags.preflight:
+        print(json.dumps(_base("EXPLICIT_PREFLIGHT_REQUIRED"),
+                         ensure_ascii=False, indent=2))
+        return 2
+    local = inspect_28pair_source_readiness_once_lab(
+        mode="audit", local_appdata=os.environ.get("LOCALAPPDATA", ""))
+    if local["state"] != "LAB_FX28_28PAIR_MANUAL_SOURCE_READINESS_NO_GO":
+        local = None  # unknown/not readable, NOT evidence of 0/8 captures
+    report = inspect_fx28_sunday_opening_preflight_lab(
+        inspected_at_utc=datetime.now(timezone.utc).replace(microsecond=0),
+        local_policy_readiness=local,
+        window_witness_claims=None,  # not fetched or independently checked
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    # Always exit 2: this command is observational, NEVER a GO gate.
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
 
 __all__ = ("SCHEMA", "inspect_fx28_sunday_opening_preflight_lab")
