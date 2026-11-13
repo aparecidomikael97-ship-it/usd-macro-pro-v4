@@ -36,6 +36,14 @@ _HEADLINE = re.compile(
     r"(\d+(?:\.\d+)?)\s+percent in October,\s+seasonally adjusted",
     re.I,
 )
+# Confirmed official wording, e.g. July 2026 PPI:
+# https://www.bls.gov/news.release/archives/ppi_08132026.htm
+# "was unchanged" states an actual 0.0% monthly change, not a missing value.
+_UNCHANGED_HEADLINE = re.compile(
+    r"The Producer Price Index for final demand\s+"
+    r"was unchanged\s+in October,\s+seasonally adjusted",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -397,14 +405,20 @@ def inspect_ppi_oct2026_first_print_lab(*, raw_html: Any,
         if mandatory.casefold() not in text.casefold():
             return _empty("WRONG_PPI_RELEASE_ID_OR_TARGET_PERIOD")
     heads = _HEADLINE.findall(text)
-    if len(heads) != 1:
+    unchanged = _UNCHANGED_HEADLINE.findall(text)
+    # Exactly one recognized BLS statement. If conflicting/duplicated,
+    # fail closed; "was unchanged" is not missing data and is not a forecast.
+    if len(heads) + len(unchanged) != 1:
         return _empty("HEADLINE_PPI_MONTHLY_TEXT_NOT_EXACTLY_IDENTIFIED")
-    action, number = heads[0]
-    headline = _decimal(number)
-    if headline is None:
-        return _empty("HEADLINE_PPI_PERCENT_INVALID")
-    if action.lower() in {"decreased", "declined", "fell"}:
-        headline = -headline
+    if unchanged:
+        headline = Decimal("0.0")
+    else:
+        action, number = heads[0]
+        headline = _decimal(number)
+        if headline is None:
+            return _empty("HEADLINE_PPI_PERCENT_INVALID")
+        if action.lower() in {"decreased", "declined", "fell"}:
+            headline = -headline
     table1 = [(rows, doc.table_layouts[index])
               for index, (context, rows) in enumerate(doc.tables)
               if "Table 1." in context and "October 2026" in context
