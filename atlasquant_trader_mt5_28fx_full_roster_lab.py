@@ -27,6 +27,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx28_ny17_m15_source_claim_lab import (
+    expected_ny17_m15_endpoint_claim_lab,
+)
 
 from atlasquant_trader_mt5_28fx_archive_reader_lab import (
     _iso_utc, inspect_local_am12_28fx_lab,
@@ -225,6 +228,8 @@ def inspect_am12_ny17_full_roster_lab(
                     "price_window_start_open_documentary"),
                 "end_close_documentary": batch["pair_results"][pair].get(
                     "price_window_end_close_documentary"),
+                **expected_ny17_m15_endpoint_claim_lab(
+                    start_at_utc=first, end_at_utc=last),
             }
             for pair in OFFICIAL_PAIRS if pair not in pair_reasons
         } if isinstance(batch, dict) else {})
