@@ -117,6 +117,50 @@ class ArchiveJoinTests(unittest.TestCase):
             "contiguous_ny17_m15_timestamps_claim_only"])
         self.safety(r)
 
+    def test_first_m15_not_in_original_archive_blocks_open_price_label(self):
+        m, compressed, captured = archive(missing_at=0)
+        result = inspect_case(manifest=m, packed=compressed,
+                              captured=captured)
+        self.assertEqual(result["state"],
+                         "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED")
+        self.assertEqual(result["window_m15_rows_found"], 95)
+        self.assertFalse(result["first_expected_m15_open_present"])
+        self.assertTrue(result["last_expected_m15_open_present"])
+        self.assertEqual(result["first_observed_delay_minutes"], 15)
+        self.assertEqual(result["missing_m15_classification"],
+                         "MISSING_FIRST_M15")
+        self.assertIsNone(result["price_window_start_open_documentary"])
+        self.assertIsNone(result["price_window_end_close_documentary"])
+        self.safety(result)
+
+    def test_last_m15_missing_blocks_documentary_ny17_close(self):
+        m, compressed, captured = archive(missing_at=95)
+        result = inspect_case(manifest=m, packed=compressed,
+                              captured=captured)
+        self.assertEqual(result["state"],
+                         "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED")
+        self.assertTrue(result["first_expected_m15_open_present"])
+        self.assertFalse(result["last_expected_m15_open_present"])
+        self.assertEqual(result["missing_at_end_consecutive_m15_slots"], 1)
+        self.assertEqual(result["missing_m15_classification"],
+                         "MISSING_LAST_M15")
+        self.assertIsNone(result["price_movement_direction_documentary"])
+        self.safety(result)
+
+    def test_internal_archive_epoch_gap_not_excluded_as_holiday(self):
+        m, compressed, captured = archive(missing_at=18)
+        result = inspect_case(manifest=m, packed=compressed,
+                              captured=captured)
+        self.assertEqual(result["state"],
+                         "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED")
+        self.assertTrue(result["first_expected_m15_open_present"])
+        self.assertTrue(result["last_expected_m15_open_present"])
+        self.assertEqual(result["missing_interior_m15_slots"], 1)
+        self.assertEqual(result["missing_m15_classification"],
+                         "MISSING_INTERIOR_M15")
+        self.assertFalse(result["broker_session_calendar_verified"])
+        self.safety(result)
+
     def test_synthetic_archive_can_cover_480_weekly_slots(self):
         m, gz, captured = archive()
         r = inspect_case(
