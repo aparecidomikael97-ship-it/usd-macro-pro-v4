@@ -219,6 +219,71 @@ class Fx28PolicyWhyWaitTests(unittest.TestCase):
         self.assertEqual([r["pair"] for r in out["per_pair"]], list(OFFICIAL_PAIRS))
         self.assertFalse(any("probability" in row for row in out["per_pair"]))
 
+    def test_14a_source_priority_three_checked_banks_all_tie_plus_three(self):
+        out=explain(archive_report=snapshot(("USD","EUR","CAD")))
+        self.safe(out)
+        sources=out["next_policy_sources_to_collect"]
+        self.assertEqual(len(sources),5)
+        self.assertEqual([x["currency"] for x in sources],
+                         ["AUD","CHF","GBP","JPY","NZD"])
+        self.assertTrue(all(
+            x["hypothetical_additional_two_policy_source_pairs"]==3
+            and len(x["hypothetical_new_pairs"])==3
+            and x["requires_issuer_bytes_and_receipt_validation"]
+            and not x["source_first_seen_independently_attested"]
+            and not x["direction_or_trade_enabled_by_this_capture"]
+            for x in sources
+        ))
+        self.assertEqual(out["pairs_with_two_policy_sources_locally_checked"],3)
+        self.assertEqual(out["pairs_admitted_for_direction"],0)
+        self.assertFalse(out["source_priority_is_trade_recommendation"])
+
+    def test_14b_last_missing_source_would_add_seven_pair_documentary_checks(self):
+        out=explain(archive_report=snapshot(set(CURRENCIES)-{"JPY"}))
+        self.safe(out)
+        self.assertEqual(out["pairs_with_two_policy_sources_locally_checked"],21)
+        self.assertEqual(out["pairs_with_missing_or_rejected_policy_source"],7)
+        self.assertEqual(len(out["next_policy_sources_to_collect"]),1)
+        nxt=out["next_policy_sources_to_collect"][0]
+        self.assertEqual(nxt["currency"],"JPY")
+        self.assertEqual(nxt["hypothetical_additional_two_policy_source_pairs"],7)
+        self.assertEqual(len(set(nxt["hypothetical_new_pairs"])),7)
+        self.assertFalse(nxt["direction_or_trade_enabled_by_this_capture"])
+
+    def test_14c_zero_source_no_single_bank_adds_pair(self):
+        out=explain(archive_report=snapshot())
+        self.safe(out)
+        self.assertEqual(len(out["next_policy_sources_to_collect"]),8)
+        self.assertTrue(all(
+            r["hypothetical_additional_two_policy_source_pairs"]==0
+            and r["hypothetical_new_pairs"]==[]
+            for r in out["next_policy_sources_to_collect"]))
+        self.assertTrue(
+            out["source_priority_measures_only_hypothetical_pair_documentary_coverage"])
+
+    def test_14d_all_eight_sources_no_collection_needed_still_no_bias(self):
+        out=explain(archive_report=snapshot(CURRENCIES))
+        self.safe(out)
+        self.assertEqual(out["next_policy_sources_to_collect"],[])
+        self.assertEqual(out["pairs_with_two_policy_sources_locally_checked"],28)
+        self.assertEqual(out["pairs_admitted_for_direction"],0)
+
+    def test_14e_rejected_priority_is_repair_not_buy_signal(self):
+        out=explain(archive_report=snapshot(("USD","EUR"),{"JPY":"BAD_SHA"}))
+        self.safe(out)
+        item=next(x for x in out["next_policy_sources_to_collect"]
+                  if x["currency"]=="JPY")
+        self.assertEqual(item["current_source_state"],"REJECTED_LOCAL_ARCHIVE")
+        self.assertEqual(item["hypothetical_additional_two_policy_source_pairs"],2)
+        self.assertFalse(item["direction_or_trade_enabled_by_this_capture"])
+
+    def test_14f_source_priority_on_invalid_report_has_no_misleading_ranking(self):
+        rep=snapshot(("USD","EUR"))
+        rep["pairs_with_both_policy_originals_locally_checked"]=28
+        out=self.block(rep)
+        self.assertEqual(out["next_policy_sources_to_collect"],[])
+        self.assertEqual(out["pairs_admitted_for_direction"],0)
+
     def test_14_caller_report_is_never_mutated(self):
         rep=snapshot(("EUR","USD"),{"JPY":"MISSING_BODY"})
         original=deepcopy(rep)
