@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 import json
 import os
 from pathlib import Path
@@ -49,6 +50,19 @@ _PPI_LABELS = (
     "Final demand",
     "Final demand less foods and energy",
     "Final demand less foods, energy, and trade services",
+)
+# BLS original October 2026 release, first-print Table 1, SA MoM:
+# https://www.bls.gov/news.release/archives/ppi_11132026.htm
+# Source is publicly accessible via web search, NOT yet captured as
+# original HTTP bytes by the AtlasQuant local PPI collector/AM12.
+# A local SHA alone is NOT independent publisher or first-seen proof.
+PPI_FIRST_PRINT_ARCHIVE_URL = (
+    "https://www.bls.gov/news.release/archives/ppi_11132026.htm"
+)
+_PPI_FIRST_PRINT_SA_OCT2026 = (
+    Decimal("0.3"),  # FD 4: final demand headline
+    Decimal("0.3"),  # FD 49104: less foods and energy
+    Decimal("0.5"),  # FD 49116: less foods, energy AND trade services
 )
 
 
@@ -90,6 +104,14 @@ def _base(reason: str) -> dict[str, Any]:
         "ppi_source_replay_state": "NOT_REQUESTED",
         "ppi_source_replay_reason": None,
         "ppi_source_replay_attempted": False,
+        "ppi_first_print_reference_url": PPI_FIRST_PRINT_ARCHIVE_URL,
+        "ppi_public_first_print_sa_oct2026_pct_by_fd_code": {
+            code: str(amount) for code, amount in
+            zip(_PPI_CODES, _PPI_FIRST_PRINT_SA_OCT2026)
+        },
+        "ppi_local_original_matches_public_first_print_values": False,
+        "ppi_local_replay_valid_but_first_print_values_disagree": False,
+        "ppi_public_first_print_numeric_crosscheck_not_authentication": True,
         "ppi_documentary_series": [],
         "ppi_documentary_series_count": 0,
         "ppi_source_raw_sha256": None,
@@ -201,6 +223,25 @@ def _valid_ppi(report: Any) -> bool:
     return True
 
 
+def _ppi_agrees_with_archived_first_print(report: Any) -> bool:
+    """Require exact FD code + first-print SA October values; no score.
+
+    The PPI replay must have already validated original bytes, receipt,
+    parser, source semantics, three distinct series and no forecasts.
+    This second numerical comparison cannot authenticate source first-seen.
+    """
+    if not _valid_ppi(report):
+        return False
+    try:
+        return all(
+            Decimal(row["actual_pct_local_documentary_claim"]) == expected
+            for row, expected in zip(
+                report["documentary_series"], _PPI_FIRST_PRINT_SA_OCT2026)
+        )
+    except (InvalidOperation, ValueError, TypeError, OverflowError):
+        return False
+
+
 def inspect_fx28_policy_ppi_readiness_lab(
     *, local_appdata: Any, decision_at_utc: Any,
     ppi_archive_basename: Any = None,
@@ -272,7 +313,12 @@ def inspect_fx28_policy_ppi_readiness_lab(
             ppi.get("state") if type(ppi) is dict else "INVALID_REPORT")
         out["ppi_source_replay_reason"] = (
             ppi.get("reason") if type(ppi) is dict else "INVALID_REPORT")
-        ppi_ok = _valid_ppi(ppi)
+        replay_structurally_ok = _valid_ppi(ppi)
+        ppi_ok = (replay_structurally_ok
+                  and _ppi_agrees_with_archived_first_print(ppi))
+        out["ppi_local_original_matches_public_first_print_values"] = ppi_ok
+        out["ppi_local_replay_valid_but_first_print_values_disagree"] = (
+            replay_structurally_ok and not ppi_ok)
         if ppi_ok:
             out["ppi_documentary_series"] = ppi["documentary_series"]
             out["ppi_documentary_series_count"] = 3
