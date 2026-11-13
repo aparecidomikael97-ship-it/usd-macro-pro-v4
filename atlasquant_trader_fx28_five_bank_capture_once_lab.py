@@ -13,12 +13,13 @@ Local checks do not independently attest first-seen, issuer identity or PIT.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
 from typing import Any, Callable
 
+from atlasquant_fx_universe import OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_fx28_policy_local_archive_replay_lab import (
     inspect_fx28_official_policy_archive_replay_lab as replay,
 )
@@ -53,7 +54,10 @@ from atlasquant_trader_nzd_rbnz_ocr_receipt_lab import (
     inspect_rbnz_official_ocr_receipt_lab,
 )
 
-SCHEMA = "ATLASQUANT_TRADER_FX28_FIVE_G8_POLICY_MANUAL_CAPTURE_ONCE_LAB_V1"
+SCHEMA = "ATLASQUANT_TRADER_FX28_FIVE_G8_POLICY_MANUAL_CAPTURE_ONCE_LAB_V2"
+# Conservative LOCAL CAPTURE age, not age of the actual policy decision.
+# It never authenticates first-seen timestamps or proves source freshness.
+MAX_LOCAL_CAPTURE_AGE = timedelta(hours=24)
 # Explicit known exact original state per existing validator; no weak "PASS".
 # Layout: collector, validator, saver, keyword for original bytes, exact state.
 _STEPS = {
@@ -90,6 +94,11 @@ def _base(reason: str) -> dict[str, Any]:
         "currency_results": {},
         "replayed_source_codes_after_run": [],
         "replayed_currency_count_after_run": 0,
+        "max_local_capture_age_hours_claim": 24,
+        "previously_checked_but_stale_or_undated_codes": [],
+        "recent_local_capture_claim_codes_after_run": [],
+        "recent_local_capture_claim_count_after_run": 0,
+        "recent_two_source_pair_coverage_after_run": 0,
         "pairs_with_both_policy_originals_locally_checked_after_run": 0,
         "first_seen_independently_authenticated": False,
         "issuer_origin_independently_authenticated": False,
@@ -102,6 +111,33 @@ def _base(reason: str) -> dict[str, Any]:
         "live_alert_allowed": False, "worker_enabled": False,
         "scheduler_enabled": False, "new_cost_brl": 0,
     }
+
+
+def _recent_local_capture_claim(
+    *, report: Any, currency: str, at_utc: datetime,
+) -> bool:
+    """Conservative recency of a *local receipt CLAIM*, never issuer PIT.
+
+    Refuse a skip if selected capture timestamp is missing, corrupted,
+    future-stamped, or older than 24 hours. No silent inherited freshness.
+    """
+    if type(report) is not dict:
+        return False
+    status = report.get("currency_archive_status")
+    if type(status) is not dict or type(status.get(currency)) is not dict:
+        return False
+    raw = status[currency].get("selected_local_capture_utc_claim")
+    if type(raw) is not str or len(raw) != 20 or not raw.endswith("Z"):
+        return False
+    try:
+        at = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc)
+        if at.strftime("%Y-%m-%dT%H:%M:%SZ") != raw:
+            return False
+        age = at_utc - at
+        return timedelta(0) <= age <= MAX_LOCAL_CAPTURE_AGE
+    except (ValueError, TypeError, OverflowError):
+        return False
 
 
 def collect_five_missing_policy_sources_once_lab(
@@ -152,7 +188,18 @@ def collect_five_missing_policy_sources_once_lab(
         out["reason"] = "PRECHECK_ARCHIVE_REPLAY_BLOCKED"
         return out
 
-    already = set(before["currencies_locally_checked"])
+    local_checked = set(before["currencies_locally_checked"])
+    # A locally valid historic source is NOT evidence that today's
+    # policy-source snapshot has been captured. A stale (or undated)
+    # record must not trigger SKIPPED_ALREADY_LOCALLY_CHECKED.
+    already = {
+        currency for currency in local_checked
+        if _recent_local_capture_claim(
+            report=before, currency=currency, at_utc=now)
+    }
+    out["previously_checked_but_stale_or_undated_codes"] = sorted(
+        local_checked - already
+    )
     if steps is None:
         steps = _STEPS
     if (type(steps) is not dict or set(steps) != set(_ORDER)):
@@ -222,6 +269,17 @@ def collect_five_missing_policy_sources_once_lab(
     postchecked = set(after.get("currencies_locally_checked", []))
     out["replayed_source_codes_after_run"] = sorted(postchecked)
     out["replayed_currency_count_after_run"] = len(postchecked)
+    recent = {
+        currency for currency in postchecked
+        if _recent_local_capture_claim(
+            report=after, currency=currency, at_utc=audited_at)
+    }
+    out["recent_local_capture_claim_codes_after_run"] = sorted(recent)
+    out["recent_local_capture_claim_count_after_run"] = len(recent)
+    out["recent_two_source_pair_coverage_after_run"] = sum(
+        1 for pair in OFFICIAL_PAIRS
+        if all(code in recent for code in split_pair(pair))
+    )
     out["pairs_with_both_policy_originals_locally_checked_after_run"] = (
         after.get("pairs_with_both_policy_originals_locally_checked", 0))
     for currency in _ORDER:
@@ -240,6 +298,13 @@ def collect_five_missing_policy_sources_once_lab(
         "LOCAL_RECEIPTS_NEVER_FIRST_SEEN_OR_BIAS_ATTESTATION"
         if out["state"] == "LAB_FX28_FIVE_SOURCE_CAPTURE_LOCAL_REPLAY_ONLY_NO_GO"
         else "ONE_OR_MORE_ISSUER_CAPTURES_UNAVAILABLE_OR_NOT_REPLAYED")
+    # A completed 5-source operation cannot be declared a fresh
+    # capture if any of those locally checked sources is older than
+    # the local 24-hour claim threshold. This NEVER enables a trade.
+    if (out["state"] == "LAB_FX28_FIVE_SOURCE_CAPTURE_LOCAL_REPLAY_ONLY_NO_GO"
+            and any(currency not in recent for currency in _ORDER)):
+        out["state"] = "LAB_FX28_FIVE_SOURCE_CAPTURE_PARTIAL_OR_BLOCKED_NO_GO"
+        out["reason"] = "LOCAL_CAPTURE_FRESHNESS_CLAIM_MISSING_OR_STALE"
     return out
 
 
