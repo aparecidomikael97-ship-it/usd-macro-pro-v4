@@ -126,19 +126,19 @@ class NumericCoverageTests(unittest.TestCase):
         self.assertEqual(r["currencies"]["USD"]["status"], OBSERVED)
         self.assertEqual(r["currencies"]["EUR"]["status"], MISSING)
 
-    def test_aligned_months_do_not_confer_method_comparability(self):
+    def test_fake_oct2025_baseline_cannot_make_eurusd_cpi_periods_look_aligned(self):
         fixture = usd_fixture()
         for row in fixture["Results"]["series"][0]["data"]:
             if row["year"] == "2026" and row["period"] == "M09":
                 row["period"] = "M10"
             elif row["year"] == "2025" and row["period"] == "M09":
                 row["period"] = "M10"
+        # Fictional October 2025 all-items US index must be blocked,
+        # even though October 2026 aligns with Eurostat's month label.
         r = run(usd_bls_raw=json.dumps(fixture).encode())
-        row = pair(r)
-        self.assertTrue(row["observation_months_aligned_if_both"])
-        self.assertFalse(row["methods_comparable"])
-        self.assertIn("HICP_AND_CPI_U_METHODS_NOT_IDENTICAL", row["comparison_blockers"])
-        self.assertIsNone(row["inflation_difference_percentage_points"])
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+        self.assertEqual(r["reason"], "MALFORMED_OR_FUTURE_SOURCE_CAPTURE")
+        self.assert_no_trading(r)
 
     def test_no_prior_year_rate_is_missing_not_zero(self):
         fixture = usd_fixture()
@@ -150,6 +150,10 @@ class NumericCoverageTests(unittest.TestCase):
         self.assertEqual(r["state"], "LAB_G8_NUMERIC_INFLATION_COVERAGE_ONLY")
         self.assertIsNone(r["currencies"]["USD"]["rate_yoy_percent_claim"])
         self.assertFalse(r["currencies"]["USD"]["has_valid_same_month_prior_year"])
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 21, "1": 7, "2": 0})
+        self.assertEqual(pair(r)["numeric_observation_sides"], 1)
+        self.assertTrue(pair(r)["base_annual_inflation_rate_present"])
+        self.assertFalse(pair(r)["quote_annual_inflation_rate_present"])
         self.assertIn("ANNUAL_RATE_DENOMINATOR_MISSING", pair(r)["comparison_blockers"])
 
     def test_valid_raw_content_hash_is_not_official_release_authentication(self):
@@ -594,6 +598,22 @@ class SwissCoverageTests(unittest.TestCase):
                 chf_capture_utc=datetime(2026,11,5,1,tzinfo=timezone.utc))
         self.assertEqual(r["state"], "LAB_BLOCKED")
 
+
+
+    def test_oct2026_2025_base_missing_counts_us_index_but_zero_us_annual_rate(self):
+        fixture = usd_fixture()
+        rows = fixture["Results"]["series"][0]["data"]
+        rows[0] = {**rows[0], "period": "M10"}
+        rows.insert(2, {"year": "2025", "period": "M10", "value": "-",
+                        "footnotes": [{}]})
+        r = run(usd_bls_raw=json.dumps(fixture).encode())
+        self.assertEqual(r["state"], "LAB_G8_NUMERIC_INFLATION_COVERAGE_ONLY")
+        self.assertEqual(r["currencies"]["USD"]["status"], OBSERVED)
+        self.assertIsNone(r["currencies"]["USD"]["rate_yoy_percent_claim"])
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 21, "1": 7, "2": 0})
+        self.assertFalse(pair(r)["quote_annual_inflation_rate_present"])
+        self.assertIn("ANNUAL_RATE_DENOMINATOR_MISSING", pair(r)["comparison_blockers"])
+        self.assert_no_trading(r)
 
 if __name__ == "__main__":
     unittest.main()
