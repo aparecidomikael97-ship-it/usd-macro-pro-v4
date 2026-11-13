@@ -137,7 +137,7 @@ class BoJGuidelineReceiptTests(unittest.TestCase):
         out = self.check(body=body, rec=receipt(body))
         self.safe(out)
         self.assertEqual(out["policy_guideline_target_pct_claim"], "1.25")
-        self.assertEqual(out["complementary_deposit_pct_claim"], "1.0")
+        self.assertEqual(out["complementary_deposit_pct_claim"], "1.00")
 
     def test_missing_market_heading_guideline_footer_or_ambiguous_repeat_blocks(self):
         for opts in (
