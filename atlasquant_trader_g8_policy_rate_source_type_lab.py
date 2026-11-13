@@ -207,7 +207,10 @@ def inspect_g8_policy_rate_candidates_lab(
         if (floor is None or ceiling is None or effective is None
                 or published is None or observed is None
                 or not published <= observed <= decision <= now
-                or effective > decision.date()):
+                # A date-only "effective today" field has no intraday
+                # release time; do not assume it existed before the
+                # decision cutoff on that same day.
+                or effective >= decision.date()):
             out["reason"] = "RATE_VALUE_CLAIM_OR_POINT_IN_TIME_CHRONOLOGY_INVALID"
             return out
         if expected["kind"] == "RANGE":
