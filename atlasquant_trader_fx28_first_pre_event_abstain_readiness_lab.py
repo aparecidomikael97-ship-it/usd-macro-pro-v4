@@ -96,8 +96,14 @@ def _json_canonical(packet: Any, *, horizon: str,
         return False
     # Compare byte-for-byte canonical representation, not merely parsed
     # values: otherwise two JSON encodings can conceal different digests.
-    canonical = json.dumps(obj, sort_keys=True, ensure_ascii=True,
-                           separators=(",", ":"), allow_nan=False)
+    try:
+        canonical = json.dumps(obj, sort_keys=True, ensure_ascii=True,
+                               separators=(",", ":"), allow_nan=False)
+    except (ValueError, TypeError, OverflowError):
+        # JSON syntax can include nonstandard NaN/Infinity under the
+        # standard decoder; never allow a malformed caller packet to
+        # crash the readiness preflight.
+        return False
     if canonical != packet:
         return False
     pairs = obj.get("pairs")
