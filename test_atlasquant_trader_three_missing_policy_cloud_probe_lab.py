@@ -83,8 +83,8 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.assertIsNone(out["source_results"]["NZD"]["official_policy_pct_claim"])
         self.assertEqual(
             out["source_results"]["NZD"]["status"],
-            "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO")
-        self.assertFalse(out["rbnz_automated_access_permission_verified"])
+            "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
+        self.assertTrue(out["rbnz_ordinary_automation_permitted_by_issuer_terms"])
         self.assertEqual(out["planned_official_https_get_max"],2)
 
     def test_03_one_403_does_not_retry_and_other_two_continue(self):
@@ -128,7 +128,7 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.assertEqual(out["requests_started_claim"],2)
         self.assertEqual(out["valid_ephemeral_original_checks"],2)
         self.assertEqual(out["source_results"]["NZD"]["status"],
-                         "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO")
+                         "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
 
     def test_06_forged_go_state_refused_even_with_plausible_policy(self):
         steps=fixtures()
@@ -198,7 +198,7 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.assertEqual(out["source_results"]["CHF"]["status"],
                          "SOURCE_VALIDATOR_EXCEPTION_NO_GO")
         self.assertEqual(out["source_results"]["NZD"]["status"],
-                         "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO")
+                         "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
 
     def test_12_no_flag_cli_makes_no_http_requests(self):
         with patch("atlasquant_trader_three_missing_policy_cloud_probe_lab."
@@ -219,8 +219,8 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.safe(out)
         self.assertEqual(out["requests_started_claim"],2)
         self.assertEqual(out["planned_official_https_get_max"],2)
-        self.assertTrue(out["rbnz_automated_get_skipped_by_terms"])
-        self.assertFalse(out["rbnz_automated_access_permission_verified"])
+        self.assertTrue(out["rbnz_prior_403_route_is_suspended"])
+        self.assertTrue(out["rbnz_ordinary_automation_permitted_by_issuer_terms"])
         self.assertNotIn("body_sha256_ephemeral_claim",
                          out["source_results"]["NZD"])
 
