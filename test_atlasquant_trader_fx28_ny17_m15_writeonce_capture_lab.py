@@ -50,6 +50,8 @@ class FakeMT5:
         self.calls.append("copy_rates_range")
         if self.defective == "no_bars" and symbol == "EURUSD":
             return None
+        if self.defective == "empty_array" and symbol == "EURUSD":
+            return []
         stamps = list(range(int(start.timestamp()), int(end.timestamp()) + 1, 900))
         stamps = [t for t in stamps if t not in self.gaps.get(symbol, set())]
         if self.defective == "duplicate" and symbol == "EURUSD":
@@ -150,7 +152,7 @@ class Fx28ReadOnlyWriteOnceTests(unittest.TestCase):
     def test_06_missing_whole_pair_is_not_dropped_from_denominator(self):
         with TemporaryDirectory() as folder:
             root=Path(folder) / "capture"
-            r=self.run_capture(FakeMT5(defective="no_bars"),root)
+            r=self.run_capture(FakeMT5(defective="empty_array"),root)
             self.assertEqual(r["captured_symbols"],28)
             self.assertEqual(r["captured_m15_total"],27*96)
             self.assertEqual(r["missing_m15_total"],96)
@@ -204,6 +206,60 @@ class Fx28ReadOnlyWriteOnceTests(unittest.TestCase):
                 self.assertEqual(api.calls,[])
                 self.assertEqual(r["state"],"LAB_FX28_M15_CAPTURE_BLOCKED")
                 self.assertFalse(r["trade_authorized"])
+
+
+    def test_12_none_from_mt5_is_api_failure_not_96_missing_bars(self):
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/"capture"
+            api=FakeMT5(defective="no_bars")
+            r=self.run_capture(api,root)
+            self.assertEqual(r["state"],"LAB_FX28_M15_CAPTURE_BLOCKED")
+            self.assertEqual(r["reason"],"MT5_HISTORY_QUERY_FAILED_NONE_EURUSD")
+            self.assertEqual(r["captured_symbols"],0)
+            self.assertIsNone(r["missing_m15_total"])
+            self.assertFalse(root.exists())
+            self.assertEqual(api.calls[-1],"shutdown")
+
+    def test_13_legacy_with_nonempty_archive_is_readable(self):
+        import json
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/"capture"
+            r=self.run_capture(FakeMT5(),root)
+            path=Path(r["archive_dir"])
+            manifest_path=path/"manifest.json"
+            m=json.loads(manifest_path.read_text(encoding="utf-8"))
+            for row in m["files"].values():
+                row.pop("mt5_query_returned_none")
+            manifest_path.write_text(json.dumps(m),encoding="utf-8")
+            verified=verify_archive_lab(path)
+            self.assertEqual(verified["symbol_hashes_verified"],28)
+            self.assertEqual(verified["missing_m15_total"],0)
+
+    def test_14_legacy_with_empty_unverified_query_fails_closed(self):
+        import json
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/"capture"
+            r=self.run_capture(FakeMT5(defective="empty_array"),root)
+            path=Path(r["archive_dir"])
+            manifest_path=path/"manifest.json"
+            m=json.loads(manifest_path.read_text(encoding="utf-8"))
+            m["files"]["EURUSD"].pop("mt5_query_returned_none")
+            manifest_path.write_text(json.dumps(m),encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"LEGACY_EMPTY_MT5_QUERY_UNVERIFIABLE_EURUSD"):
+                verify_archive_lab(path)
+
+    def test_15_manifest_must_not_claim_none_query_as_verified_market_gap(self):
+        import json
+        with TemporaryDirectory() as folder:
+            root=Path(folder)/"capture"
+            r=self.run_capture(FakeMT5(),root)
+            path=Path(r["archive_dir"])
+            manifest_path=path/"manifest.json"
+            m=json.loads(manifest_path.read_text(encoding="utf-8"))
+            m["files"]["EURUSD"]["mt5_query_returned_none"]=True
+            manifest_path.write_text(json.dumps(m),encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"MANIFEST_CSV_GAP_DISAGREEMENT_EURUSD"):
+                verify_archive_lab(path)
 
 
 if __name__ == "__main__":
