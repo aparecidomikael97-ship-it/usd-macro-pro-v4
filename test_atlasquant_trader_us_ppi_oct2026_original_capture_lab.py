@@ -458,13 +458,13 @@ class BLSOriginalPpiCaptureTests(unittest.TestCase):
         self.assertIn("  pull_request:", workflow)
         self.assertIn("  workflow_dispatch:", workflow)
         fetch_step = workflow.split(
-            "      - name: Exactly one official post-event BLS HTML GET and verified local replay\\n",
+            "      - name: Exactly one official post-event BLS HTML GET and verified local replay",
             1,
         )[1].split("      - name: Preserve ORIGINAL", 1)[0]
         self.assertIn("if: github.event_name == 'workflow_dispatch'", fetch_step)
         self.assertIn("id: source", fetch_step)
         upload_step = workflow.split(
-            "      - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research\\n",
+            "      - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research",
             1,
         )[1]
         self.assertIn(
