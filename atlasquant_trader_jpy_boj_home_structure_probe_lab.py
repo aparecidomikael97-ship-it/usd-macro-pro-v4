@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import re
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 
@@ -27,6 +28,27 @@ SCHEMA = "ATLASQUANT_JPY_BOJ_ONE_SHOT_HTML_STRUCTURE_DIAGNOSTIC_LAB_V1"
 MARKET = "The Bank's Market Operations"
 GUIDELINE = "Guideline"
 FOOTER = "Bank of Japan Operations"
+DEPOSIT_LABEL = "Interest Rate Applied to the Complementary Deposit Facility"
+LOAN_LABEL = "Basic Loan Rate"
+# These tolerant patterns are DIAGNOSTIC ONLY, not admission rules.
+_DEPOSIT_NEAR = re.compile(
+    re.escape(DEPOSIT_LABEL) +
+    r".{0,150}?[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s*%\\s+since",
+    re.I,
+)
+_LOAN_NEAR = re.compile(
+    re.escape(LOAN_LABEL) +
+    r".{0,150}?[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s*%\\s+since",
+    re.I,
+)
+_DEPOSIT_SPACE_PERCENT = re.compile(
+    re.escape(DEPOSIT_LABEL) +
+    r"\\s+[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s+%\\s+since", re.I,
+)
+_LOAN_SPACE_PERCENT = re.compile(
+    re.escape(LOAN_LABEL) +
+    r"\\s+[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s+%\\s+since", re.I,
+)
 
 
 def _base(reason: str) -> dict[str, Any]:
@@ -44,6 +66,12 @@ def _base(reason: str) -> dict[str, Any]:
         "whole_page_exact_policy_guideline_occurrences": 0,
         "whole_page_exact_deposit_occurrences": 0,
         "whole_page_exact_loan_occurrences": 0,
+        "deposit_label_exact_occurrences": 0,
+        "loan_label_exact_occurrences": 0,
+        "deposit_near_rate_and_since_diagnostic_occurrences": 0,
+        "loan_near_rate_and_since_diagnostic_occurrences": 0,
+        "deposit_space_before_percent_diagnostic_occurrences": 0,
+        "loan_space_before_percent_diagnostic_occurrences": 0,
         "last_market_section_guideline_found": False,
         "last_market_section_footer_found": False,
         "last_market_section_policy_occurrences": 0,
@@ -91,6 +119,16 @@ def inspect_boj_home_structure_lab(
     out["whole_page_exact_policy_guideline_occurrences"] = len(TARGET_RE.findall(text))
     out["whole_page_exact_deposit_occurrences"] = len(DEPOSIT_RE.findall(text))
     out["whole_page_exact_loan_occurrences"] = len(LOAN_RE.findall(text))
+    out["deposit_label_exact_occurrences"] = text.count(DEPOSIT_LABEL)
+    out["loan_label_exact_occurrences"] = text.count(LOAN_LABEL)
+    out["deposit_near_rate_and_since_diagnostic_occurrences"] = len(
+        _DEPOSIT_NEAR.findall(text))
+    out["loan_near_rate_and_since_diagnostic_occurrences"] = len(
+        _LOAN_NEAR.findall(text))
+    out["deposit_space_before_percent_diagnostic_occurrences"] = len(
+        _DEPOSIT_SPACE_PERCENT.findall(text))
+    out["loan_space_before_percent_diagnostic_occurrences"] = len(
+        _LOAN_SPACE_PERCENT.findall(text))
 
     market = text.rfind(MARKET)
     if market >= 0:
