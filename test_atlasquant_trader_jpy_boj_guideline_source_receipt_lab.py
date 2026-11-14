@@ -12,6 +12,7 @@ import unittest
 
 from atlasquant_trader_jpy_boj_guideline_source_receipt_lab import (
     URL, STATEMENT_URL, MAX_BYTES,
+    OFFICIAL_CANONICAL_HOME_URL, ALLOWED_FINAL_URLS,
     inspect_boj_home_guideline_receipt_lab as inspect,
 )
 from atlasquant_trader_jpy_boj_guideline_manual_capture_lab import (
@@ -66,8 +67,9 @@ def receipt(body):
 
 
 class FakeResponse:
-    def __init__(self, body):
+    def __init__(self, body, final_url=URL):
         self.raw = BytesIO(body)
+        self.final_url = final_url
         self.status = 200
         self.headers = {"Content-Type": "text/html; charset=utf-8"}
     def __enter__(self):
@@ -77,7 +79,7 @@ class FakeResponse:
     def read(self, n=-1):
         return self.raw.read(n)
     def geturl(self):
-        return URL
+        return self.final_url
 
 
 class BoJGuidelineReceiptTests(unittest.TestCase):
@@ -251,6 +253,79 @@ class BoJGuidelineReceiptTests(unittest.TestCase):
         self.assertTrue(out["boJ_current_policy_source_current_only"])
         self.assertFalse(out["oct30_issuer_release_time_independently_attested"])
         self.assertIsNone(out["calibrated_directional_probability"])
+
+    def test_official_canonical_index_htm_redirect_is_limited_and_not_signed(self):
+        self.assertEqual(
+            ALLOWED_FINAL_URLS,
+            frozenset((URL, "https://www.boj.or.jp/en/index.htm")))
+        rec = deepcopy(self.rec)
+        rec["final_url"] = OFFICIAL_CANONICAL_HOME_URL
+        rec["redirects_followed"] = True
+        out = self.check(rec=rec)
+        self.safe(out)
+        self.assertEqual(
+            out["state"], "LAB_JPY_BOJ_CURRENT_GUIDELINE_HTML_LOCALLY_CHECKED_NO_GO")
+        self.assertEqual(out["policy_guideline_target_pct_claim"], "1.25")
+        self.assertFalse(out["historic_first_seen_source_vintage_authenticated"])
+
+    def test_canonical_index_requires_true_redirect_receipt(self):
+        rec = deepcopy(self.rec)
+        rec["final_url"] = OFFICIAL_CANONICAL_HOME_URL
+        rec["redirects_followed"] = False
+        out = self.check(rec=rec)
+        self.safe(out)
+        self.assertEqual(out["reason"], "NONOFFICIAL_BOJ_URL_OR_UNSAFE_TRANSPORT_CLAIM")
+
+    def test_nonredirect_home_requires_false_redirect_receipt(self):
+        rec = deepcopy(self.rec)
+        rec["redirects_followed"] = True
+        out = self.check(rec=rec)
+        self.safe(out)
+        self.assertEqual(out["reason"], "NONOFFICIAL_BOJ_URL_OR_UNSAFE_TRANSPORT_CLAIM")
+
+    def test_official_host_unapproved_paths_query_and_hostspoof_block(self):
+        for url in (
+            "https://www.boj.or.jp/en/other.htm",
+            "https://www.boj.or.jp/en/index.htm?currency=JPY",
+            "https://boj.or.jp/en/index.htm",
+            "http://www.boj.or.jp/en/index.htm",
+            "https://www.boj.or.jp.evil.example/en/index.htm",
+            "https://www.boj.or.jp/en/INDEX.HTM",
+        ):
+            with self.subTest(url=url):
+                rec = deepcopy(self.rec)
+                rec["final_url"] = url
+                rec["redirects_followed"] = True
+                out = self.check(rec=rec)
+                self.safe(out)
+                self.assertEqual(
+                    out["reason"], "NONOFFICIAL_BOJ_URL_OR_UNSAFE_TRANSPORT_CLAIM")
+
+    def test_single_official_redirected_get_captures_hash_and_revalidates(self):
+        calls = []
+        times = iter(("2026-11-13T10:09:59Z", "2026-11-13T10:10:00Z"))
+        def opener(req, *, timeout):
+            calls.append((req.full_url, timeout))
+            return FakeResponse(self.body, final_url=OFFICIAL_CANONICAL_HOME_URL)
+        raw, rec = collect(open_url=opener, now_utc=lambda: next(times))
+        self.assertEqual(calls, [(URL,12)])
+        self.assertEqual(rec["final_url"], OFFICIAL_CANONICAL_HOME_URL)
+        self.assertTrue(rec["redirects_followed"])
+        self.assertEqual(sha256(raw).hexdigest(), rec["body_sha256"])
+        out = self.check(body=raw, rec=rec)
+        self.safe(out)
+        self.assertEqual(
+            out["state"], "LAB_JPY_BOJ_CURRENT_GUIDELINE_HTML_LOCALLY_CHECKED_NO_GO")
+
+    def test_canonical_redirect_never_overrides_semantic_policy_veto(self):
+        body = homepage(duplicate_policy=True)
+        rec = receipt(body)
+        rec["final_url"] = OFFICIAL_CANONICAL_HOME_URL
+        rec["redirects_followed"] = True
+        out = self.check(body=body, rec=rec)
+        self.safe(out)
+        self.assertEqual(out["reason"],
+                         "BOJ_POLICY_GUIDELINE_INSTRUMENT_OR_HTML_STRUCTURE_INVALID")
 
 
 if __name__ == "__main__":

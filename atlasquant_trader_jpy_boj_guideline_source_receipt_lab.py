@@ -28,6 +28,10 @@ from typing import Any
 
 SCHEMA = "ATLASQUANT_JPY_BOJ_CURRENT_POLICY_GUIDELINE_HTML_LAB_V1"
 URL = "https://www.boj.or.jp/en/"
+# The BoJ also serves the English homepage at this exact alternative.
+# Never accept arbitrary same-host paths, query strings or other redirects.
+OFFICIAL_CANONICAL_HOME_URL = "https://www.boj.or.jp/en/index.htm"
+ALLOWED_FINAL_URLS = frozenset((URL, OFFICIAL_CANONICAL_HOME_URL))
 STATEMENT_URL = "https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k261030a.pdf"
 MAX_BYTES = 300_000
 SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -154,12 +158,16 @@ def inspect_boj_home_guideline_receipt_lab(
             or type(receipt) is not dict or set(receipt) != RECEIPT_KEYS
             or now is None):
         return result
-    if (receipt["source_url"] != URL or receipt["final_url"] != URL
+    if (receipt["source_url"] != URL
+            or type(receipt["final_url"]) is not str
+            or receipt["final_url"] not in ALLOWED_FINAL_URLS
             or type(receipt["http_status"]) is not int or receipt["http_status"] != 200
             or type(receipt["content_type"]) is not str
             or receipt["content_type"].split(";")[0].strip().lower() != "text/html"
             or receipt["https_validation_claim"] is not True
-            or receipt["redirects_followed"] is not False
+            or type(receipt["redirects_followed"]) is not bool
+            or receipt["redirects_followed"] is not (
+                receipt["final_url"] != URL)
             or type(receipt["body_sha256"]) is not str
             or SHA.fullmatch(receipt["body_sha256"]) is None):
         result["reason"] = "NONOFFICIAL_BOJ_URL_OR_UNSAFE_TRANSPORT_CLAIM"
@@ -222,4 +230,5 @@ def inspect_boj_home_guideline_receipt_lab(
 
 
 __all__ = ("SCHEMA", "URL", "STATEMENT_URL", "MAX_BYTES",
-           "inspect_boj_home_guideline_receipt_lab")
+           "OFFICIAL_CANONICAL_HOME_URL", "ALLOWED_FINAL_URLS",
+    "inspect_boj_home_guideline_receipt_lab")
