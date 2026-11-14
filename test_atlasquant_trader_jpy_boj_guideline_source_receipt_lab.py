@@ -25,6 +25,7 @@ NOW = datetime(2026, 11, 13, 10, 11, tzinfo=UTC)
 
 
 def homepage(*, policy="1.25", deposit="1.25", loan="1.5",
+             deposit_pct_sep="", loan_pct_sep="",
              dissent="1.5", duplicate_policy=False,
              title="The Bank's Market Operations", footer=True):
     guideline = (
@@ -43,8 +44,8 @@ def homepage(*, policy="1.25", deposit="1.25", loan="1.5",
         "<section><h2>" + title + "</h2>"
         "<p>Uncollateralized Overnight Call Rate(average) %</p>"
         "<p>Interest Rate Applied to the Complementary Deposit Facility " +
-        deposit + "% since September 24, 2026</p>"
-        "<p>Basic Loan Rate " + loan + "% since September 24, 2026</p>"
+        deposit + deposit_pct_sep + "% since September 24, 2026</p>"
+        "<p>Basic Loan Rate " + loan + loan_pct_sep + "% since September 24, 2026</p>"
         "<h3>Guideline</h3><p>" + guideline + "</p>" +
         (f"<p>{guideline}</p>" if duplicate_policy else "") +
         ("<a>Bank of Japan Operations</a>" if footer else "") +
@@ -326,6 +327,42 @@ class BoJGuidelineReceiptTests(unittest.TestCase):
         self.safe(out)
         self.assertEqual(out["reason"],
                          "BOJ_POLICY_GUIDELINE_INSTRUMENT_OR_HTML_STRUCTURE_INVALID")
+
+
+    def test_official_boj_home_rate_spaces_before_percent_in_both_rows(self):
+        body = homepage(deposit_pct_sep=" ", loan_pct_sep=" ")
+        out = self.check(body=body, rec=receipt(body))
+        self.safe(out)
+        self.assertEqual(
+            out["state"], "LAB_JPY_BOJ_CURRENT_GUIDELINE_HTML_LOCALLY_CHECKED_NO_GO")
+        self.assertEqual(out["policy_guideline_target_pct_claim"], "1.25")
+        self.assertEqual(out["complementary_deposit_pct_claim"], "1.25")
+        self.assertEqual(out["basic_loan_rate_pct_claim"], "1.5")
+        self.assertTrue(out["supplementary_rates_separately_typed"])
+
+    def test_mixed_spaced_and_unspaced_supplementary_rates(self):
+        for dep, loan in (("", " "), (" ", "")):
+            with self.subTest(deposit_sep=repr(dep), loan_sep=repr(loan)):
+                body = homepage(deposit_pct_sep=dep, loan_pct_sep=loan)
+                out = self.check(body=body, rec=receipt(body))
+                self.safe(out)
+                self.assertEqual(
+                    out["state"], "LAB_JPY_BOJ_CURRENT_GUIDELINE_HTML_LOCALLY_CHECKED_NO_GO")
+
+    def test_extra_words_or_fake_instrument_between_number_percent_blocked(self):
+        for kwargs in (
+            {"deposit_pct_sep": " DIFFERENT INSTRUMENT "},
+            {"loan_pct_sep": " RANDOM MARKET RATE "},
+            {"deposit_pct_sep": "1"},
+            {"loan_pct_sep": "-"},
+        ):
+            with self.subTest(kwargs=kwargs):
+                body = homepage(**kwargs)
+                out = self.check(body=body, rec=receipt(body))
+                self.safe(out)
+                self.assertEqual(out["state"],"LAB_JPY_BOJ_GUIDELINE_SOURCE_BLOCKED")
+                self.assertEqual(
+                    out["reason"],"BOJ_POLICY_GUIDELINE_INSTRUMENT_OR_HTML_STRUCTURE_INVALID")
 
 
 if __name__ == "__main__":
