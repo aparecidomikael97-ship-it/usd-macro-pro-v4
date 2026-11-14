@@ -1,0 +1,39 @@
+name: AtlasQuant BoJ HTML Structure One-Shot LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_trader_jpy_boj_home_structure_probe_lab.py"
+      - "test_atlasquant_trader_jpy_boj_home_structure_probe_lab.py"
+      - ".github/workflows/atlasquant-trader-boj-home-structure-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    name: BoJ original HTML structure once — NO-GO
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout read-only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Synthetic parser tests before any request
+        run: |
+          python -m unittest -q test_atlasquant_trader_jpy_boj_home_structure_probe_lab
+      - name: Exactly one original BoJ homepage GET for count-only diagnostic
+        run: |
+          python -m atlasquant_trader_jpy_boj_home_structure_probe_lab --diagnose-official-once
+
+# No raw HTML logs/artifacts, retries, fallback domains, long-term original
+# archive, schedule, issue mutations, broker data, live forecasts or trading.
