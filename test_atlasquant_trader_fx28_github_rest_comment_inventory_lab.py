@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from io import BytesIO
 import json
+import os
 import unittest
 from unittest.mock import patch
 
@@ -314,6 +315,37 @@ class GitHubRawCommentInventoryTests(unittest.TestCase):
         self.assertFalse(r["canonical_28_pair_roster_bytes_reconciled"])
         self.assertFalse(r["publisher_and_first_seen_cryptographically_attested"])
         self.assertEqual(r["independently_authenticated_forecasts"],0)
+
+
+    def test_19_preexisting_readonly_token_never_printed_in_public_report(self):
+        secret="synthetic-token-NEVER-DISPLAY"
+        calls=[]
+        def opener(req,*,timeout):
+            calls.append(req.get_header("Authorization"))
+            return FakeReply(b"[]",req.full_url)
+        with patch.dict(os.environ,{"GITHUB_TOKEN":secret}):
+            r=collect(inspect_public_github=True,request_open=opener,
+                      observed_clock=lambda:BEFORE)
+        self.complete(r)
+        self.assertEqual(calls,["Bearer "+secret])
+        self.assertNotIn(secret,json.dumps(r))
+        self.assertEqual(r["http_requests_started"],1)
+
+    def test_20_bad_token_with_crlf_fails_before_request(self):
+        for bad in ("line\\nInjected: header","line\\rInjected: header","X"*2049):
+            with self.subTest(length=len(bad)):
+                opened=[]
+                def opener(req,*,timeout):
+                    opened.append(req.full_url)
+                    raise AssertionError("Should not call")
+                with patch.dict(os.environ,{"GITHUB_TOKEN":bad}):
+                    r=collect(inspect_public_github=True,request_open=opener,
+                              observed_clock=lambda:BEFORE)
+                self.safe(r)
+                self.assertEqual(r["state"],
+                                 "LAB_GITHUB_REST_COMMENT_INVENTORY_BLOCKED_NO_GO")
+                self.assertEqual(r["reason"],"UNSAFE_GITHUB_TOKEN_FORMAT_NO_REQUEST")
+                self.assertEqual(opened,[])
 
 
 if __name__=="__main__":
