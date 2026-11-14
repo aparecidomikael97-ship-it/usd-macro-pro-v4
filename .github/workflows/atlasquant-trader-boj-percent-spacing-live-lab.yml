@@ -1,0 +1,72 @@
+name: AtlasQuant BoJ Percent Spacing Live Validation LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_trader_jpy_boj_guideline_source_receipt_lab.py"
+      - "test_atlasquant_trader_jpy_boj_guideline_source_receipt_lab.py"
+      - ".github/workflows/atlasquant-trader-boj-percent-spacing-live-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: BoJ exact official page — one GET and no stored body
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout read-only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Synthetic source and byte-hash tests
+        run: |
+          python -m unittest -q test_atlasquant_trader_jpy_boj_guideline_source_receipt_lab
+      - name: Single real BoJ official page GET with strict validator
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from urllib.error import HTTPError, URLError
+          from atlasquant_trader_jpy_boj_guideline_manual_capture_lab import collect_boj_home_once_lab
+          from atlasquant_trader_jpy_boj_guideline_source_receipt_lab import inspect_boj_home_guideline_receipt_lab
+          import json,sys
+          try:
+              raw, receipt = collect_boj_home_once_lab()
+              now=datetime.now(timezone.utc).replace(microsecond=0)
+              report=inspect_boj_home_guideline_receipt_lab(
+                  original_html=raw, receipt=receipt, decision_at_utc=now)
+              valid=(report["state"] ==
+                  "LAB_JPY_BOJ_CURRENT_GUIDELINE_HTML_LOCALLY_CHECKED_NO_GO")
+              print(json.dumps({
+                  "state":report["state"],
+                  "reason":report["reason"],
+                  "body_sha256_ephemeral_claim":receipt["body_sha256"] if valid else None,
+                  "capture_utc_claim":receipt["finished_at_utc"] if valid else None,
+                  "policy_guideline_pct_claim":report["policy_guideline_target_pct_claim"] if valid else None,
+                  "complementary_deposit_pct_claim":report["complementary_deposit_pct_claim"] if valid else None,
+                  "basic_loan_rate_pct_claim":report["basic_loan_rate_pct_claim"] if valid else None,
+                  "source_html_retained":False,
+                  "historic_first_seen_authenticated":False,
+                  "fx_direction_authorized":False,
+                  "trade_authorized":False,
+              },sort_keys=True,indent=2))
+              sys.exit(0 if valid else 2)
+          except HTTPError as exc:
+              print("LAB_BOJ_OFFICIAL_HTTP_REFUSED_"+str(exc.code))
+              sys.exit(2)
+          except (URLError,OSError,ValueError,TypeError,KeyError,OverflowError):
+              print("LAB_BOJ_OFFICIAL_SOURCE_OR_RESPONSE_FAILED_NO_GO")
+              sys.exit(2)
+          PY
+
+# No retries, fallback, browser bypass, upload/redistribution of original
+# source, archive on AM12, cron, issue mutation, real forecast, MT5 or trades.
