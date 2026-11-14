@@ -33,21 +33,21 @@ LOAN_LABEL = "Basic Loan Rate"
 # These tolerant patterns are DIAGNOSTIC ONLY, not admission rules.
 _DEPOSIT_NEAR = re.compile(
     re.escape(DEPOSIT_LABEL) +
-    r".{0,150}?[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s*%\\s+since",
+    r".{0,150}?[0-9]{1,2}(?:\.[0-9]{1,3})?\s*%\s+since",
     re.I,
 )
 _LOAN_NEAR = re.compile(
     re.escape(LOAN_LABEL) +
-    r".{0,150}?[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s*%\\s+since",
+    r".{0,150}?[0-9]{1,2}(?:\.[0-9]{1,3})?\s*%\s+since",
     re.I,
 )
 _DEPOSIT_SPACE_PERCENT = re.compile(
     re.escape(DEPOSIT_LABEL) +
-    r"\\s+[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s+%\\s+since", re.I,
+    r"\s+[0-9]{1,2}(?:\.[0-9]{1,3})?\s+%\s+since", re.I,
 )
 _LOAN_SPACE_PERCENT = re.compile(
     re.escape(LOAN_LABEL) +
-    r"\\s+[0-9]{1,2}(?:\\.[0-9]{1,3})?\\s+%\\s+since", re.I,
+    r"\s+[0-9]{1,2}(?:\.[0-9]{1,3})?\s+%\s+since", re.I,
 )
 
 
