@@ -350,6 +350,12 @@ def inspect_fx28_672_two_axis_coverage_lab(
                     type(price) is not str or price not in PRICE_CLAIMS)):
             out["reason"] = "DUPLICATE_UNKNOWN_OR_UNSUPPORTED_SLOT_CLAIM"
             return out
+        # A future window can still receive a valid prospective forecast.
+        # Even an *untrusted claim* of non-issuance is premature until
+        # the nominal opportunity starts; do not pre-label it as missed.
+        if fc == "NOT_ISSUED_CLAIM_ONLY" and now < ids[sid][1]:
+            out["reason"] = "FORECAST_NOT_ISSUED_BEFORE_NOMINAL_WINDOW_OPEN"
+            return out
         if price is not None and now < ids[sid][2]:
             out["reason"] = "PRICE_CLAIM_BEFORE_NOMINAL_WINDOW_CLOSE"
             return out
