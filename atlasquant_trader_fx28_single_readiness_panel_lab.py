@@ -13,6 +13,7 @@ here. No network, orders, MT5, file writes, scheduler, alerts or deployment.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import re
 import os
 import json
 import argparse
@@ -36,6 +37,10 @@ from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
 )
 
 SCHEMA = "ATLASQUANT_TRADER_FX28_SINGLE_READINESS_PANEL_LAB_V1"
+# A deliberately conservative CURRENT LOCAL-CAPTURE claim threshold, not
+# release-time authenticity, source correctness, or economic-policy freshness.
+LOCAL_CAPTURE_RECENCY = timedelta(hours=24)
+_RECEIPT_STAMP = re.compile(r"20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ\Z")
 _POLICY_STATES = frozenset((
     "LAB_FX28_POLICY_ARCHIVE_EIGHT_ORIGINALS_LOCAL_ONLY_NO_GO",
     "LAB_FX28_POLICY_ARCHIVE_PARTIAL_OR_REJECTED_NO_GO",
@@ -58,6 +63,55 @@ def _utc(value: Any) -> datetime | None:
         return None
 
 
+def _local_receipt_age_status(
+    *, checked_currencies: list[str], archive_status: Any,
+    inspected_at_utc: datetime,
+) -> tuple[dict[str, str], list[str], list[str], list[str]] | None:
+    """Classify local capture-clock CLAIMS, not issuer first-published time.
+
+    The upstream file replay must already have SHA, filename, receipt shape
+    and issuer parser consistency. Missing metadata is UNKNOWN, never recent.
+    A claimed timestamp from the future or malformed present metadata is
+    an inconsistency and blocks the combined panel.
+    """
+    if type(archive_status) is not dict:
+        return None
+    rows: dict[str, str] = {}
+    recent: list[str] = []
+    stale: list[str] = []
+    unknown: list[str] = []
+    for currency in sorted(checked_currencies):
+        record = archive_status.get(currency)
+        if record is None:
+            rows[currency] = "LOCAL_RECEIPT_CLOCK_UNKNOWN_NOT_FRESH"
+            unknown.append(currency)
+            continue
+        if type(record) is not dict:
+            return None
+        stamp = record.get("selected_local_capture_utc_claim")
+        if stamp is None:
+            rows[currency] = "LOCAL_RECEIPT_CLOCK_UNKNOWN_NOT_FRESH"
+            unknown.append(currency)
+            continue
+        if type(stamp) is not str or _RECEIPT_STAMP.fullmatch(stamp) is None:
+            return None
+        try:
+            captured = datetime.strptime(
+                stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
+        age = inspected_at_utc - captured
+        if age < timedelta(0):
+            return None
+        if age <= LOCAL_CAPTURE_RECENCY:
+            rows[currency] = "RECENT_24H_LOCAL_RECEIPT_CLAIM_NOT_ISSUER_VINTAGE"
+            recent.append(currency)
+        else:
+            rows[currency] = "STALE_OVER_24H_LOCAL_RECEIPT_CLAIM"
+            stale.append(currency)
+    return rows, recent, stale, unknown
+
+
 def _base(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
@@ -70,6 +124,15 @@ def _base(reason: str) -> dict[str, Any]:
         "pairs_with_both_policy_documents": 0,
         "pairs_lacking_policy_document": 28,
         "missing_issuer_reference_urls": {},
+        "local_capture_age_threshold_hours": 24,
+        "recent_24h_local_receipt_claim_currencies": [],
+        "stale_over_24h_local_receipt_claim_currencies": [],
+        "unknown_local_receipt_clock_currencies": [],
+        "recent_24h_local_receipt_claim_count": 0,
+        "recent_24h_bilateral_policy_pair_count": 0,
+        "local_document_capture_age_status_by_currency": {},
+        "capture_recency_is_not_rate_freshness_or_issuer_first_seen": True,
+        "stale_policy_document_is_still_documentary_not_current": True,
         "factors_expected": 32,
         "factors_with_any_relevant_local_document": 0,
         "factors_with_independently_accepted_signed_effect": 0,
@@ -169,6 +232,19 @@ def inspect_fx28_single_readiness_panel_lab(
                != 28 - pair_count):
         out["reason"] = "POLICY_CURRENCY_SET_OR_PAIR_COVERAGE_INCOHERENT"
         return out
+    # Do not present an old local HTML/CSV screenshot as CURRENT source
+    # just because the issuer parser accepted its content months ago.
+    # Sources may be old yet remain valid documentary historical context.
+    aged = _local_receipt_age_status(
+        checked_currencies=accepted,
+        archive_status=policy.get("currency_archive_status"),
+        inspected_at_utc=now,
+    )
+    if aged is None:
+        out["reason"] = "POLICY_LOCAL_CAPTURE_RECEIPT_CLOCK_INCONSISTENT"
+        return out
+    age_rows, recent, stale, unknown = aged
+
     if (type(factors) is not dict or factors.get("schema") != FACTOR_SCHEMA
             or factors.get("state")
                 != "LAB_FX28_32_FACTOR_DOCUMENTARY_GAP_RECONCILED_NO_GO"
@@ -230,6 +306,13 @@ def inspect_fx28_single_readiness_panel_lab(
             code: _SOURCE_URLS[code] for code in sorted(set(missing) | set(rejected))
             if code in _SOURCE_URLS
         },
+        "recent_24h_local_receipt_claim_currencies": recent,
+        "stale_over_24h_local_receipt_claim_currencies": stale,
+        "unknown_local_receipt_clock_currencies": unknown,
+        "recent_24h_local_receipt_claim_count": len(recent),
+        "recent_24h_bilateral_policy_pair_count":
+            len(recent) * (len(recent) - 1) // 2,
+        "local_document_capture_age_status_by_currency": age_rows,
         "factors_with_any_relevant_local_document":
             factors["factor_slots_with_any_relevant_local_document"],
         "slots_accounted": 672,
