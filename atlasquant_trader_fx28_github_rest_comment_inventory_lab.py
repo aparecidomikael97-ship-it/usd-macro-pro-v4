@@ -260,8 +260,10 @@ def collect_public_github_issue_snapshot_once_lab(
     """Read only exact public GitHub REST endpoint, once per page, no retry.
 
     A caller can inject a fake opener in tests. Only the normal CLI uses the
-    standard HTTPS stack. No auth token is necessary for a public repository.
-    If the repository is private or unavailable, fail closed.
+    standard HTTPS stack. An existing GITHUB_TOKEN may authorize reading a
+    private repo on GitHub Actions; no key creation, logs or writes. A
+    missing token is allowed only if GitHub makes the issue public.
+    Unavailable/unauthorized issue = fail closed.
     """
     out = _reject("EXPLICIT_PUBLIC_GITHUB_READ_FLAG_REQUIRED")
     if inspect_public_github is not True:
@@ -277,15 +279,20 @@ def collect_public_github_issue_snapshot_once_lab(
     try:
         for page_number in range(1, MAX_PAGES+1):
             url = f"{ENDPOINT}?per_page={PAGE_SIZE}&page={page_number}"
-            req = Request(
-                url,
-                headers={
-                    "Accept": "application/vnd.github+json",
-                    "User-Agent": "AtlasQuant-FX28-ReadOnly-Witness-Audit",
-                    "X-GitHub-Api-Version": "2026-03-10",
-                },
-                method="GET",
-            )
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "AtlasQuant-FX28-ReadOnly-Witness-Audit",
+                "X-GitHub-Api-Version": "2026-03-10",
+            }
+            token = os.environ.get("GITHUB_TOKEN", "")
+            if token:
+                # Never print, return, hash, write or interpolate secrets.
+                # Reject CRLF so an environment string cannot add headers.
+                if (len(token) > 2048 or "\\r" in token or "\\n" in token):
+                    out["reason"] = "UNSAFE_GITHUB_TOKEN_FORMAT_NO_REQUEST"
+                    return out
+                headers["Authorization"] = "Bearer " + token
+            req = Request(url, headers=headers, method="GET")
             out["http_requests_started"] += 1
             with request_open(req, timeout=12) as response:
                 status = response.status
