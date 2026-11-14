@@ -1,0 +1,41 @@
+name: AtlasQuant JPY CHF NZD One-Shot Source Probe LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_trader_three_missing_policy_cloud_probe_lab.py"
+      - "test_atlasquant_trader_three_missing_policy_cloud_probe_lab.py"
+      - ".github/workflows/atlasquant-trader-three-missing-source-cloud-probe-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  issuer-diagnostics:
+    name: Three exact official HTTPS sources once (ephemeral NO-GO)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout read only, no retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Setup Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Check exact policy parsers with synthetic bytes before any HTTP
+        run: |
+          python -m unittest -q \
+            test_atlasquant_trader_three_missing_policy_cloud_probe_lab
+      - name: Try each missing first-party policy page at most once
+        run: |
+          python -m atlasquant_trader_three_missing_policy_cloud_probe_lab --probe-official
+
+# One-shot per PR workflow run (max 3 requests: JPY CHF NZD, no retries).
+# No cron, fallback endpoint, raw HTML upload, source-byte artifact,
+# persistent desktop archive, issue write, MT5, GO or trades.
