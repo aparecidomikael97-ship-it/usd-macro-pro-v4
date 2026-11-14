@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
@@ -57,7 +58,12 @@ class FakeSteps:
             def collect(c=currency):
                 self.calls.append(("get", c))
                 if c == self.broken and self.behavior == "network":
-                    raise OSError("synthetic 403/timeout")
+                    raise OSError("synthetic network/timeout")
+                if c == self.broken and self.behavior == "http_403":
+                    raise HTTPError("https://example.invalid/issuer", 403,
+                                    "synthetic access denied", None, None)
+                if c == self.broken and self.behavior == "url_error":
+                    raise URLError("synthetic TLS or transport")
                 finished = ("2026-11-13T16:50:00Z"
                             if c == self.broken and self.behavior == "future"
                             else "2026-11-13T15:50:00Z")
@@ -66,8 +72,8 @@ class FakeSteps:
             def check(*, receipt, decision_at_utc, c=currency, **kwargs):
                 self.calls.append(("validator", c))
                 if c == self.broken and self.behavior == "rejected":
-                    return {"state":"BLOCKED","trade_authorized":False,
-                            "publishable":False}
+                    return {"state":"BLOCKED","reason":"SYNTHETIC_INVALID_POLICY_DATA",
+                            "trade_authorized":False,"publishable":False}
                 return {"state":_STEPS[c][4],"trade_authorized":False,
                         "publishable":False}
             def save(*, body, receipt, local_appdata, c=currency):
@@ -112,6 +118,14 @@ class FivePolicyCollectorTests(unittest.TestCase):
         self.assertIsNone(r["calibrated_probability"])
         self.assertEqual(r["new_cost_brl"], 0)
         self.assertLessEqual(r["https_gets_attempted_or_started"], 5)
+        self.assertIsInstance(r["failure_diagnostics_by_currency"], dict)
+        for c, reason in r["failure_diagnostics_by_currency"].items():
+            self.assertIn(c, _ORDER)
+            self.assertIsInstance(reason, str)
+            self.assertTrue(reason)
+            # The diagnostic must not contain raw exceptions, URLs, or bodies.
+            self.assertNotIn("http://", reason.lower())
+            self.assertNotIn("https://", reason.lower())
 
     def test_01_default_no_flag_zero_reads_or_http(self):
         result, calls = self.call(capture=False)
@@ -162,6 +176,8 @@ class FivePolicyCollectorTests(unittest.TestCase):
         self.safe(r)
         self.assertEqual(r["https_gets_attempted_or_started"],5)
         self.assertEqual(r["currency_results"]["AUD"],"FETCH_VALIDATE_OR_SAVE_FAILED")
+        self.assertEqual(r["failure_diagnostics_by_currency"]["AUD"],
+                         "FETCH_TRANSPORT_OR_RESPONSE_EXCEPTION")
         self.assertEqual([c for op,c in self.fake.calls if op=="get"].count("AUD"),1)
         self.assertIn(("get","NZD"),self.fake.calls)
         self.assertNotIn(("saver","AUD"),self.fake.calls)
@@ -172,6 +188,8 @@ class FivePolicyCollectorTests(unittest.TestCase):
         r,_=self.call(after=archive(checked=("GBP","JPY","AUD","NZD")))
         self.safe(r)
         self.assertEqual(r["currency_results"]["CHF"],"ISSUER_BYTES_OR_RECEIPT_REJECTED")
+        self.assertEqual(r["failure_diagnostics_by_currency"]["CHF"],
+                         "VALIDATOR_REJECTED_SYNTHETIC_INVALID_POLICY_DATA")
         self.assertNotIn(("saver","CHF"),self.fake.calls)
 
     def test_07_future_timestamp_blocks_source(self):
@@ -187,6 +205,8 @@ class FivePolicyCollectorTests(unittest.TestCase):
         r,_=self.call(after=archive(checked=("GBP","JPY","CHF","AUD")))
         self.safe(r)
         self.assertEqual(r["currency_results"]["NZD"],"FETCH_VALIDATE_OR_SAVE_FAILED")
+        self.assertEqual(r["failure_diagnostics_by_currency"]["NZD"],
+                         "LAB_LOCAL_SAVE_EXCEPTION")
         self.assertEqual(r["state"],"LAB_FX28_FIVE_SOURCE_CAPTURE_PARTIAL_OR_BLOCKED_NO_GO")
 
     def test_09_save_success_is_not_replay_success(self):
@@ -374,6 +394,37 @@ class FivePolicyCollectorTests(unittest.TestCase):
         self.assertEqual(clock.calls,7)
         self.assertEqual(r["currency_results"]["AUD"],
                          "SAVED_AND_LOCALLY_REPLAYED_ONLY_NO_GO")
+
+
+    def test_26_exact_http_403_code_no_retry_no_raw_message(self):
+        self.fake=FakeSteps("CHF","http_403")
+        r,_=self.call(after=archive(checked=("GBP","JPY","AUD","NZD")))
+        self.safe(r)
+        self.assertEqual(r["currency_results"]["CHF"],
+                         "FETCH_VALIDATE_OR_SAVE_FAILED")
+        self.assertEqual(r["failure_diagnostics_by_currency"]["CHF"],
+                         "OFFICIAL_HTTP_STATUS_403")
+        self.assertEqual([c for op,c in self.fake.calls if op=="get"].count("CHF"),1)
+        self.assertNotIn(("saver","CHF"),self.fake.calls)
+
+    def test_27_tls_or_url_error_not_misreported_as_disk_error(self):
+        self.fake=FakeSteps("NZD","url_error")
+        r,_=self.call(after=archive(checked=("GBP","JPY","CHF","AUD")))
+        self.safe(r)
+        self.assertEqual(r["failure_diagnostics_by_currency"]["NZD"],
+                         "OFFICIAL_URL_TLS_OR_NETWORK_FAILURE")
+        self.assertEqual([c for op,c in self.fake.calls if op=="get"].count("NZD"),1)
+
+    def test_28_success_and_skips_are_local_only_diagnostics(self):
+        r,_=self.call(before=archive(checked=("GBP",)),
+                      after=archive(checked=_ORDER))
+        self.safe(r)
+        self.assertEqual(r["failure_diagnostics_by_currency"]["GBP"],
+                         "RECENT_LOCAL_DOCUMENT_REUSED_NO_NEW_REQUEST")
+        self.assertEqual(r["failure_diagnostics_by_currency"]["AUD"],
+                         "LOCAL_REPLAY_PASSED_NOT_FIRST_SEEN_OR_ISSUER_PROOF")
+        self.assertFalse(r["trade_authorized"])
+        self.assertIsNone(r["calibrated_probability"])
 
 
 if __name__ == "__main__":
