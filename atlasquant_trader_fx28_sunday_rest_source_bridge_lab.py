@@ -186,7 +186,6 @@ def inspect_sunday_fx28_cross_source_preflight_lab(
             or sum(x.get("forecast_abstain_claim_only", -999)
                    for x in cohorts.values()) != 0
             or sum(x.get("not_started", -999)
-                   + x.get("window_open", -999)
                    for x in cohorts.values()) != ledger["not_yet_due_slots"]
             or sum(x.get("window_open", -999)
                    + x.get("window_closed", -999)
