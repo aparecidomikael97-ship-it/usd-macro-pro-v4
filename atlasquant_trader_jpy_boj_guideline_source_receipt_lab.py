@@ -40,13 +40,16 @@ TARGET_RE = re.compile(
     r"The Bank will encourage the uncollateralized overnight call rate"
     r" to remain at around ([0-9]{1,2}(?:\.[0-9]{1,3})?) percent\."
 )
+# Confirmed issuer HTML on Nov 14 contains a space before '%' for
+# BOTH supplementary rate rows. Allow <=1 optional separator, never a
+# wildcard or numeric extraction from another financial instrument.
 DEPOSIT_RE = re.compile(
     r"Interest Rate Applied to the Complementary Deposit Facility"
-    r" ([0-9]{1,2}(?:\.[0-9]{1,3})?)% since "
+    r" ([0-9]{1,2}(?:\.[0-9]{1,3})?)\s?% since "
     r"([A-Za-z]+ [0-9]{1,2}, 20[0-9]{2})"
 )
 LOAN_RE = re.compile(
-    r"Basic Loan Rate ([0-9]{1,2}(?:\.[0-9]{1,3})?)% since "
+    r"Basic Loan Rate ([0-9]{1,2}(?:\.[0-9]{1,3})?)\s?% since "
     r"([A-Za-z]+ [0-9]{1,2}, 20[0-9]{2})"
 )
 RECEIPT_KEYS = frozenset((
