@@ -67,6 +67,8 @@ class SundayRestLedgerSourceBridgeTests(unittest.TestCase):
         self.assertTrue(r["rest_server_timestamps_are_not_immutable_first_seen"])
         self.assertTrue(r["no_supplied_witness_never_proves_github_absence"])
         self.assertTrue(r["prewindow_absence_is_not_missing_forecast_yet"])
+        self.assertTrue(r["coverage_missing_input_never_promoted_to_not_issued"])
+        self.assertTrue(r["rest_metadata_never_promoted_to_directional_forecast"])
         for key in ("validated_direction_accuracy","calibrated_fx_probability"):
             self.assertIsNone(r[key])
         self.assertEqual((r["http_requests"],r["file_writes"],r["new_cost_brl"]),
@@ -230,6 +232,50 @@ class SundayRestLedgerSourceBridgeTests(unittest.TestCase):
                 self.safe(r)
                 self.assertEqual(
                     r["state"],"LAB_SUNDAY_FX28_CROSS_SOURCE_PREFLIGHT_BLOCKED_NO_GO")
+
+
+    def test_16_prewindow_two_axis_forecast_unknown_price_future(self):
+        r=self.report()
+        self.assertTrue(r["coverage_two_axis_nominal_census_reconciled"])
+        self.assertEqual(r["coverage_forecast_unknown_no_authenticated_roster"],672)
+        self.assertEqual(r["coverage_price_not_yet_labelable_by_clock"],672)
+        self.assertEqual(r["coverage_price_closed_but_without_verified_source"],0)
+        self.assertEqual(r["ledger_past_no_supplied_witness"],0)
+
+    def test_17_two_hash_only_rest_headers_not_56_auth_forecasts(self):
+        at=PREFLIGHT+timedelta(minutes=1)
+        r=self.report(now=at,inv=witness_report(at,horizons=("D1","W1")))
+        self.assertEqual(r["rest_first_window_candidate_count_claim"],2)
+        self.assertEqual(r["coverage_forecast_unknown_no_authenticated_roster"],672)
+        self.assertEqual(r["coverage_price_not_yet_labelable_by_clock"],672)
+        self.assertTrue(r["coverage_two_axis_nominal_census_reconciled"])
+        self.assertFalse(r["all_56_first_window_forecasts_authenticated"])
+
+    def test_18_open_window_is_due_not_finished_and_not_price_unavailable(self):
+        at=OPEN+timedelta(seconds=1)
+        r=self.report(now=at)
+        self.assertEqual(r["ledger_past_no_supplied_witness"],56)
+        self.assertEqual(r["ledger_future_no_supplied_witness"],616)
+        self.assertEqual(r["coverage_forecast_unknown_no_authenticated_roster"],672)
+        self.assertEqual(r["coverage_price_not_yet_labelable_by_clock"],672)
+        self.assertEqual(r["coverage_price_closed_but_without_verified_source"],0)
+
+    def test_19_first_d1_close_without_am12_does_not_infer_28_outcomes(self):
+        at=OPEN+timedelta(days=1)
+        r=self.report(now=at)
+        self.assertEqual(r["coverage_forecast_unknown_no_authenticated_roster"],672)
+        self.assertEqual(r["coverage_price_closed_but_without_verified_source"],28)
+        self.assertEqual(r["coverage_price_not_yet_labelable_by_clock"],644)
+        self.assertEqual(r["ledger_past_no_supplied_witness"],84)
+        self.assertFalse(r["broker_price_point_in_time_verified"])
+
+    def test_20_rest_unavailable_still_keeps_clock_only_two_axis_status(self):
+        r=check(inspected_at_utc=PREFLIGHT,github_rest_inventory=None)
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_SUNDAY_FX28_REST_NOT_OBSERVED_UNKNOWN_NO_GO")
+        self.assertTrue(r["coverage_two_axis_nominal_census_reconciled"])
+        self.assertEqual(r["coverage_forecast_unknown_no_authenticated_roster"],672)
+        self.assertIsNone(r["rest_comment_count_observed_claim"])
 
 
 if __name__=="__main__":
