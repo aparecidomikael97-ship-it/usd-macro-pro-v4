@@ -231,5 +231,118 @@ class Fx28ReadinessPanelTests(unittest.TestCase):
                          "LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
 
 
+    def test_16_two_recent_and_three_stale_are_not_five_realtime_sources(self):
+        p=mock_policy()
+        status={}
+        for c in ("AUD","GBP"):
+            status[c]={"selected_local_capture_utc_claim":"2026-11-14T00:00:00Z"}
+        for c in ("USD","EUR","CAD"):
+            status[c]={"selected_local_capture_utc_claim":"2026-11-12T22:00:00Z"}
+        p["currency_archive_status"]=status
+        r=self.run_panel(policy=p)
+        self.successful(r)
+        self.assertEqual(r["issuer_policy_document_count"],5)
+        self.assertEqual(r["pairs_with_both_policy_documents"],10)
+        self.assertEqual(r["recent_24h_local_receipt_claim_count"],2)
+        self.assertEqual(r["recent_24h_bilateral_policy_pair_count"],1)
+        self.assertEqual(r["recent_24h_local_receipt_claim_currencies"],
+                         ["AUD","GBP"])
+        self.assertEqual(r["stale_over_24h_local_receipt_claim_currencies"],
+                         ["CAD","EUR","USD"])
+        self.assertEqual(r["unknown_local_receipt_clock_currencies"],[])
+        self.assertFalse(r["issuer_identity_and_first_seen_independently_authenticated"])
+
+    def test_17_sunday_preflight_old_captures_do_not_remain_recent(self):
+        p=mock_policy()
+        p["currency_archive_status"]={
+            c:{"selected_local_capture_utc_claim":
+               "2026-11-13T23:56:00Z"} for c in p["currencies_locally_checked"]
+        }
+        sunday=datetime(2026,11,15,10,0,0,tzinfo=UTC)
+        r=self.run_panel(now=sunday,policy=p)
+        self.successful(r)
+        self.assertEqual(r["recent_24h_local_receipt_claim_count"],0)
+        self.assertEqual(r["recent_24h_bilateral_policy_pair_count"],0)
+        self.assertEqual(len(r["stale_over_24h_local_receipt_claim_currencies"]),5)
+        self.assertEqual(r["issuer_policy_document_count"],5)
+        self.assertEqual(r["pairs_with_both_policy_documents"],10)
+        self.assertEqual(r["slots_future_no_supplied_witness"],672)
+
+    def test_18_exact_24h_boundary_is_recent_one_second_later_stale(self):
+        p=mock_policy(("EUR","USD"))
+        p["currency_archive_status"]={
+            "EUR":{"selected_local_capture_utc_claim":"2026-11-13T00:25:00Z"},
+            "USD":{"selected_local_capture_utc_claim":"2026-11-13T00:24:59Z"},
+        }
+        r=self.run_panel(policy=p,factors=mock_factors(2))
+        self.successful(r)
+        self.assertEqual(r["recent_24h_local_receipt_claim_currencies"],["EUR"])
+        self.assertEqual(r["stale_over_24h_local_receipt_claim_currencies"],["USD"])
+        self.assertEqual(r["recent_24h_bilateral_policy_pair_count"],0)
+
+    def test_19_missing_clock_unknown_not_automatic_recent(self):
+        p=mock_policy()
+        r=self.run_panel(policy=p)
+        self.successful(r)
+        self.assertEqual(r["recent_24h_local_receipt_claim_count"],0)
+        self.assertEqual(r["unknown_local_receipt_clock_currencies"],
+                         ["AUD","CAD","EUR","GBP","USD"])
+        self.assertTrue(r["capture_recency_is_not_rate_freshness_or_issuer_first_seen"])
+
+    def test_20_malformed_future_and_spoofed_timestamp_all_fail_closed(self):
+        for stamp in ("2026-11-14T00:25:01Z","2026-11-14T00:25:00+00:00",
+                      "2026-13-14T00:25:00Z", "2026-11-14T00:25:00Z?fake",
+                      "notatime", True):
+            with self.subTest(stamp=stamp):
+                p=mock_policy()
+                p["currency_archive_status"]={"USD":{
+                    "selected_local_capture_utc_claim":stamp}}
+                r=self.run_panel(policy=p)
+                self.safe(r)
+                self.assertEqual(r["state"],
+                                 "LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+                self.assertEqual(r["reason"],
+                                 "POLICY_LOCAL_CAPTURE_RECEIPT_CLOCK_INCONSISTENT")
+
+    def test_21_recent_policy_documents_still_zero_signed_macro_probabilities(self):
+        p=mock_policy(tuple(CURRENCIES))
+        p["currency_archive_status"]={
+            c:{"selected_local_capture_utc_claim":"2026-11-14T00:20:00Z"}
+            for c in CURRENCIES
+        }
+        r=self.run_panel(policy=p,factors=mock_factors(8))
+        self.successful(r)
+        self.assertEqual(r["recent_24h_local_receipt_claim_count"],8)
+        self.assertEqual(r["recent_24h_bilateral_policy_pair_count"],28)
+        self.assertEqual(r["factors_with_independently_accepted_signed_effect"],0)
+        self.assertFalse(r["witnesses_independently_authenticated"])
+        self.assertFalse(r["trade_authorized"])
+
+    def test_22_clock_timestamp_cannot_be_credit_for_missing_currency(self):
+        p=mock_policy()
+        p["currency_archive_status"]={
+            "CHF":{"selected_local_capture_utc_claim":"2026-11-14T00:20:00Z"},
+            "AUD":{"selected_local_capture_utc_claim":"2026-11-14T00:20:00Z"},
+        }
+        r=self.run_panel(policy=p)
+        self.successful(r)
+        self.assertEqual(r["recent_24h_local_receipt_claim_currencies"],["AUD"])
+        self.assertEqual(r["issuer_policy_missing_currencies"],["CHF","JPY","NZD"])
+
+    def test_23_different_currency_receipt_age_types_and_none_fail_safely(self):
+        p=mock_policy()
+        p["currency_archive_status"]={"AUD":"2026-11-14T00:20:00Z"}
+        r=self.run_panel(policy=p)
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+        p=mock_policy()
+        p["currency_archive_status"]={"AUD":{
+            "selected_local_capture_utc_claim":None}}
+        r=self.run_panel(policy=p)
+        self.successful(r)
+        self.assertEqual(r["recent_24h_local_receipt_claim_count"],0)
+        self.assertIn("AUD",r["unknown_local_receipt_clock_currencies"])
+
+
 if __name__ == "__main__":
     unittest.main()
