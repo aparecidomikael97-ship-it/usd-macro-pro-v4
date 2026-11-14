@@ -332,7 +332,7 @@ class GitHubRawCommentInventoryTests(unittest.TestCase):
         self.assertEqual(r["http_requests_started"],1)
 
     def test_20_bad_token_with_crlf_fails_before_request(self):
-        for bad in ("line\\nInjected: header","line\\rInjected: header","X"*2049):
+        for bad in ("line\nInjected: header","line\rInjected: header","X"*2049):
             with self.subTest(length=len(bad)):
                 opened=[]
                 def opener(req,*,timeout):
