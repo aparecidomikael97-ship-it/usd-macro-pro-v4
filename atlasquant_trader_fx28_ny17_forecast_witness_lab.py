@@ -100,6 +100,7 @@ def _base(reason: str) -> dict[str, Any]:
         "nominal_windows_expected": 24,
         "witness_must_be_created_in_final_12h": True,
         "forecast_and_feature_cutoff_must_be_in_final_12h": True,
+        "early_body_dry_runs_are_not_witnesses": True,
         "witness_window_limit_hours": 12,
         "pair_horizon_slots_expected": EXPECTED_PAIR_HORIZON_SLOTS,
         "not_yet_due_slots": 0, "due_missing_witness_slots": 0,
@@ -128,6 +129,7 @@ def _base(reason: str) -> dict[str, Any]:
 
 def _canonical_roster(
     claim: WindowForecastWitnessClaim, *, inspected_at: datetime,
+    enforce_prewindow: bool = False,
 ) -> tuple[list[dict[str, str | None]], datetime] | None:
     start, end = _utc(claim.start_at), _utc(claim.end_at)
     if (start is None or end is None
@@ -149,9 +151,10 @@ def _canonical_roster(
                 or not _digest(record.model_sha256_claim)
                 or not _digest(record.evidence_sha256_claim)
                 or cutoff is None or issued is None
-                or not prewindow_open <= cutoff <= issued <= inspected_at
-                or not max(CAMPAIGN_PUBLICATION_CLAIM_UTC, prewindow_open)
-                    <= issued < start
+                or not cutoff <= issued <= inspected_at
+                or not CAMPAIGN_PUBLICATION_CLAIM_UTC <= issued < start
+                or (enforce_prewindow and cutoff < prewindow_open)
+                or (enforce_prewindow and issued < prewindow_open)
                 or (record.direction == "ABSTAIN"
                     and record.abstain_reason not in ABSTAIN_REASONS)
                 or (record.direction != "ABSTAIN"
@@ -183,8 +186,10 @@ def prepare_window_witness_body_lab(
            "canonical_forecast_payload_retained_externally": False,
            "body_posted_on_github": False, "external_precommit_verified": False}
     now, start, end = _utc(prepared_at), _utc(start_at), _utc(end_at)
-    if (now is None or start is None or end is None
-            or not start - PREWINDOW_LOOKBACK <= now < start):
+    # Early research dry-runs may prepare hashes, but they are never
+    # a prospective GitHub witness. Only census acceptance enforces the
+    # 12h pre-window contract. No external write occurs here.
+    if now is None or start is None or end is None or not now < start:
         return out
     if horizon not in ("D1", "W1") or (start, end) not in _nominal_windows(horizon):
         return out
@@ -248,7 +253,8 @@ def inspect_prospective_fx28_witness_census_lab(
                 or windows[key] != end or key in seen):
             out["reason"] = "DUPLICATE_UNKNOWN_OR_WRONG_NY17_WINDOW"
             return out
-        valid = _canonical_roster(claim, inspected_at=now)
+        valid = _canonical_roster(claim, inspected_at=now,
+                                  enforce_prewindow=True)
         if valid is None:
             out["reason"] = "INCOMPLETE_DUPLICATE_POST_EVENT_OR_INVALID_28FX_FORECASTS"
             return out
