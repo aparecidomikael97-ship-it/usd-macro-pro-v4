@@ -1,6 +1,8 @@
 """Manual one-shot RBNZ official OCR overview public source capture (LAB).
 
-Requires explicit --capture. No login, key, bypass, retries, broker,
+Requires explicit --capture. Current real HTTP route additionally suspended
+after prior HTTP 403; ordinary RBNZ automation IS allowed under Nov 12 terms,
+subject to documented conditions. No login, key, bypass, retries, broker,
 account, market prices, signals, trades, recurring task or deployment.
 If explicitly approved in the future, preserve official HTML + SHA receipt under
 %LOCALAPPDATA%/AtlasQuant/LAB/official_macro_receipts.
@@ -32,9 +34,10 @@ def collect_rbnz_ocr_once_lab(
     *,open_url:Callable[...,Any]=urlopen,
     now_utc:Callable[[],str]=_now,
 )->tuple[bytes,dict[str,Any]]:
-    # An injected opener is for offline synthetic tests only.
-    # Production use always supplies the actual urllib.urlopen default.
-    # A CLI flag is NOT the issuer's prior written permission.
+    # In synthetic unit tests an injected opener never performs actual HTTP.
+    # The default source route yielded HTTP 403 previously. Pause THAT
+    # route; do not misstate that all ordinary automation needs permission
+    # under the revised RBNZ Terms of Use dated 12 November 2026.
     if open_url is urlopen:
         raise PermissionError(RBNZ_BLOCK_REASON)
     start=now_utc()
@@ -91,11 +94,13 @@ def main()->int:
     if not args.capture:
         print("LAB_NO_HTTP_NO_FILES: explicit --capture required")
         return 2
-    # Fail before any HTTP or files even with --capture. Review written
-    # allow-list authorization before changing the production collector.
+    # Fail before HTTP/files on the route which returned 403. The RBNZ
+    # current terms DO allow ordinary compliant automation at <=120/hour,
+    # but do not force a new attempt on this previously denied route.
     terms=inspect_rbnz_automated_access_policy_lab()
-    if not terms["automated_collection_permission_verified"]:
-        print("LAB_RBNZ_PERMISSION_REQUIRED_NO_HTTP_NO_FILES: "+RBNZ_BLOCK_REASON)
+    if not terms["current_atlasquant_endpoint_access_allowed"]:
+        print("LAB_RBNZ_PREVIOUS_403_ROUTE_SUSPENDED_NO_HTTP_NO_FILES: "+
+              RBNZ_BLOCK_REASON)
         return 2
     try:
         body,receipt=collect_rbnz_ocr_once_lab()
