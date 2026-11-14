@@ -358,11 +358,17 @@ def main(
             if type(inventory) is dict else None)
         if (type(reported_gets) is not int or
                 not 1 <= reported_gets <= 5):
-            report.update({
-                "state": "LAB_SUNDAY_FX28_GITHUB_HTTP_COUNT_INVALID_NO_GO",
-                "reason": "REST_READER_REQUEST_COUNT_MISSING_ZERO_OR_UNBOUNDED",
-                "http_requests": None,
-            })
+            # Preserve the root error from the REST/ledger validator.
+            # Request accounting is only the primary error when the
+            # source report itself was otherwise fully admissible.
+            if report["state"] == (
+                "LAB_SUNDAY_FX28_REST_LEDGER_SOURCE_SEPARATED_NO_GO"
+            ):
+                report.update({
+                    "state": "LAB_SUNDAY_FX28_GITHUB_HTTP_COUNT_INVALID_NO_GO",
+                    "reason": "REST_READER_REQUEST_COUNT_MISSING_ZERO_OR_UNBOUNDED",
+                })
+            report["http_requests"] = None
         else:
             report["http_requests"] = reported_gets
         report["http_requests_provenance"] = (
