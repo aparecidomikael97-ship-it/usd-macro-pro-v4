@@ -1,10 +1,14 @@
-name: AtlasQuant JPY CHF NZD One-Shot Source Probe LAB
+name: AtlasQuant G8 Source Access Compliance Offline LAB
 
 on:
   pull_request:
     paths:
       - "atlasquant_trader_three_missing_policy_cloud_probe_lab.py"
       - "test_atlasquant_trader_three_missing_policy_cloud_probe_lab.py"
+      - "atlasquant_trader_nzd_rbnz_access_terms_lab.py"
+      - "test_atlasquant_trader_nzd_rbnz_access_terms_lab.py"
+      - "atlasquant_trader_nzd_rbnz_ocr_manual_capture_lab.py"
+      - "test_atlasquant_trader_nzd_rbnz_ocr_receipt_lab.py"
       - ".github/workflows/atlasquant-trader-three-missing-source-cloud-probe-lab.yml"
   workflow_dispatch:
 
@@ -13,7 +17,7 @@ permissions:
 
 jobs:
   issuer-diagnostics:
-    name: Three exact official HTTPS sources once (ephemeral NO-GO)
+    name: Offline source validation + RBNZ written-permission gate
     runs-on: ubuntu-latest
     timeout-minutes: 4
     env:
@@ -28,14 +32,42 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - name: Check exact policy parsers with synthetic bytes before any HTTP
+      - name: Check source parsers and RBNZ terms guard without HTTP
         run: |
           python -m unittest -q \
-            test_atlasquant_trader_three_missing_policy_cloud_probe_lab
-      - name: Try each missing first-party policy page at most once
+            test_atlasquant_trader_three_missing_policy_cloud_probe_lab \
+            test_atlasquant_trader_nzd_rbnz_access_terms_lab \
+            test_atlasquant_trader_nzd_rbnz_ocr_receipt_lab
+      - name: Prove NZD cloud probe refuses even an injected synthetic collector
         run: |
-          python -m atlasquant_trader_three_missing_policy_cloud_probe_lab --probe-official
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from atlasquant_trader_three_missing_policy_cloud_probe_lab import (
+              probe_three_missing_policy_sources_once_lab as probe, STEPS
+          )
+          calls=[]
+          def no_nzd_request():
+              calls.append("BAD_RBNZ_REQUEST")
+              raise RuntimeError("unauthorized RBNZ request")
+          steps={
+              c: ((lambda: (_ for _ in ()).throw(OSError("no network")))
+                  if c!="NZD" else no_nzd_request,
+                  STEPS[c][1], STEPS[c][2])
+              for c in ("JPY","CHF","NZD")
+          }
+          r=probe(explicit_probe=True,steps=steps,
+                  clock=lambda:datetime(2026,11,14,10,0,tzinfo=timezone.utc))
+          assert calls==[]
+          assert r["requests_started_claim"]==2
+          assert r["planned_official_https_get_max"]==2
+          assert (r["source_results"]["NZD"]["status"] ==
+                  "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO")
+          assert not r["trade_authorized"]
+          print("LAB_RBNZ_NO_HTTP_WRITTEN_PERMISSION_GATE_VERIFIED")
+          PY
 
-# One-shot per PR workflow run (max 3 requests: JPY CHF NZD, no retries).
-# No cron, fallback endpoint, raw HTML upload, source-byte artifact,
-# persistent desktop archive, issue write, MT5, GO or trades.
+# Never GET any issuer in PR/CI. The previous one-shot live results
+# remain in immutable GitHub run #43586776906 for traceability.
+# NZD no GET, even on workflow_dispatch; written RBNZ approval is
+# required before considering a separately reviewed future design.
+# No cron, artifacts, issue writes, MT5, GO or trades.
