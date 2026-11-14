@@ -290,8 +290,19 @@ class ProspectiveWitnessCensusTests(unittest.TestCase):
         prepared = prepare(horizon="D1", start_at=FIRST_START,
                            end_at=FIRST_END, forecast_roster=roster,
                            prepared_at=FIRST_START - timedelta(hours=1))
-        self.assertEqual(prepared["state"], "LAB_WITNESS_BODY_BLOCKED")
-        self.assertIsNone(prepared["body"])
+        # Early preparation is permitted as a DRY RUN, not proof of a
+        # prospective forecast. Only the census can count a witness.
+        self.assertEqual(prepared["state"],
+                         "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        self.assertFalse(prepared["body_posted_on_github"])
+        witness = replace(base.github_witness,
+                          comment_body=prepared["body"])
+        altered = replace(base, forecast_roster=roster,
+                          github_witness=witness)
+        value = self.audit((altered,))
+        self.assertEqual(value["reason"],
+                         "INCOMPLETE_DUPLICATE_POST_EVENT_OR_INVALID_28FX_FORECASTS")
+        self.safe(value)
 
     def test_prewindow_old_feature_cutoff_rejected_even_if_issued_recently(self):
         claim = make_claim()
@@ -309,8 +320,12 @@ class ProspectiveWitnessCensusTests(unittest.TestCase):
         prepared = prepare(horizon=claim.horizon, start_at=claim.start_at,
                            end_at=claim.end_at, forecast_roster=claim.forecast_roster,
                            prepared_at=old)
-        self.assertEqual(prepared["state"], "LAB_WITNESS_BODY_BLOCKED")
-        self.assertIsNone(prepared["forecast_roster_sha256"])
+        self.assertEqual(prepared["state"],
+                         "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        self.assertIsNotNone(prepared["forecast_roster_sha256"])
+        self.assertFalse(prepared["body_posted_on_github"])
+        # A research-only hash prepared before the 12h period is NOT an
+        # accepted externally witnessed forecast.
 
     def test_prewindow_old_comment_time_not_recast_as_pre_event_witness(self):
         claim = make_claim()
