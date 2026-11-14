@@ -106,6 +106,19 @@ def inspect_nzd_rbnz_policy_variant_lab(
         if checked["state"] != "LAB_NZD_RBNZ_OCR_HTML_LOCALLY_CHECKED_NO_GO":
             out["reason"] = checked["reason"]
             return out
+        # The overview parser checks the capture was during the stated
+        # issuer update window. Replaying later also needs to reject
+        # the stale document once its NEXT update has become due.
+        try:
+            next_update = datetime.fromisoformat(
+                checked["next_ocr_update_utc_interpreted_from_nz_local_claim"]
+            ).astimezone(timezone.utc)
+        except (ValueError, TypeError, OverflowError):
+            out["reason"] = "LEGACY_OCR_NEXT_UPDATE_CLOCK_INVALID"
+            return out
+        if cutoff >= next_update:
+            out["reason"] = "LEGACY_OCR_CARD_SUPERSEDED_AT_NEXT_SCHEDULED_UPDATE"
+            return out
         out.update({
             "state": ADMITTED_STATE,
             "reason": "LEGACY_OCR_OVERVIEW_DOCUMENT_CHECKED_NOT_A_TRADE",
