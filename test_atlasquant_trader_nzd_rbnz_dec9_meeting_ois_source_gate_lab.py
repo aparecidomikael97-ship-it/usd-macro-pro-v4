@@ -195,7 +195,19 @@ class RbnzOisSourceReadinessTests(unittest.TestCase):
         self.assertFalse(r["scheduler_enabled"])
         self.assertFalse(r["worker_enabled"])
 
-    def test_17_one_policy_event_not_seven_or_fourteen_independent_roots(self):
+    def test_17_correct_nzor_benchmark_midrate_not_immediate_tick(self):
+        r=self.ready("NZFMA_MEETING_DATE_OIS_LICENSED")
+        self.assertEqual(r["correct_benchmark_nzfbf_identifier"],"NZOR")
+        self.assertEqual(
+            r["correct_benchmark_official_methodology_url"],
+            "https://www.nzfbf.co.nz/benchmarks/closing-rates/nzor")
+        self.assertTrue(
+            r["nz_or_is_closing_midrate_between_consecutive_ocr_meetings"])
+        self.assertTrue(
+            r["a_closing_midrate_is_not_automatically_a_pre_event_tick"])
+        self.assertFalse(r["quote_capture_clock_before_event_verified"])
+
+    def test_18_one_policy_event_not_seven_or_fourteen_independent_roots(self):
         r=self.ready()
         self.assertEqual(r["economic_event_roots"],1)
         self.assertEqual(r["d1_w1_potential_event_exposures"],14)
