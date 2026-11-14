@@ -357,10 +357,10 @@ def main(
             inventory.get("http_requests_started")
             if type(inventory) is dict else None)
         if (type(reported_gets) is not int or
-                not 0 <= reported_gets <= 5):
+                not 1 <= reported_gets <= 5):
             report.update({
                 "state": "LAB_SUNDAY_FX28_GITHUB_HTTP_COUNT_INVALID_NO_GO",
-                "reason": "REST_READER_REQUEST_COUNT_MISSING_OR_UNBOUNDED",
+                "reason": "REST_READER_REQUEST_COUNT_MISSING_ZERO_OR_UNBOUNDED",
                 "http_requests": None,
             })
         else:
