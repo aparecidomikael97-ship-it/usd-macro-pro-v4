@@ -40,6 +40,7 @@ def page(month, *, sentence=None, extra="", title=None):
         '<!doctype html><html><head><title>Reserve Bank of New Zealand</title>'
         '<script>Fake market view to raise OCR to 99.0 percent.</script>'
         '</head><body><main><h1>'+title+'</h1>'
+        '<p>Reserve Bank of New Zealand official media release.</p>'
         '<p>'+sentence+'</p>'
         '<p>Inflation is expected to increase to 4.4 percent.</p>'
         '<p>Future OCR outlook: the committee may change rates later.</p>'
