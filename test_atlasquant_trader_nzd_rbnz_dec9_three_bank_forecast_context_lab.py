@@ -88,7 +88,7 @@ class ThreeBankDec9ForecastResearchTests(unittest.TestCase):
     def test_04_westpac_risks_and_data_dependence_are_disclosed(self):
         r=self.ready()
         risk={x["publisher"]:x["risk_note"] for x in r["bank_forecast_rows"]}
-        self.assertIn("not done deal",risk["WESTPAC"])
+        self.assertIn("far from done deal",risk["WESTPAC"])
         self.assertIn("global downside risks",risk["ANZ"])
         self.assertIn("not certainty",risk["BNZ"])
 
