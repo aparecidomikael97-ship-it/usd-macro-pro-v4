@@ -83,8 +83,11 @@ def _utc(value: Any) -> datetime | None:
 def _serialize_rows(rates: Any, *, expected: tuple[int, ...],
                     digits: int) -> tuple[bytes, list[int], int]:
     """Accept only strictly ordered, on-grid real bars; never synthesize gaps."""
+    # In MetaTrader5, None means an API/read failure, not proof that
+    # the broker emitted zero candles. NEVER translate a failed query
+    # into a complete missing-price archive.
     if rates is None:
-        rates = ()
+        raise ValueError("MT5_QUERY_NONE_IS_NOT_A_GAP")
     if len(rates) > len(expected):
         raise ValueError("TOO_MANY_M15_CANDLES")
     expected_set = set(expected)
@@ -159,6 +162,9 @@ def collect_window_lab(api: Any, *, window: str, terminal_path: str,
                         break
                     rates = api.copy_rates_range(
                         symbol, api.TIMEFRAME_M15, start, end - timedelta(minutes=15))
+                    if rates is None:
+                        problem = "MT5_HISTORY_QUERY_FAILED_NONE_" + symbol
+                        break
                     info_after = api.symbol_info(symbol)
                     if (info_after is None or
                             type(getattr(info_after, "visible", None)) is not bool or
@@ -176,7 +182,10 @@ def collect_window_lab(api: Any, *, window: str, terminal_path: str,
                         "last_expected_open_present": expected[-1] not in missing,
                         "market_watch_visible_claim": visible,
                         "price_digits_claim": spec["digits_claim"],
-                        "mt5_no_bars_returned": rates is None,
+                        # An empty returned array is still an uncertain
+                        # local absence, distinct from a None/API failure.
+                        "mt5_no_bars_returned": len(rates) == 0,
+                        "mt5_query_returned_none": False,
                     }
     except (AttributeError, TypeError, ValueError, KeyError, OSError,
             OverflowError, RuntimeError) as exc:
@@ -277,7 +286,11 @@ def verify_archive_lab(path: Path) -> dict[str, Any]:
         missing = sorted(expected.difference(times))
         if (len(times) != row["m15_returned"] or
                 len(missing) != row["m15_missing"] or
-                missing != row["missing_open_epochs_utc"]):
+                missing != row["missing_open_epochs_utc"] or
+                type(row.get("mt5_query_returned_none")) is not bool or
+                row["mt5_query_returned_none"] is not False or
+                type(row.get("mt5_no_bars_returned")) is not bool or
+                row["mt5_no_bars_returned"] != (len(times) == 0)):
             raise ValueError("MANIFEST_CSV_GAP_DISAGREEMENT_" + symbol)
         summaries[symbol] = len(missing)
     return {
