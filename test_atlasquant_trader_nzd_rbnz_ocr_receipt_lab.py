@@ -323,7 +323,7 @@ class NZDSourceTests(unittest.TestCase):
         # No opener is injected: this is the production HTTP path.
         # PermissionError is raised before urllib.urlopen is invoked.
         with self.assertRaisesRegex(
-            PermissionError, "PRIOR_WRITTEN_PERMISSION_REQUIRED"
+            PermissionError, "PREVIOUS_HTTP403_NO_AUTOMATED_RETRY_OR_BYPASS"
         ):
             collect()
 
@@ -339,7 +339,7 @@ class NZDSourceTests(unittest.TestCase):
               redirect_stdout(output)):
             self.assertEqual(main(),2)
         collector.assert_not_called()
-        self.assertIn("LAB_RBNZ_PERMISSION_REQUIRED_NO_HTTP_NO_FILES",
+        self.assertIn("LAB_RBNZ_PREVIOUS_403_ROUTE_SUSPENDED_NO_HTTP_NO_FILES",
                       output.getvalue())
 
 if __name__=="__main__":
