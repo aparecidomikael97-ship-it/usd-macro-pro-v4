@@ -1,0 +1,43 @@
+name: AtlasQuant RBNZ OCR Original Decision Articles LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_trader_nzd_rbnz_ocr_decision_article_lab.py"
+      - "test_atlasquant_trader_nzd_rbnz_ocr_decision_article_lab.py"
+      - ".github/workflows/atlasquant-trader-rbnz-ocr-decision-articles-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  issuer-ocr-decisions:
+    name: RBNZ Sept hike vs Oct hold — 2 official articles, no-GO
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout read-only without retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Prove adversarial parser contracts before network
+        run: |
+          python -m unittest -q \
+            test_atlasquant_trader_nzd_rbnz_ocr_decision_article_lab
+      - name: Check exactly two RSS-linked official OCR decision articles
+        run: |
+          python -m atlasquant_trader_nzd_rbnz_ocr_decision_article_lab --inspect-two-official-once
+
+# The two URLs were identified from the RBNZ official XML feed in run
+# 43590310919, not invented fallback URLs or retrying the denied OCR
+# HTML overview. Terms 12 Nov 2026 allow ordinary automation, 120/h and
+# RBNZ-Automated-Agent custom UA. Two GETs, no redirects, raw body uploads,
+# cron, webhook, MT5, orders, public live signals, or historical first seen.
