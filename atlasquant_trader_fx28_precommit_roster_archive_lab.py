@@ -236,6 +236,13 @@ def verify_roster_archive_lab(directory: Path) -> dict[str, Any]:
     prepared = prepare_window_witness_body_lab(
         horizon=horizon, start_at=start, end_at=end,
         forecast_roster=tuple(records), prepared_at=created)
+    if (receipt.get("input_schema") != INPUT_SCHEMA
+            or receipt.get("research_only") is not True
+            or receipt.get("model_prediction_accuracy") is not None
+            or receipt.get("horizon") != horizon
+            or receipt.get("start_utc") != start.isoformat()
+            or receipt.get("end_utc") != end.isoformat()):
+        raise ValueError("RECEIPT_CAMPAIGN_WINDOW_METADATA_MISMATCH")
     if (prepared["state"] != "LAB_WITNESS_BODY_PREPARED_NOT_POSTED"
             or prepared["canonical_forecast_json"].encode("ascii") != canonical
             or (prepared["body"] + "\n").encode("utf-8") != body):
