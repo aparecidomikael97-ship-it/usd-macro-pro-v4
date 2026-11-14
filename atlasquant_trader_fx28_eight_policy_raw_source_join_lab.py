@@ -40,8 +40,8 @@ from atlasquant_trader_cad_boc_valet_policy_receipt_lab import (
 from atlasquant_trader_aud_rba_cash_target_receipt_lab import (
     inspect_rba_cash_target_current_receipt_lab,
 )
-from atlasquant_trader_nzd_rbnz_ocr_receipt_lab import (
-    inspect_rbnz_official_ocr_receipt_lab,
+from atlasquant_trader_nzd_rbnz_policy_source_variant_lab import (
+    inspect_nzd_rbnz_policy_variant_lab, ADMITTED_STATE as NZD_ADMITTED_STATE,
 )
 
 SCHEMA = "ATLASQUANT_FX28_EIGHT_BANK_POLICY_RAW_SOURCE_JOIN_LAB_V1"
@@ -76,8 +76,8 @@ _VALIDATORS: dict[str, tuple[Callable[..., dict[str, Any]], str, str]] = {
         "original_html", "LAB_AUD_RBA_CASH_TARGET_HTML_LOCALLY_CHECKED_NO_GO",
     ),
     "NZD": (
-        inspect_rbnz_official_ocr_receipt_lab,
-        "original_html", "LAB_NZD_RBNZ_OCR_HTML_LOCALLY_CHECKED_NO_GO",
+        inspect_nzd_rbnz_policy_variant_lab,
+        "original_html", NZD_ADMITTED_STATE,
     ),
 }
 
