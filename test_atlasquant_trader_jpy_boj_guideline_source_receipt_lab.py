@@ -353,7 +353,7 @@ class BoJGuidelineReceiptTests(unittest.TestCase):
         for kwargs in (
             {"deposit_pct_sep": " DIFFERENT INSTRUMENT "},
             {"loan_pct_sep": " RANDOM MARKET RATE "},
-            {"deposit_pct_sep": "1"},
+            {"deposit_pct_sep": " text 1"},
             {"loan_pct_sep": "-"},
         ):
             with self.subTest(kwargs=kwargs):
