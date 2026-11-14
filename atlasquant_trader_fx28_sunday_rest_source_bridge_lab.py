@@ -21,11 +21,14 @@ model predictions, trade execution, or runtime modification.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import argparse
+import json
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from atlasquant_trader_fx28_github_rest_comment_inventory_lab import (
     SCHEMA as REST_SCHEMA,
+    collect_public_github_issue_snapshot_once_lab,
 )
 from atlasquant_trader_fx28_single_readiness_panel_lab import (
     SCHEMA as PANEL_SCHEMA,
@@ -305,7 +308,70 @@ def inspect_sunday_fx28_cross_source_preflight_lab(
     return out
 
 
+
+def main(
+    argv: list[str] | None = None, *,
+    get_inventory: Any = collect_public_github_issue_snapshot_once_lab,
+    observed_clock: Any = None,
+) -> int:
+    """Explicit one-shot REAL REST inventory -> 672-slot gate.
+
+    The GitHub collector performs bounded GET only after the CLI flag. The
+    bridge does not assume it can see AM12 local files from GitHub Actions.
+    Prints a bounded diagnosis, not the issue comment body or private token.
+    Both a failed REST request and a missing flag fail closed without
+    classifying missing comments as an absence of forecasts.
+    """
+    parser = argparse.ArgumentParser(
+        description="FX28 issue 1884 REST + 672 slot read-only preflight")
+    parser.add_argument("--read-public-github", action="store_true")
+    args = parser.parse_args(argv)
+    if not args.read_public_github:
+        print(json.dumps({
+            "state": "LAB_SUNDAY_FX28_EXPLICIT_GITHUB_READ_REQUIRED_NO_GO",
+            "operational_bias": "AGUARDAR", "trade_authorized": False,
+            "github_comments_observed": False, "network_requests": 0,
+        }, sort_keys=True))
+        return 2
+    if not callable(get_inventory):
+        print("LAB_SUNDAY_FX28_INVALID_GITHUB_READER_NO_GO")
+        return 2
+    if observed_clock is None:
+        observed_clock = lambda: datetime.now(timezone.utc).replace(
+            microsecond=0)
+    if not callable(observed_clock):
+        print("LAB_SUNDAY_FX28_INVALID_UTC_CLOCK_NO_GO")
+        return 2
+    try:
+        inventory = get_inventory(inspect_public_github=True)
+        now = observed_clock()
+        report = inspect_sunday_fx28_cross_source_preflight_lab(
+            inspected_at_utc=now, github_rest_inventory=inventory,
+            local_document_panel=None)
+        report["github_rest_gets_attempted_claim"] = (
+            inventory.get("http_requests_started")
+            if type(inventory) is dict else None)
+        report["am12_directly_contacted"] = False
+        report["raw_issue_comment_bodies_disclosed"] = False
+        print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+        return 0 if report["state"] == (
+            "LAB_SUNDAY_FX28_REST_LEDGER_SOURCE_SEPARATED_NO_GO"
+        ) else 2
+    except (OSError, ValueError, TypeError, RuntimeError,
+            OverflowError, RecursionError):
+        print(json.dumps({
+            "state": "LAB_SUNDAY_FX28_PUBLIC_REST_READ_EXCEPTION_NO_GO",
+            "operational_bias": "AGUARDAR", "trade_authorized": False,
+            "rest_witnesses_independently_attested": False,
+        }, sort_keys=True))
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
 __all__ = (
     "SCHEMA","FIRST_PRECOMMIT_ALLOWED_UTC","FIRST_D1","FIRST_W1",
-    "inspect_sunday_fx28_cross_source_preflight_lab",
+    "inspect_sunday_fx28_cross_source_preflight_lab", "main",
 )
