@@ -1,9 +1,11 @@
 """Synthetic RBNZ official cash-rate OCR source and mocked collector tests."""
 from __future__ import annotations
 from copy import deepcopy
-from datetime import datetime,timezone
+from datetime import datetime,timedelta,timezone
 from hashlib import sha256
 from io import BytesIO
+from unittest.mock import patch
+from zoneinfo import ZoneInfoNotFoundError
 import json,tempfile,unittest
 
 from atlasquant_trader_nzd_rbnz_ocr_receipt_lab import (
@@ -164,14 +166,87 @@ class NZDSourceTests(unittest.TestCase):
                 self.safe(r)
                 self.assertEqual(r["state"],"LAB_NZD_RBNZ_OCR_RECEIPT_BLOCKED")
 
-    def test_future_or_same_day_updated_date_never_pit_witness(self):
-        for updated in ("2:00pm, 13 Nov 2026","2:00pm, 14 Nov 2026",
+    def test_future_updated_date_never_pit_witness(self):
+        for updated in ("2:00pm, 14 Nov 2026",
                         "2:00pm, 31 Feb 2026","2:00pm, 28 Oct 2027"):
             with self.subTest(updated=updated):
                 raw=html_page(updated=updated)
                 r=self.check(raw=raw,rc=receipt(raw))
                 self.safe(r)
                 self.assertEqual(r["state"],"LAB_NZD_RBNZ_OCR_RECEIPT_BLOCKED")
+
+    def test_nz_summer_1400_update_is_0100_utc_same_day(self):
+        raw=html_page(updated="2:00pm, 13 Nov 2026")
+        r=self.check(raw=raw,rc=receipt(raw))
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_NZD_RBNZ_OCR_HTML_LOCALLY_CHECKED_NO_GO")
+        self.assertEqual(r["ocr_updated_utc_interpreted_from_nz_local_claim"],
+                         "2026-11-13T01:00:00+00:00")
+        self.assertTrue(r["nz_local_to_utc_interpretation_is_not_issuer_first_seen_proof"])
+        self.assertFalse(r["issuer_first_release_available_at_cutoff_verified"])
+
+    def test_nz_1400_exact_second_accepts_claim_not_true_first_seen(self):
+        raw=html_page(updated="2:00pm, 13 Nov 2026")
+        rc=receipt(raw)
+        rc["started_at_utc"]="2026-11-13T00:59:59Z"
+        rc["finished_at_utc"]="2026-11-13T01:00:00Z"
+        r=self.check(raw=raw,rc=rc)
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_NZD_RBNZ_OCR_HTML_LOCALLY_CHECKED_NO_GO")
+        self.assertFalse(r["historical_first_seen_vintage_authenticated"])
+
+    def test_one_second_before_nz_1400_update_is_blocked(self):
+        raw=html_page(updated="2:00pm, 13 Nov 2026")
+        rc=receipt(raw)
+        rc["started_at_utc"]="2026-11-13T00:59:58Z"
+        rc["finished_at_utc"]="2026-11-13T00:59:59Z"
+        r=self.check(raw=raw,rc=rc)
+        self.safe(r)
+        self.assertEqual(r["reason"],"RBNZ_OCR_POLICY_CARD_OR_CHRONOLOGY_INVALID")
+
+    def test_next_update_nz_1400_allows_before_but_not_at_cutoff(self):
+        raw=html_page(next_ocr="2:00pm, 13 Nov 2026")
+        for second,accepted in (("2026-11-13T00:59:59Z",True),
+                                ("2026-11-13T01:00:00Z",False)):
+            with self.subTest(second=second):
+                rc=receipt(raw)
+                at=datetime.strptime(second,"%Y-%m-%dT%H:%M:%SZ").replace(
+                    tzinfo=UTC)
+                rc["started_at_utc"]=(at-timedelta(seconds=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ")
+                rc["finished_at_utc"]=second
+                r=self.check(raw=raw,rc=rc)
+                self.safe(r)
+                self.assertEqual(r["state"]==
+                    "LAB_NZD_RBNZ_OCR_HTML_LOCALLY_CHECKED_NO_GO",accepted)
+
+    def test_nz_winter_1400_is_0200_utc_not_summer_offset(self):
+        raw=html_page(updated="2:00pm, 12 Jun 2026")
+        rc=receipt(raw)
+        rc["started_at_utc"]="2026-06-12T01:59:59Z"
+        rc["finished_at_utc"]="2026-06-12T02:00:00Z"
+        r=self.check(raw=raw,rc=rc,clock=NOW)
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_NZD_RBNZ_OCR_HTML_LOCALLY_CHECKED_NO_GO")
+        self.assertEqual(r["ocr_updated_utc_interpreted_from_nz_local_claim"],
+                         "2026-06-12T02:00:00+00:00")
+
+    def test_nz_winter_1400_one_second_early_blocked(self):
+        raw=html_page(updated="2:00pm, 12 Jun 2026")
+        rc=receipt(raw)
+        rc["started_at_utc"]="2026-06-12T01:59:58Z"
+        rc["finished_at_utc"]="2026-06-12T01:59:59Z"
+        r=self.check(raw=raw,rc=rc,clock=NOW)
+        self.safe(r)
+        self.assertEqual(r["reason"],"RBNZ_OCR_POLICY_CARD_OR_CHRONOLOGY_INVALID")
+
+    def test_missing_iana_tzdb_fails_closed_not_fixed_offset(self):
+        with patch("atlasquant_trader_nzd_rbnz_ocr_receipt_lab.ZoneInfo",
+                   side_effect=ZoneInfoNotFoundError("test-only tzdb missing")):
+            r=self.check()
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_NZD_RBNZ_OCR_RECEIPT_BLOCKED")
+        self.assertEqual(r["reason"],"RBNZ_OCR_POLICY_CARD_OR_CHRONOLOGY_INVALID")
 
     def test_next_update_in_past_or_now_does_not_authorize_current(self):
         for next_ in ("2:00pm, 12 Nov 2026","2:00pm, 13 Nov 2026",
