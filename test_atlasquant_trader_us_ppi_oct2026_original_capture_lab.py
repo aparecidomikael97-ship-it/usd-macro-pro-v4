@@ -449,5 +449,29 @@ class BLSOriginalPpiCaptureTests(unittest.TestCase):
         self.assertEqual(report["capture_get_attempts"],0)
 
 
+    def test_29_pr_updates_validate_offline_without_automatic_bls_get(self):
+        """Workflow PR events must not silently repeat external BLS capture."""
+        workflow = (
+            Path(__file__).resolve().parent / ".github" / "workflows" /
+            "atlasquant-trader-bls-ppi-oct2026-original-once-lab.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("  pull_request:", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
+        fetch_step = workflow.split(
+            "      - name: Exactly one official post-event BLS HTML GET and verified local replay\\n",
+            1,
+        )[1].split("      - name: Preserve ORIGINAL", 1)[0]
+        self.assertIn("if: github.event_name == 'workflow_dispatch'", fetch_step)
+        self.assertIn("id: source", fetch_step)
+        upload_step = workflow.split(
+            "      - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research\\n",
+            1,
+        )[1]
+        self.assertIn(
+            "if: github.event_name == 'workflow_dispatch' && steps.source.outcome == 'success'",
+            upload_step,
+        )
+
+
 if __name__=="__main__":
     unittest.main()
