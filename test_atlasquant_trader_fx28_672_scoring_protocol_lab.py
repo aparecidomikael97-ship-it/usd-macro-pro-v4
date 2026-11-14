@@ -14,6 +14,7 @@ from atlasquant_trader_fx_ny17_forecast_outcome_join_lab import (
 )
 from atlasquant_trader_fx28_672_scoring_protocol_lab import (
     SCHEMA, precommit_fx28_672_scoring_rules_lab as inspect,
+    inspect_fx28_672_two_axis_coverage_lab as coverage,
 )
 
 BEFORE = datetime(2026,11,13,18,tzinfo=timezone.utc)
@@ -262,6 +263,101 @@ class Fx28ScoringProtocolTests(unittest.TestCase):
         self.assertFalse(r["pre_event_publication_independently_authenticated"])
         self.assertIsNone(r["validated_hit_rate_percent"])
         self.assertTrue(r["research_only"])
+
+
+class Fx28TwoAxisCoverageTests(unittest.TestCase):
+    @staticmethod
+    def sid(*, horizon="D1", window=0, pair="EUR/USD"):
+        start=_nominal_windows(horizon)[window][0]
+        return f"FX28_NY17_{start.strftime('%Y%m%dT%H%MZ')}_{horizon}_{pair}"
+
+    def one(self, *, horizon="D1", window=0, pair="EUR/USD",
+            fc="DIRECTIONAL_CLAIM_ONLY", price=None):
+        return {
+            "slot_id":self.sid(horizon=horizon,window=window,pair=pair),
+            "forecast_status_claim":fc,
+            "price_status_claim":price,
+        }
+
+    def safe(self, r):
+        self.assertFalse(r["trade_authorized"])
+        self.assertFalse(r["publishable"])
+        self.assertEqual(r["operational_bias"],"AGUARDAR")
+        self.assertIsNone(r["validated_hit_rate_percent"])
+        self.assertIsNone(r["calibrated_probability"])
+        self.assertTrue(r["source_claims_not_issuer_or_broker_attestation"])
+        self.assertTrue(r["absence_of_supplied_claim_is_not_proof_of_nonissuance"])
+        self.assertTrue(r["price_gap_cannot_be_a_hit_or_abstention"])
+        self.assertEqual((r["http_requests"],r["file_writes"],r["new_cost_brl"]),(0,0,0))
+
+    def test_17_preflight_first_56_future_no_forecast_absence_inferred(self):
+        pre=datetime(2026,11,15,10,tzinfo=timezone.utc)
+        r=coverage(as_of_utc=pre)
+        self.safe(r)
+        self.assertTrue(r["all_slots_accounted"])
+        self.assertEqual(r["per_horizon"]["D1"]["slots"],560)
+        self.assertEqual(r["per_horizon"]["W1"]["slots"],112)
+        self.assertEqual(sum(v["forecast_unknown_no_supplied_evidence"]
+                             for v in r["per_horizon"].values()),672)
+        self.assertEqual(sum(v["price_not_yet_labelable_by_clock"]
+                             for v in r["per_horizon"].values()),672)
+
+    def test_18_after_first_d1_close_price_gap_never_abstention_or_hit(self):
+        after=datetime(2026,11,16,22,tzinfo=timezone.utc)
+        records=[
+            self.one(price="UNLABELABLE_M15_GAP_CLAIM_ONLY"),
+            self.one(pair="GBP/USD",fc="ABSTAIN_CLAIM_ONLY",
+                     price="COMPLETE_M15_CLAIM_ONLY"),
+            self.one(pair="AUD/USD",fc="NOT_ISSUED_CLAIM_ONLY",
+                     price="UNAVAILABLE_PRICE_CLAIM_ONLY"),
+            self.one(pair="NZD/USD",price="COMPLETE_M15_CLAIM_ONLY"),
+        ]
+        r=coverage(as_of_utc=after,supplied_slot_claims=records)
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_FX28_672_TWO_AXIS_COVERAGE_CLAIM_ONLY_NO_GO")
+        self.assertEqual(r["per_horizon"]["D1"]["window_closed"],28)
+        self.assertEqual(r["per_horizon"]["D1"]["price_unlabelable_m15_gap_claim_only"],1)
+        self.assertEqual(r["per_horizon"]["D1"]["forecast_abstain_claim_only"],1)
+        self.assertEqual(r["per_horizon"]["D1"]["forecast_not_issued_claim_only"],1)
+        self.assertEqual(r["per_horizon"]["D1"]["directional_with_price_complete_claim_only"],1)
+        self.assertEqual(r["per_horizon"]["W1"]["window_closed"],0)
+
+    def test_19_price_from_future_or_current_window_is_rejected(self):
+        for at in (datetime(2026,11,15,10,tzinfo=timezone.utc),
+                   datetime(2026,11,16,21,59,tzinfo=timezone.utc)):
+            r=coverage(as_of_utc=at,supplied_slot_claims=[
+                self.one(price="COMPLETE_M15_CLAIM_ONLY")])
+            self.safe(r)
+            self.assertEqual(r["reason"],"PRICE_CLAIM_BEFORE_NOMINAL_WINDOW_CLOSE")
+            self.assertFalse(r["all_slots_accounted"])
+
+    def test_20_unknown_duplicate_wrong_record_types_do_not_inflate_slots(self):
+        at=datetime(2026,11,16,22,tzinfo=timezone.utc)
+        valid=self.one(price="UNLABELABLE_M15_GAP_CLAIM_ONLY")
+        cases=[
+            [valid,dict(valid)],
+            [{**valid,"slot_id":"FX28_NOT_AN_ACTUAL_SLOT"}],
+            [{**valid,"forecast_status_claim":["DIRECTIONAL_CLAIM_ONLY"]}],
+            [{**valid,"price_status_claim":{"adversarial":"value"}}],
+            [{**valid,"untrusted_extra":True}],
+        ]
+        for c in cases:
+            with self.subTest(c=c):
+                r=coverage(as_of_utc=at,supplied_slot_claims=c)
+                self.safe(r)
+                self.assertEqual(r["state"],"LAB_FX28_672_COVERAGE_BLOCKED_NO_GO")
+                self.assertFalse(r["all_slots_accounted"])
+
+    def test_21_672_nominal_slots_remain_even_without_any_supplied_price(self):
+        at=FROZEN_END_UTC+timedelta(seconds=1)
+        r=coverage(as_of_utc=at,supplied_slot_claims=())
+        self.safe(r)
+        self.assertTrue(r["all_slots_accounted"])
+        self.assertEqual(sum(v["window_closed"] for v in r["per_horizon"].values()),672)
+        self.assertEqual(sum(v["price_unknown_no_supplied_evidence"]
+                             for v in r["per_horizon"].values()),672)
+        self.assertEqual(sum(v["forecast_not_issued_claim_only"]
+                             for v in r["per_horizon"].values()),0)
 
 if __name__=="__main__":
     unittest.main()
