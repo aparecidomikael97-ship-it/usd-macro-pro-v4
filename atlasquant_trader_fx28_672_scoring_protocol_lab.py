@@ -268,4 +268,151 @@ def precommit_fx28_672_scoring_rules_lab(
     return out
 
 
-__all__ = ("SCHEMA", "precommit_fx28_672_scoring_rules_lab")
+# Auxiliary census for unavailable data. This does NOT change the frozen
+# score formula above and NEVER upgrades a source or a self-declared status.
+COVERAGE_SCHEMA = "ATLASQUANT_FX28_672_COVERAGE_TWO_AXIS_CLAIM_ONLY_LAB_V1"
+FORECAST_CLAIMS = frozenset((
+    "DIRECTIONAL_CLAIM_ONLY", "ABSTAIN_CLAIM_ONLY",
+    "NOT_ISSUED_CLAIM_ONLY",
+))
+PRICE_CLAIMS = frozenset((
+    "COMPLETE_M15_CLAIM_ONLY", "UNLABELABLE_M15_GAP_CLAIM_ONLY",
+    "UNAVAILABLE_PRICE_CLAIM_ONLY",
+))
+
+
+def inspect_fx28_672_two_axis_coverage_lab(
+    *, as_of_utc: Any, supplied_slot_claims: Any = (),
+) -> dict[str, Any]:
+    """Reconcile all 672 fixed opportunities even when sources are missing.
+
+    A supplied record is an untrusted *claim*, NEVER authenticated proof
+    of pre-window issuance or Pepperstone historical price. Omitted records
+    mean UNKNOWN, NOT 'NOT_ISSUED'. Price reports are inadmissible before
+    the corresponding nominal window has CLOSED. This is a coverage-only
+    diagnostic, not a scorer and not a replacement for real archive joins.
+    """
+    out = {
+        "schema": COVERAGE_SCHEMA,
+        "state": "LAB_FX28_672_COVERAGE_BLOCKED_NO_GO",
+        "reason": "INVALID_CENSUS_INPUT",
+        "frozen_opportunities": 672,
+        "per_horizon": {},
+        "all_slots_accounted": False,
+        "source_claims_not_issuer_or_broker_attestation": True,
+        "absence_of_supplied_claim_is_not_proof_of_nonissuance": True,
+        "forecast_and_price_availability_are_independent_axes": True,
+        "price_gap_cannot_be_a_hit_or_abstention": True,
+        "validated_hit_rate_percent": None,
+        "calibrated_probability": None,
+        "trade_authorized": False,
+        "publishable": False,
+        "operational_bias": "AGUARDAR",
+        "http_requests": 0, "file_writes": 0, "new_cost_brl": 0,
+    }
+    now = _utc(as_of_utc)
+    if (now is None or type(supplied_slot_claims) not in (tuple, list)
+            or len(supplied_slot_claims) > 672):
+        return out
+    if len(OFFICIAL_PAIRS) != 28 or EXPECTED_PAIR_HORIZON_SLOTS != 672:
+        return out
+    windows = [
+        (horizon, start, end, pair)
+        for horizon in ("D1", "W1")
+        for start, end in _nominal_windows(horizon)
+        for pair in OFFICIAL_PAIRS
+    ]
+    if (len(windows) != 672 or
+            sum(h == "D1" for h, *_ in windows) != 560 or
+            sum(h == "W1" for h, *_ in windows) != 112):
+        out["reason"] = "FROZEN_CALENDAR_OR_PAIR_UNIVERSE_INVALID"
+        return out
+    ids = {
+        f"FX28_NY17_{start.strftime('%Y%m%dT%H%MZ')}_{h}_{pair}":
+            (h, start, end)
+        for h, start, end, pair in windows
+    }
+    if len(ids) != 672:
+        out["reason"] = "FROZEN_SLOT_IDENTIFIERS_NOT_UNIQUE"
+        return out
+    supplied = {}
+    for record in supplied_slot_claims:
+        if type(record) is not dict or set(record) != {
+                "slot_id", "forecast_status_claim", "price_status_claim"}:
+            out["reason"] = "INVALID_SLOT_CLAIM_SHAPE"
+            return out
+        sid = record["slot_id"]
+        fc = record["forecast_status_claim"]
+        price = record["price_status_claim"]
+        if (type(sid) is not str or sid not in ids or sid in supplied
+                or fc not in FORECAST_CLAIMS
+                or price is not None and price not in PRICE_CLAIMS):
+            out["reason"] = "DUPLICATE_UNKNOWN_OR_UNSUPPORTED_SLOT_CLAIM"
+            return out
+        if price is not None and now < ids[sid][2]:
+            out["reason"] = "PRICE_CLAIM_BEFORE_NOMINAL_WINDOW_CLOSE"
+            return out
+        supplied[sid] = (fc, price)
+
+    per_horizon = {}
+    total = 0
+    for horizon in ("D1", "W1"):
+        cnt = {
+            "slots": 0, "not_started": 0, "window_open": 0,
+            "window_closed": 0,
+            "forecast_unknown_no_supplied_evidence": 0,
+            "forecast_directional_claim_only": 0,
+            "forecast_abstain_claim_only": 0,
+            "forecast_not_issued_claim_only": 0,
+            "price_not_yet_labelable_by_clock": 0,
+            "price_unknown_no_supplied_evidence": 0,
+            "price_complete_m15_claim_only": 0,
+            "price_unlabelable_m15_gap_claim_only": 0,
+            "price_unavailable_claim_only": 0,
+            "directional_with_price_complete_claim_only": 0,
+        }
+        for h, start, end, pair in windows:
+            if h != horizon:
+                continue
+            sid = f"FX28_NY17_{start.strftime('%Y%m%dT%H%MZ')}_{h}_{pair}"
+            fc, price = supplied.get(sid, (None, None))
+            cnt["slots"] += 1
+            if now < start:
+                cnt["not_started"] += 1
+            elif now < end:
+                cnt["window_open"] += 1
+            else:
+                cnt["window_closed"] += 1
+            fk = {
+                None: "forecast_unknown_no_supplied_evidence",
+                "DIRECTIONAL_CLAIM_ONLY": "forecast_directional_claim_only",
+                "ABSTAIN_CLAIM_ONLY": "forecast_abstain_claim_only",
+                "NOT_ISSUED_CLAIM_ONLY": "forecast_not_issued_claim_only",
+            }[fc]
+            cnt[fk] += 1
+            if now < end:
+                cnt["price_not_yet_labelable_by_clock"] += 1
+            else:
+                pk = {
+                    None: "price_unknown_no_supplied_evidence",
+                    "COMPLETE_M15_CLAIM_ONLY": "price_complete_m15_claim_only",
+                    "UNLABELABLE_M15_GAP_CLAIM_ONLY":
+                        "price_unlabelable_m15_gap_claim_only",
+                    "UNAVAILABLE_PRICE_CLAIM_ONLY": "price_unavailable_claim_only",
+                }[price]
+                cnt[pk] += 1
+                if fc == "DIRECTIONAL_CLAIM_ONLY" and price == "COMPLETE_M15_CLAIM_ONLY":
+                    cnt["directional_with_price_complete_claim_only"] += 1
+        per_horizon[horizon] = cnt
+        total += cnt["slots"]
+    out.update({
+        "state": "LAB_FX28_672_TWO_AXIS_COVERAGE_CLAIM_ONLY_NO_GO",
+        "reason": "ALL_SLOTS_RECONCILED_SOURCE_AND_LABEL_AVAILABILITY_UNATTESTED",
+        "per_horizon": per_horizon,
+        "all_slots_accounted": total == 672,
+    })
+    return out
+
+
+__all__ = ("SCHEMA", "COVERAGE_SCHEMA", "precommit_fx28_672_scoring_rules_lab",
+           "inspect_fx28_672_two_axis_coverage_lab")
