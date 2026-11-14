@@ -1,7 +1,10 @@
-"""One bounded first-party HTTPS probe for missing JPY/CHF/NZD policy pages.
+"""One bounded first-party HTTPS check for JPY/CHF; NZD blocked by terms.
 
-Run once in a GitHub Actions ephemeral runner with explicit --probe-official.
+Offline on CI by default; explicit manual probe permits at most 2 GETs.
 Reuse EXISTING issuer-specific collectors and original-byte validators.
+The RBNZ now permits ORDINARY automated access on conditions (Nov 12
+terms); however THIS OCR HTML route returned 403, so it is suspended here.
+Never retry or change URL merely to evade that denial, even with mocks.
 No retries, mirror, challenges bypass, browser impersonation, fallbacks,
 source HTML logging, file writing, upload, MT5, trades, API subscriptions,
 model direction or archive recency claim on the user's disconnected AM12.
@@ -20,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 import json
 from urllib.error import HTTPError, URLError
+from atlasquant_trader_nzd_rbnz_access_terms_lab import RBNZ_BLOCK_REASON
 
 from atlasquant_trader_jpy_boj_guideline_manual_capture_lab import (
     collect_boj_home_once_lab,
@@ -88,7 +92,9 @@ def _base(reason: str) -> dict[str, Any]:
         "schema": SCHEMA,
         "state": "LAB_THREE_ISSUER_CLOUD_PROBE_NO_REQUEST",
         "reason": reason,
-        "planned_official_https_get_max": 3,
+        "planned_official_https_get_max": 2,
+        "rbnz_ordinary_automation_permitted_by_issuer_terms": True,
+        "rbnz_prior_403_route_is_suspended": True,
         "requests_started_claim": 0,
         "source_results": {},
         "valid_ephemeral_original_checks": 0,
@@ -148,6 +154,17 @@ def probe_three_missing_policy_sources_once_lab(
     out["state"] = "LAB_THREE_ISSUER_CLOUD_PROBE_COMPLETED_NO_GO"
     out["reason"] = "EPHEMERAL_POLICY_CHECKS_NO_LOCAL_AM12_ARCHIVE_OR_TRADE"
     for currency in ORDER:
+        if currency == "NZD":
+            # Existing RBNZ URL returned HTTP 403; do not retry or bypass.
+            # The issuer's revised Nov 12 terms permit other compliant
+            # ordinary automation, but this previously denied route remains
+            # suspended here, even with injected steps.
+            out["source_results"][currency] = {
+                "status": "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO",
+                "reason": RBNZ_BLOCK_REASON,
+                "official_policy_pct_claim": None,
+            }
+            continue
         collector, validator, rate_field = steps[currency]
         phase = "HTTPS_GET"
         out["requests_started_claim"] += 1

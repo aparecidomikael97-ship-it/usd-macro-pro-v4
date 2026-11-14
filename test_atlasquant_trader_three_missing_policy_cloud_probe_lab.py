@@ -1,4 +1,4 @@
-"""Offline tests for one-shot (max 3) issuer policy probes."""
+"""Offline tests: JPY/CHF may be queried, NZD must never GET without permission."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -71,18 +71,21 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.assertEqual(out["requests_started_claim"],0)
         self.assertEqual(touched,[])
 
-    def test_02_all_three_synthetic_originals_pass_but_never_live(self):
+    def test_02_only_jpy_chf_synthetic_originals_pass_nzd_permission_blocked(self):
         out=probe(explicit_probe=True,clock=lambda:NOW,steps=fixtures())
         self.safe(out)
         self.assertEqual(out["state"],"LAB_THREE_ISSUER_CLOUD_PROBE_COMPLETED_NO_GO")
-        self.assertEqual(out["requests_started_claim"],3)
-        self.assertEqual(out["valid_ephemeral_original_checks"],3)
+        self.assertEqual(out["requests_started_claim"],2)
+        self.assertEqual(out["valid_ephemeral_original_checks"],2)
         self.assertEqual(set(out["source_results"]),set(ORDER))
         self.assertEqual(out["source_results"]["JPY"]["official_policy_pct_claim"],"1.25")
         self.assertEqual(out["source_results"]["CHF"]["official_policy_pct_claim"],"0.00")
-        self.assertEqual(out["source_results"]["NZD"]["official_policy_pct_claim"],"2.75")
-        self.assertTrue(all(row["status"]=="VALIDATED_EPHEMERAL_BYTES_NOT_ARCHIVED_NO_GO"
-                            for row in out["source_results"].values()))
+        self.assertIsNone(out["source_results"]["NZD"]["official_policy_pct_claim"])
+        self.assertEqual(
+            out["source_results"]["NZD"]["status"],
+            "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
+        self.assertTrue(out["rbnz_ordinary_automation_permitted_by_issuer_terms"])
+        self.assertEqual(out["planned_official_https_get_max"],2)
 
     def test_03_one_403_does_not_retry_and_other_two_continue(self):
         steps=fixtures()
@@ -94,8 +97,8 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         out=probe(explicit_probe=True,clock=lambda:NOW,steps=steps)
         self.safe(out)
         self.assertEqual(calls,["JPY"])
-        self.assertEqual(out["requests_started_claim"],3)
-        self.assertEqual(out["valid_ephemeral_original_checks"],2)
+        self.assertEqual(out["requests_started_claim"],2)
+        self.assertEqual(out["valid_ephemeral_original_checks"],1)
         self.assertEqual(out["source_results"]["JPY"]["http_status"],403)
         self.assertEqual(out["source_results"]["JPY"]["status"],
                          "OFFICIAL_HTTPS_REQUEST_REJECTED_NO_GO")
@@ -107,23 +110,25 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         steps["CHF"]=(rejected,steps["CHF"][1],steps["CHF"][2])
         out=probe(explicit_probe=True,clock=lambda:NOW,steps=steps)
         self.safe(out)
-        self.assertEqual(out["valid_ephemeral_original_checks"],2)
+        self.assertEqual(out["valid_ephemeral_original_checks"],1)
         self.assertEqual(out["source_results"]["CHF"]["status"],
                          "OFFICIAL_TLS_OR_NETWORK_UNAVAILABLE_NO_GO")
         self.assertIsNone(out["source_results"]["CHF"]["official_policy_pct_claim"])
 
-    def test_05_validator_rejects_tampered_policy_bytes(self):
+    def test_05_rbnz_never_collected_even_if_injected_fake_ocr(self):
         steps=fixtures()
-        b,r=steps["NZD"][0]()
-        steps["NZD"]=(lambda: (b+b" altered",r),
-                      steps["NZD"][1],steps["NZD"][2])
+        seen=[]
+        def unauthorized_get():
+            seen.append(True)
+            raise AssertionError("RBNZ GET must never run")
+        steps["NZD"]=(unauthorized_get,steps["NZD"][1],steps["NZD"][2])
         out=probe(explicit_probe=True,clock=lambda:NOW,steps=steps)
         self.safe(out)
+        self.assertEqual(seen,[])
+        self.assertEqual(out["requests_started_claim"],2)
         self.assertEqual(out["valid_ephemeral_original_checks"],2)
         self.assertEqual(out["source_results"]["NZD"]["status"],
-                         "SOURCE_VALIDATOR_REJECTED_NO_GO")
-        self.assertEqual(out["source_results"]["NZD"]["validation_reason_code"],
-                         "RBNZ_ORIGINAL_HTML_SHA256_MISMATCH")
+                         "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
 
     def test_06_forged_go_state_refused_even_with_plausible_policy(self):
         steps=fixtures()
@@ -135,7 +140,7 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         steps["CHF"]=(steps["CHF"][0],fake,field)
         out=probe(explicit_probe=True,clock=lambda:NOW,steps=steps)
         self.safe(out)
-        self.assertEqual(out["valid_ephemeral_original_checks"],2)
+        self.assertEqual(out["valid_ephemeral_original_checks"],1)
         self.assertEqual(out["source_results"]["CHF"]["status"],
                          "SOURCE_VALIDATOR_REJECTED_NO_GO")
 
@@ -156,7 +161,7 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.safe(out)
         self.assertEqual(out["source_results"]["JPY"]["status"],
                          "INVALID_POST_GET_CLOCK_NO_GO")
-        self.assertEqual(out["valid_ephemeral_original_checks"],2)
+        self.assertEqual(out["valid_ephemeral_original_checks"],1)
 
     def test_09_post_capture_over_three_minutes_blocks(self):
         steps=fixtures()
@@ -181,17 +186,19 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
             self.safe(out)
             self.assertEqual(out["requests_started_claim"],0)
 
-    def test_11_validator_exceptions_do_not_skip_remaining_issuers(self):
+    def test_11_chf_validator_exception_does_not_enable_nzd(self):
         steps=fixtures()
         def invalid(**kwargs):
             raise ValueError("untrusted malformed source")
-        steps["NZD"]=(steps["NZD"][0],invalid,steps["NZD"][2])
+        steps["CHF"]=(steps["CHF"][0],invalid,steps["CHF"][2])
         out=probe(explicit_probe=True,clock=lambda:NOW,steps=steps)
         self.safe(out)
-        self.assertEqual(out["requests_started_claim"],3)
-        self.assertEqual(out["valid_ephemeral_original_checks"],2)
-        self.assertEqual(out["source_results"]["NZD"]["status"],
+        self.assertEqual(out["requests_started_claim"],2)
+        self.assertEqual(out["valid_ephemeral_original_checks"],1)
+        self.assertEqual(out["source_results"]["CHF"]["status"],
                          "SOURCE_VALIDATOR_EXCEPTION_NO_GO")
+        self.assertEqual(out["source_results"]["NZD"]["status"],
+                         "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
 
     def test_12_no_flag_cli_makes_no_http_requests(self):
         with patch("atlasquant_trader_three_missing_policy_cloud_probe_lab."
@@ -206,6 +213,16 @@ class ProbeThreeOfficialIssuerSourcesTests(unittest.TestCase):
         self.assertFalse(out["source_original_bytes_retained"])
         self.assertFalse(out["historical_first_seen_authenticated"])
         self.assertIsNone(out["calibrated_probability"])
+
+    def test_14_rbnz_gate_never_counts_cloud_original(self):
+        out=probe(explicit_probe=True,clock=lambda:NOW,steps=fixtures())
+        self.safe(out)
+        self.assertEqual(out["requests_started_claim"],2)
+        self.assertEqual(out["planned_official_https_get_max"],2)
+        self.assertTrue(out["rbnz_prior_403_route_is_suspended"])
+        self.assertTrue(out["rbnz_ordinary_automation_permitted_by_issuer_terms"])
+        self.assertNotIn("body_sha256_ephemeral_claim",
+                         out["source_results"]["NZD"])
 
 
 if __name__ == "__main__":

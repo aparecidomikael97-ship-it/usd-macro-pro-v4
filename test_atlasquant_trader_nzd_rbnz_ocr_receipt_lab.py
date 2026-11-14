@@ -318,5 +318,29 @@ class NZDSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"RBNZ_OCR_RESPONSE_TOO_LARGE"):
             collect(open_url=opener,now_utc=lambda:"2026-11-13T10:58:11Z")
 
+
+    def test_default_rbnz_collector_refuses_before_any_real_network(self):
+        # No opener is injected: this is the production HTTP path.
+        # PermissionError is raised before urllib.urlopen is invoked.
+        with self.assertRaisesRegex(
+            PermissionError, "PREVIOUS_HTTP403_NO_AUTOMATED_RETRY_OR_BYPASS"
+        ):
+            collect()
+
+    def test_capture_cli_flag_cannot_replace_written_permission(self):
+        import sys
+        from io import StringIO
+        from contextlib import redirect_stdout
+        from atlasquant_trader_nzd_rbnz_ocr_manual_capture_lab import main
+        output=StringIO()
+        with (patch.object(sys, "argv", ["rbnz", "--capture"]),
+              patch("atlasquant_trader_nzd_rbnz_ocr_manual_capture_lab."
+                    "collect_rbnz_ocr_once_lab") as collector,
+              redirect_stdout(output)):
+            self.assertEqual(main(),2)
+        collector.assert_not_called()
+        self.assertIn("LAB_RBNZ_PREVIOUS_403_ROUTE_SUSPENDED_NO_HTTP_NO_FILES",
+                      output.getvalue())
+
 if __name__=="__main__":
     unittest.main()
