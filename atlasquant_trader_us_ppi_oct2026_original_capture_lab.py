@@ -352,6 +352,27 @@ def capture_oct2026_bls_original_once_lab(
         }
         parsed = _check_bytes(body, receipt, after)
         if parsed is None:
+            # One network read, never print or store unvalidated HTML.
+            # Structural diagnostics reveal only existing validator reason
+            # codes (no economic values). Do not call alternative URLs
+            # or bypass Table 1 identity requirements.
+            first_print = inspect_ppi_oct2026_first_print_lab(
+                raw_html=body,
+                receipt=ClaimedPostReleaseHTTP(
+                    source_url=OFFICIAL_URL, status_code=200,
+                    content_type=content, started_utc=before,
+                    finished_utc=after,
+                    raw_sha256=receipt["raw_sha256"]),
+                as_of_utc=after,
+            )
+            if (type(first_print) is dict
+                    and type(first_print.get("reason")) is str
+                    and len(first_print["reason"]) <= 120):
+                out["strict_first_print_rejection_code"] = first_print["reason"]
+                if first_print.get("state") == _ACCEPTED:
+                    out["ex_trade_table1_row_missing_or_ambiguous"] = (
+                        _extract_ex_trade_actual_from_same_table1(body) is None
+                    )
             out["reason"] = "OFFICIAL_BLS_BYTES_TABLE1_OR_TIME_NOT_ACCEPTED"
             return out
         folder = _lab_folder(local_appdata)
