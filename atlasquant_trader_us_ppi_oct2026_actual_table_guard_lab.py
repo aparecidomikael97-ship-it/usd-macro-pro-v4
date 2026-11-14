@@ -335,7 +335,7 @@ def _strip_bls_label_footnotes(label: str) -> str:
     # Real BLS Table 1 includes superscript citations e.g. "(5)" in the
     # FD/49104 row. Remove only trailing numbered footnotes, not words,
     # before checking the full series name AND the FD commodity code.
-    return re.sub(r"(?:\s*\([0-9]{1,2}\))+\s*$", "", label).strip().casefold()
+    return re.sub(r"(?:\s*\(\s*[0-9]{1,2}\s*\))+\s*$", "", label).strip().casefold()
 
 
 def _extract_table_value(rows: list[tuple[str, ...]], exact_label: str,

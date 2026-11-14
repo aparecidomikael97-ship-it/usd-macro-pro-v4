@@ -1,0 +1,67 @@
+name: AtlasQuant BLS PPI Oct2026 Original Source LAB
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlasquant-trader-bls-ppi-oct2026-original-once-lab.yml"
+      - "atlasquant_trader_us_ppi_oct2026_original_capture_lab.py"
+      - "atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab.py"
+      - "test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bls-original-once:
+    name: BLS Oct2026 original bytes + receipt (post-event, NO-GO)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      # No runner-specific context in job-level env.
+    steps:
+      - name: Checkout without retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Verify existing BLS bytes, Table 1, receipt and write-once contracts offline
+        run: |
+          python -m unittest -q \
+            test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab \
+            test_atlasquant_trader_us_ppi_oct2026_original_capture_lab
+      - name: Exactly one official post-event BLS HTML GET and verified local replay
+        # PR updates run offline validation only; no repeated issuer GETs or
+        # expiring ZIP artifacts. External collection requires explicit dispatch.
+        if: github.event_name == 'workflow_dispatch'
+        id: source
+        env:
+          # runner.temp is available at STEP scope, not job env scope.
+          # Ephemeral runner archive, not AM12 and not 13-Nov first-seen.
+          LOCALAPPDATA: ${{ runner.temp }}
+        run: |
+          python -m atlasquant_trader_us_ppi_oct2026_original_capture_lab --capture-official
+      - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research
+        if: github.event_name == 'workflow_dispatch' && steps.source.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: atlasquant-bls-ppi-oct2026-postrelease-original-lab
+          path: ${{ runner.temp }}/AtlasQuant/LAB/official_macro_receipts/US_BLS_PPI_OCT2026_*/
+          if-no-files-found: error
+          retention-days: 30
+
+# PR event runs only offline validators; manual workflow_dispatch is the only
+# authorized network path (where dispatch is available for that workflow).
+# Explicit research probe; no retry, redirect or alternative/paid endpoint.
+# The ONLY network request to the economic issuer is the exact BLS HTML URL
+# hard-coded in the already-reviewed --capture-official command. An HTTP403,
+# inaccessible page, malformed source or absent table fails the job and
+# produces NO evidence archive. On success the GitHub Actions ARTIFACT can be
+# downloaded during retention, but this is not original 13-Nov first-seen,
+# not a user PC AM12 receipt, not a forecast or an FX direction.
+# No cron, merged branch, MT5 trade, user credentials or signals.

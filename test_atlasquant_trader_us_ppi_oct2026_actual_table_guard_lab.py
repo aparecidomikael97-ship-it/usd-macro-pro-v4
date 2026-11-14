@@ -584,5 +584,54 @@ def bls_implicit_header_october():
 
 
 
+
+class BLSActualOctoberFootnoteSpacingRegression(unittest.TestCase):
+    """REAL BLS HTML note has '( 5 )', not synthetic '(5)'."""
+
+    def test_01_spaced_real_footnotes_accept_exact_fd_series(self):
+        body=raw(head="0.3",core="0.3",extra="0.5")
+        body=body.replace(
+            b"Final demand less foods and energy</td>",
+            b"Final demand less foods and energy ( 5 )</td>")
+        body=body.replace(
+            b"Final demand less foods, energy, and trade services</td>",
+            b"Final demand less foods, energy, and trade services ( 5 )</td>")
+        report=inspect(raw_html=body,receipt=receipt(body),as_of_utc=AFTER)
+        self.assertEqual(report["state"],
+                         "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED")
+        self.assertEqual(report["core_ex_food_energy_sa_mom_pct_body_claim"],"0.3")
+        from atlasquant_trader_us_ppi_oct2026_macro_context_lab import (
+            _extract_ex_trade_actual_from_same_table1,
+        )
+        self.assertEqual(
+            str(_extract_ex_trade_actual_from_same_table1(body)),"0.5")
+        self.assertFalse(report["trade_authorized"])
+        self.assertIsNone(report["market_bias"])
+
+    def test_02_invalid_footnote_format_or_extra_words_still_blocks(self):
+        for label in (
+            b"Final demand less foods and energy ( 5 ) bogus",
+            b"Final demand less foods and energy ( v5 )",
+            b"Final demand less foods and energy ( 123 )",
+        ):
+            with self.subTest(label=label):
+                body=raw(head="0.3",core="0.3",extra="0.5").replace(
+                    b"Final demand less foods and energy</td>",label+b"</td>")
+                r=inspect(raw_html=body,receipt=receipt(body),as_of_utc=AFTER)
+                self.assertEqual(
+                    r["reason"],"MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+                self.assertFalse(r["trade_authorized"])
+
+    def test_03_spaced_citation_cannot_change_core_commodity_code(self):
+        body=raw(head="0.3",core="0.3",extra="0.5",swap_core=True)
+        body=body.replace(
+            b"Final demand goods less foods and energy</td>",
+            b"Final demand goods less foods and energy ( 5 )</td>")
+        r=inspect(raw_html=body,receipt=receipt(body),as_of_utc=AFTER)
+        self.assertEqual(
+            r["reason"],"MONTHLY_SA_TABLE1_SERIES_MISSING_OR_HEADLINE_MISMATCH")
+        self.assertFalse(r["trade_authorized"])
+
+
 if __name__ == '__main__':
     unittest.main()
