@@ -272,11 +272,16 @@ class Fx28TwoAxisCoverageTests(unittest.TestCase):
         return f"FX28_NY17_{start.strftime('%Y%m%dT%H%MZ')}_{horizon}_{pair}"
 
     def one(self, *, horizon="D1", window=0, pair="EUR/USD",
-            fc="DIRECTIONAL_CLAIM_ONLY", price=None):
+            fc="DIRECTIONAL_CLAIM_ONLY", price=None, issued="auto"):
+        start=_nominal_windows(horizon)[window][0]
+        if issued == "auto":
+            issued=(start-timedelta(hours=12)).isoformat() if (
+                fc != "NOT_ISSUED_CLAIM_ONLY") else None
         return {
             "slot_id":self.sid(horizon=horizon,window=window,pair=pair),
             "forecast_status_claim":fc,
             "price_status_claim":price,
+            "forecast_issued_at_utc_claim":issued,
         }
 
     def safe(self, r):
@@ -286,6 +291,8 @@ class Fx28TwoAxisCoverageTests(unittest.TestCase):
         self.assertIsNone(r["validated_hit_rate_percent"])
         self.assertIsNone(r["calibrated_probability"])
         self.assertTrue(r["source_claims_not_issuer_or_broker_attestation"])
+        self.assertTrue(r["forecast_issuance_clock_is_untrusted_caller_claim"])
+        self.assertTrue(r["backdated_clock_without_external_witness_is_not_authenticated"])
         self.assertTrue(r["absence_of_supplied_claim_is_not_proof_of_nonissuance"])
         self.assertTrue(r["price_gap_cannot_be_a_hit_or_abstention"])
         self.assertEqual((r["http_requests"],r["file_writes"],r["new_cost_brl"]),(0,0,0))
@@ -388,6 +395,75 @@ class Fx28TwoAxisCoverageTests(unittest.TestCase):
         self.safe(r)
         self.assertEqual(
             r["reason"],"FORECAST_NOT_ISSUED_BEFORE_NOMINAL_WINDOW_OPEN")
+
+
+    def test_24_timestamped_directional_only_pre_window_claim_no_attestation(self):
+        pre=datetime(2026,11,15,10,tzinfo=timezone.utc)
+        r=coverage(as_of_utc=pre,supplied_slot_claims=[self.one()])
+        self.safe(r)
+        self.assertTrue(r["all_slots_accounted"])
+        self.assertEqual(r["per_horizon"]["D1"]["forecast_directional_claim_only"],1)
+        self.assertEqual(r["per_horizon"]["D1"]["forecast_not_issued_claim_only"],0)
+        self.assertIsNone(r["validated_hit_rate_percent"])
+
+    def test_25_late_backfilled_unstamped_and_future_forecasts_are_rejected(self):
+        after=datetime(2026,11,16,22,tzinfo=timezone.utc)
+        start=_nominal_windows("D1")[0][0]
+        cases=[
+            None,
+            start.isoformat(),
+            (start+timedelta(seconds=1)).isoformat(),
+            (start-timedelta(hours=12,seconds=1)).isoformat(),
+            "2026-11-15T21:00:00",
+            "2026-11-15T21:00:00.123456+00:00",
+            "2026-11-15T21:00:00Z_EXTRA",
+            42,
+        ]
+        for stamp in cases:
+            with self.subTest(stamp=stamp):
+                r=coverage(as_of_utc=after,supplied_slot_claims=[
+                    self.one(issued=stamp)])
+                self.safe(r)
+                self.assertEqual(r["state"],"LAB_FX28_672_COVERAGE_BLOCKED_NO_GO")
+                self.assertEqual(
+                    r["reason"],"FORECAST_ISSUANCE_CLAIM_NOT_IN_12H_BEFORE_OPEN")
+
+    def test_26_abstain_requires_12h_cutoff_and_cannot_claim_issuance_after_open(self):
+        start=_nominal_windows("W1")[0][0]
+        after=start+timedelta(minutes=1)
+        ok=coverage(as_of_utc=after,supplied_slot_claims=[
+            self.one(horizon="W1",fc="ABSTAIN_CLAIM_ONLY",
+                     issued=(start-timedelta(seconds=1)).isoformat())])
+        self.safe(ok)
+        self.assertTrue(ok["all_slots_accounted"])
+        self.assertEqual(ok["per_horizon"]["W1"]["forecast_abstain_claim_only"],1)
+        bad=coverage(as_of_utc=after,supplied_slot_claims=[
+            self.one(horizon="W1",fc="ABSTAIN_CLAIM_ONLY",
+                     issued=(start+timedelta(seconds=1)).isoformat())])
+        self.safe(bad)
+        self.assertEqual(bad["reason"],
+                         "FORECAST_ISSUANCE_CLAIM_NOT_IN_12H_BEFORE_OPEN")
+
+    def test_27_pre_window_forecast_cannot_be_issued_in_caller_future(self):
+        first=datetime(2026,11,15,10,tzinfo=timezone.utc)
+        r=coverage(as_of_utc=first,supplied_slot_claims=[
+            self.one(issued=(first+timedelta(seconds=1)).isoformat())])
+        self.safe(r)
+        self.assertEqual(r["reason"],
+                         "FORECAST_ISSUANCE_CLAIM_NOT_IN_12H_BEFORE_OPEN")
+
+    def test_28_not_issued_cannot_carry_fake_issue_time_or_old_v1_schema(self):
+        start=_nominal_windows("D1")[0][0]
+        claim=self.one(fc="NOT_ISSUED_CLAIM_ONLY",
+                       issued=(start-timedelta(hours=1)).isoformat())
+        r=coverage(as_of_utc=start,supplied_slot_claims=[claim])
+        self.safe(r)
+        self.assertEqual(r["reason"],"NOT_ISSUED_MUST_NOT_CLAIM_A_FORECAST_TIME")
+        old=self.one()
+        old.pop("forecast_issued_at_utc_claim")
+        r=coverage(as_of_utc=start,supplied_slot_claims=[old])
+        self.safe(r)
+        self.assertEqual(r["reason"],"INVALID_SLOT_CLAIM_SHAPE")
 
 if __name__=="__main__":
     unittest.main()
