@@ -406,7 +406,6 @@ def capture_oct2026_bls_original_once_lab(
                             "group_code": row[1][:12],
                             "item_code": row[2][:12],
                             "physical_columns": len(row),
-                            "last_two_columns": list(row[-2:]),
                         }
                         for row in rows
                         if len(row) >= 3
