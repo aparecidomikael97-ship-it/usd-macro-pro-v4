@@ -284,11 +284,16 @@ def verify_archive_lab(path: Path) -> dict[str, Any]:
         if times != sorted(set(times)) or not set(times) <= expected:
             raise ValueError("CSV_EPOCH_INVALID_" + symbol)
         missing = sorted(expected.difference(times))
+        # Pre-fix local archives without this flag remain readable
+        # ONLY when they actually contain bars. An old empty CSV cannot
+        # distinguish an MT5 None/error from a genuine empty array.
+        if not times and "mt5_query_returned_none" not in row:
+            raise ValueError("LEGACY_EMPTY_MT5_QUERY_UNVERIFIABLE_" + symbol)
         if (len(times) != row["m15_returned"] or
                 len(missing) != row["m15_missing"] or
                 missing != row["missing_open_epochs_utc"] or
-                type(row.get("mt5_query_returned_none")) is not bool or
-                row["mt5_query_returned_none"] is not False or
+                ("mt5_query_returned_none" in row and
+                 row["mt5_query_returned_none"] is not False) or
                 type(row.get("mt5_no_bars_returned")) is not bool or
                 row["mt5_no_bars_returned"] != (len(times) == 0)):
             raise ValueError("MANIFEST_CSV_GAP_DISAGREEMENT_" + symbol)
