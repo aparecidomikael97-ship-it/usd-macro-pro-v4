@@ -1,7 +1,9 @@
-"""One bounded first-party HTTPS probe for missing JPY/CHF/NZD policy pages.
+"""One bounded first-party HTTPS check for JPY/CHF; NZD blocked by terms.
 
-Run once in a GitHub Actions ephemeral runner with explicit --probe-official.
+Offline on CI by default; explicit manual probe permits at most 2 GETs.
 Reuse EXISTING issuer-specific collectors and original-byte validators.
+RBNZ automated access requires prior written issuer permission; never
+attempt the NZD URL while blocked, even if a fake synthetic collector exists.
 No retries, mirror, challenges bypass, browser impersonation, fallbacks,
 source HTML logging, file writing, upload, MT5, trades, API subscriptions,
 model direction or archive recency claim on the user's disconnected AM12.
@@ -20,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 import json
 from urllib.error import HTTPError, URLError
+from atlasquant_trader_nzd_rbnz_access_terms_lab import RBNZ_BLOCK_REASON
 
 from atlasquant_trader_jpy_boj_guideline_manual_capture_lab import (
     collect_boj_home_once_lab,
@@ -88,7 +91,9 @@ def _base(reason: str) -> dict[str, Any]:
         "schema": SCHEMA,
         "state": "LAB_THREE_ISSUER_CLOUD_PROBE_NO_REQUEST",
         "reason": reason,
-        "planned_official_https_get_max": 3,
+        "planned_official_https_get_max": 2,
+        "rbnz_automated_access_permission_verified": False,
+        "rbnz_automated_get_skipped_by_terms": True,
         "requests_started_claim": 0,
         "source_results": {},
         "valid_ephemeral_original_checks": 0,
@@ -148,6 +153,15 @@ def probe_three_missing_policy_sources_once_lab(
     out["state"] = "LAB_THREE_ISSUER_CLOUD_PROBE_COMPLETED_NO_GO"
     out["reason"] = "EPHEMERAL_POLICY_CHECKS_NO_LOCAL_AM12_ARCHIVE_OR_TRADE"
     for currency in ORDER:
+        if currency == "NZD":
+            # RBNZ written authorization has not been verified. Never GET
+            # this issuer through the cloud probe, even via injected steps.
+            out["source_results"][currency] = {
+                "status": "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO",
+                "reason": RBNZ_BLOCK_REASON,
+                "official_policy_pct_claim": None,
+            }
+            continue
         collector, validator, rate_field = steps[currency]
         phase = "HTTPS_GET"
         out["requests_started_claim"] += 1
