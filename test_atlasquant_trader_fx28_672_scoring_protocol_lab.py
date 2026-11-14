@@ -359,5 +359,35 @@ class Fx28TwoAxisCoverageTests(unittest.TestCase):
         self.assertEqual(sum(v["forecast_not_issued_claim_only"]
                              for v in r["per_horizon"].values()),0)
 
+
+    def test_22_not_issued_cannot_be_claimed_before_start(self):
+        # At 06:00 Cuiaba the first 56 slots can STILL receive a forecast.
+        pre=datetime(2026,11,15,10,tzinfo=timezone.utc)
+        for horizon in ("D1", "W1"):
+            with self.subTest(horizon=horizon):
+                r=coverage(as_of_utc=pre,supplied_slot_claims=[
+                    self.one(horizon=horizon,fc="NOT_ISSUED_CLAIM_ONLY")])
+                self.safe(r)
+                self.assertEqual(
+                    r["reason"],"FORECAST_NOT_ISSUED_BEFORE_NOMINAL_WINDOW_OPEN")
+                self.assertFalse(r["all_slots_accounted"])
+
+    def test_23_exact_open_nonissuance_only_untrusted_and_next_week_future(self):
+        opening=datetime(2026,11,15,22,tzinfo=timezone.utc)
+        # The boundary itself makes non-issuance a possible *claim*, never a fact.
+        r=coverage(as_of_utc=opening,supplied_slot_claims=[
+            self.one(fc="NOT_ISSUED_CLAIM_ONLY")])
+        self.safe(r)
+        self.assertTrue(r["all_slots_accounted"])
+        self.assertEqual(r["per_horizon"]["D1"]["forecast_not_issued_claim_only"],1)
+        self.assertEqual(r["per_horizon"]["D1"]["window_open"],28)
+        self.assertEqual(r["per_horizon"]["D1"]["price_not_yet_labelable_by_clock"],560)
+        # A future weekly start cannot inherit today's non-issuance label.
+        r=coverage(as_of_utc=opening,supplied_slot_claims=[
+            self.one(horizon="W1",window=1,fc="NOT_ISSUED_CLAIM_ONLY")])
+        self.safe(r)
+        self.assertEqual(
+            r["reason"],"FORECAST_NOT_ISSUED_BEFORE_NOMINAL_WINDOW_OPEN")
+
 if __name__=="__main__":
     unittest.main()
