@@ -29,12 +29,14 @@ def run(argv,reader,now=PREFLIGHT):
 
 
 def clean_rest(now=PREFLIGHT):
-    return parse_rest(
+    report = parse_rest(
         raw_pages=pages(fixture_comment(
             body="Narrative comment only. Never a precommit.",
             created="2026-11-14T13:00:00Z",
             updated="2026-11-14T13:00:00Z")),
         observed_at_utc=now)
+    report["http_requests_started"] = 1  # synthetic injected REST reader
+    return report
 
 
 class SundayLiveReadonlyCliTests(unittest.TestCase):
@@ -60,6 +62,9 @@ class SundayLiveReadonlyCliTests(unittest.TestCase):
         self.assertEqual(ret,0)
         self.assertEqual(called,[{"inspect_public_github":True}])
         self.assertEqual(out["github_rest_gets_attempted_claim"],1)
+        self.assertEqual(out["http_requests"],1)
+        self.assertEqual(out["http_requests_provenance"],
+             "GITHUB_REST_COLLECTOR_ATTEMPTED_GETS_NOT_NETWORK_INDEPENDENT_ATTESTATION")
         self.assertEqual(out["rest_comment_count_observed_claim"],1)
         self.assertEqual(out["rest_exact_headers_observed_claim"],0)
         self.assertEqual(out["ledger_slots_accounted"],672)
@@ -81,6 +86,7 @@ class SundayLiveReadonlyCliTests(unittest.TestCase):
                 created="2026-11-15T10:00:00Z",
                 updated="2026-11-15T10:00:00Z")),
             observed_at_utc=at)
+        inv["http_requests_started"]=1
         ret,out=run(["--read-public-github"],
                     lambda **kwargs:inv,now=at)
         self.assertEqual(ret,0)
@@ -146,7 +152,30 @@ class SundayLiveReadonlyCliTests(unittest.TestCase):
         self.assertEqual(out["state"],
                          "LAB_SUNDAY_FX28_CROSS_SOURCE_PREFLIGHT_BLOCKED_NO_GO")
 
-    def test_11_reader_never_writes_or_orders_even_if_comments_count_positive(self):
+    def test_11_zero_or_forged_rest_request_count_never_success(self):
+        for invalid in (None, 0, -1, 6, True, "1"):
+            with self.subTest(value=invalid):
+                inv=clean_rest()
+                inv["http_requests_started"]=invalid
+                ret,out=run(["--read-public-github"],lambda **kw:inv)
+                self.assertEqual(ret,2)
+                self.assertEqual(
+                    out["state"],"LAB_SUNDAY_FX28_GITHUB_HTTP_COUNT_INVALID_NO_GO")
+                self.assertIsNone(out["http_requests"])
+                self.assertEqual(out["reason"],
+                    "REST_READER_REQUEST_COUNT_MISSING_ZERO_OR_UNBOUNDED")
+                self.assertFalse(out["trade_authorized"])
+
+    def test_12_two_pages_are_counted_without_exaggerating_source_validity(self):
+        inv=clean_rest()
+        inv["http_requests_started"]=2
+        ret,out=run(["--read-public-github"],lambda **kw:inv)
+        self.assertEqual(ret,0)
+        self.assertEqual(out["http_requests"],2)
+        self.assertEqual(out["github_rest_gets_attempted_claim"],2)
+        self.assertFalse(out["all_56_first_window_forecasts_authenticated"])
+
+    def test_13_reader_never_writes_or_orders_even_if_comments_count_positive(self):
         inv=clean_rest()
         inv["comments_reconciled"]=1
         ret,out=run(["--read-public-github"],lambda **kw:inv)
