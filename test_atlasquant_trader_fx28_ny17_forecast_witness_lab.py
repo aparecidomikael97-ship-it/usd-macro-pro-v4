@@ -11,6 +11,7 @@ from atlasquant_trader_fx28_ny17_forecast_witness_lab import (
     PairForecastClaim, GithubWitnessClaim, WindowForecastWitnessClaim,
     prepare_window_witness_body_lab as prepare,
     inspect_prospective_fx28_witness_census_lab as inspect,
+    PREWINDOW_LOOKBACK,
 )
 
 UTC = timezone.utc
@@ -264,6 +265,106 @@ class ProspectiveWitnessCensusTests(unittest.TestCase):
         self.assertGreater(report["due_missing_witness_slots"], 28)
         self.assertEqual(report["due_witness_claim_only_slots"], 28)
         self.safe(report)
+
+    def test_prewindow_exact_12_hours_is_accepted_for_hash_preparation_only(self):
+        self.assertEqual(PREWINDOW_LOOKBACK, timedelta(hours=12))
+        base = make_claim()
+        first = FIRST_START - PREWINDOW_LOOKBACK
+        roster = tuple(replace(record, feature_cutoff_at=first,
+                               forecast_issued_at=first)
+                       for record in base.forecast_roster)
+        prepared = prepare(horizon="D1", start_at=FIRST_START,
+                           end_at=FIRST_END, forecast_roster=roster,
+                           prepared_at=first)
+        self.assertEqual(prepared["state"],
+                         "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        self.assertFalse(prepared["body_posted_on_github"])
+        self.assertFalse(prepared["external_precommit_verified"])
+
+    def test_prewindow_one_second_stale_issuance_cannot_be_hash_published(self):
+        base = make_claim()
+        old = FIRST_START - PREWINDOW_LOOKBACK - timedelta(seconds=1)
+        roster = tuple(replace(record, feature_cutoff_at=old,
+                               forecast_issued_at=old)
+                       for record in base.forecast_roster)
+        prepared = prepare(horizon="D1", start_at=FIRST_START,
+                           end_at=FIRST_END, forecast_roster=roster,
+                           prepared_at=FIRST_START - timedelta(hours=1))
+        # Early preparation is permitted as a DRY RUN, not proof of a
+        # prospective forecast. Only the census can count a witness.
+        self.assertEqual(prepared["state"],
+                         "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        self.assertFalse(prepared["body_posted_on_github"])
+        witness = replace(base.github_witness,
+                          comment_body=prepared["body"])
+        altered = replace(base, forecast_roster=roster,
+                          github_witness=witness)
+        value = self.audit((altered,))
+        self.assertEqual(value["reason"],
+                         "INCOMPLETE_DUPLICATE_POST_EVENT_OR_INVALID_28FX_FORECASTS")
+        self.safe(value)
+
+    def test_prewindow_old_feature_cutoff_rejected_even_if_issued_recently(self):
+        claim = make_claim()
+        old = FIRST_START - PREWINDOW_LOOKBACK - timedelta(seconds=1)
+        row = replace(claim.forecast_roster[0], feature_cutoff_at=old)
+        altered = replace(claim, forecast_roster=(row,) + claim.forecast_roster[1:])
+        value = self.audit((altered,))
+        self.assertEqual(value["reason"],
+                         "INCOMPLETE_DUPLICATE_POST_EVENT_OR_INVALID_28FX_FORECASTS")
+        self.safe(value)
+
+    def test_prewindow_old_body_preparation_cannot_commit_28_roster(self):
+        claim = make_claim()
+        old = FIRST_START - PREWINDOW_LOOKBACK - timedelta(seconds=1)
+        # A valid research-only dry-run must have been issued BEFORE its
+        # own preparation time, even if both precede the witness window.
+        issued = old - timedelta(minutes=1)
+        cutoff = issued - timedelta(minutes=1)
+        roster = tuple(replace(record, feature_cutoff_at=cutoff,
+                               forecast_issued_at=issued)
+                       for record in claim.forecast_roster)
+        prepared = prepare(horizon=claim.horizon, start_at=claim.start_at,
+                           end_at=claim.end_at, forecast_roster=roster,
+                           prepared_at=old)
+        self.assertEqual(prepared["state"],
+                         "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        self.assertIsNotNone(prepared["forecast_roster_sha256"])
+        self.assertFalse(prepared["body_posted_on_github"])
+        # A research-only hash prepared before the 12h period is NOT an
+        # accepted externally witnessed forecast.
+
+    def test_prewindow_old_comment_time_not_recast_as_pre_event_witness(self):
+        claim = make_claim()
+        created = FIRST_START - PREWINDOW_LOOKBACK - timedelta(seconds=1)
+        altered = replace(claim, github_witness=replace(
+            claim.github_witness, created_at=created, updated_at=created,
+            retrieved_at=created))
+        value = self.audit((altered,))
+        self.assertEqual(value["reason"],
+                         "LATE_EDITED_UNOBSERVED_OR_FAKE_GITHUB_COMMENT_FIELDS")
+        self.safe(value)
+
+    def test_prewindow_last_second_genuine_claim_only_not_forecast_proof(self):
+        claim = make_claim()
+        issued = FIRST_START - timedelta(seconds=2)
+        comment_at = FIRST_START - timedelta(seconds=1)
+        roster = tuple(replace(record, feature_cutoff_at=issued,
+                               forecast_issued_at=issued)
+                       for record in claim.forecast_roster)
+        prepared = prepare(horizon="D1", start_at=FIRST_START,
+                           end_at=FIRST_END, forecast_roster=roster,
+                           prepared_at=comment_at)
+        self.assertEqual(prepared["state"], "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        witness = replace(claim.github_witness, created_at=comment_at,
+                          updated_at=comment_at, retrieved_at=comment_at,
+                          comment_body=prepared["body"])
+        value = self.audit((replace(claim, forecast_roster=roster,
+                                   github_witness=witness),))
+        self.assertEqual(value["state"],
+                         "LAB_PROSPECTIVE_WITNESS_CENSUS_CLAIM_ONLY_NO_GO")
+        self.assertFalse(value["pre_event_forecasts_independently_witnessed"])
+        self.safe(value)
 
 
 if __name__ == "__main__":
