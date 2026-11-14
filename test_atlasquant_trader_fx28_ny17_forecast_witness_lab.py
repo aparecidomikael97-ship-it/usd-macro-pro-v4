@@ -317,8 +317,15 @@ class ProspectiveWitnessCensusTests(unittest.TestCase):
     def test_prewindow_old_body_preparation_cannot_commit_28_roster(self):
         claim = make_claim()
         old = FIRST_START - PREWINDOW_LOOKBACK - timedelta(seconds=1)
+        # A valid research-only dry-run must have been issued BEFORE its
+        # own preparation time, even if both precede the witness window.
+        issued = old - timedelta(minutes=1)
+        cutoff = issued - timedelta(minutes=1)
+        roster = tuple(replace(record, feature_cutoff_at=cutoff,
+                               forecast_issued_at=issued)
+                       for record in claim.forecast_roster)
         prepared = prepare(horizon=claim.horizon, start_at=claim.start_at,
-                           end_at=claim.end_at, forecast_roster=claim.forecast_roster,
+                           end_at=claim.end_at, forecast_roster=roster,
                            prepared_at=old)
         self.assertEqual(prepared["state"],
                          "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
