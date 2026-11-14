@@ -373,6 +373,48 @@ def capture_oct2026_bls_original_once_lab(
                     out["ex_trade_table1_row_missing_or_ambiguous"] = (
                         _extract_ex_trade_actual_from_same_table1(body) is None
                     )
+            # Preserve just a bounded structural fingerprint of the
+            # BLS Table 1 HTML parser, never the rejected original body.
+            # It is a negative diagnostic ONLY: no values/GO accepted.
+            try:
+                from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
+                    _BlsTables, _oct2026_sa_month_column,
+                )
+                doc = _BlsTables()
+                doc.feed(body.decode("utf-8", "surrogateescape"))
+                doc.close()
+                selected = [
+                    (rows, doc.table_layouts[i])
+                    for i, (context, rows) in enumerate(doc.tables)
+                    if "Table 1." in context and "October 2026" in context
+                    and "seasonally adjusted" in context.lower()
+                ]
+                out["table1_candidate_count_diagnostic"] = len(selected)
+                if len(selected) == 1:
+                    rows, layout = selected[0]
+                    out["table1_header_physical_cells_diagnostic"] = [
+                        len(row) for row in layout[:2]
+                    ]
+                    out["table1_sa_month_column_diagnostic"] = (
+                        list(_oct2026_sa_month_column(layout))
+                        if _oct2026_sa_month_column(layout) is not None
+                        else None
+                    )
+                    out["table1_selected_row_shape_diagnostic"] = [
+                        {
+                            "row_label_prefix": row[0][:85],
+                            "group_code": row[1][:12],
+                            "item_code": row[2][:12],
+                            "physical_columns": len(row),
+                            "last_two_columns": list(row[-2:]),
+                        }
+                        for row in rows
+                        if len(row) >= 3
+                        and row[2] in ("4", "49104", "49116")
+                    ][:9]
+            except (ValueError, TypeError, UnicodeError, RecursionError,
+                    OverflowError):
+                out["table1_structural_diagnostic_unavailable"] = True
             out["reason"] = "OFFICIAL_BLS_BYTES_TABLE1_OR_TIME_NOT_ACCEPTED"
             return out
         folder = _lab_folder(local_appdata)
