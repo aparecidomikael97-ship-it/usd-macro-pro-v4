@@ -33,6 +33,10 @@ from atlasquant_trader_nzd_rbnz_dec9_three_bank_forecast_context_lab import (
 
 SCHEMA = "ATLASQUANT_RBNZ_DEC9_MEETING_OIS_ENTITLEMENT_GATE_LAB_V1"
 NZFMA_SOURCE_URL = "https://www.nzfma.org/nzdata/"
+NZFBF_NZOR_DEFINITION_URL = (
+    "https://www.nzfbf.co.nz/benchmarks/closing-rates/nzor"
+)
+NZOR_BENCHMARK_CODE = "NZOR"
 NZFMA_COMPOUND_URL = "https://www.nzfma.org/nzdata/nz-ocr-compound-index"
 RBNZ_B2_SOURCE_URL = (
     "https://www.rbnz.govt.nz/statistics/series/"
@@ -136,6 +140,11 @@ def _base(reason: str) -> dict[str, Any]:
         "research_visible_floor_utc":
             RESEARCH_SAFE_VISIBLE_FROM_UTC.isoformat(),
         "issuer_source_catalog": [],
+        "correct_benchmark_nzfbf_identifier": NZOR_BENCHMARK_CODE,
+        "correct_benchmark_official_methodology_url":
+            NZFBF_NZOR_DEFINITION_URL,
+        "nz_or_is_closing_midrate_between_consecutive_ocr_meetings": True,
+        "a_closing_midrate_is_not_automatically_a_pre_event_tick": True,
         "source_candidates_count": 0,
         "correct_instrument_sources_known": 0,
         "source_key_requested": None,
@@ -246,6 +255,7 @@ def inspect_rbnz_dec9_ois_sources_lab(
 
 __all__ = (
     "SCHEMA", "NZFMA_SOURCE_URL", "NZFMA_COMPOUND_URL",
+    "NZFBF_NZOR_DEFINITION_URL", "NZOR_BENCHMARK_CODE",
     "RBNZ_B2_SOURCE_URL", "CANDIDATES", "InstrumentCandidate",
     "inspect_rbnz_dec9_ois_sources_lab",
 )
