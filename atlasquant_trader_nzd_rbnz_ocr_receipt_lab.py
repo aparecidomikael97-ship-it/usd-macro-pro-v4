@@ -19,6 +19,7 @@ network, IO, MT5, orders, account, push, recurring worker or costs.
 from __future__ import annotations
 
 from datetime import date, datetime, timezone, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from html.parser import HTMLParser
@@ -73,6 +74,9 @@ def _base(reason:str)->dict[str,Any]:
         "ocr_updated_nz_local_claim":None,
         "next_ocr_update_nz_local_claim":None,
         "original_source_received_utc_claim":None,
+        "ocr_updated_utc_interpreted_from_nz_local_claim":None,
+        "next_ocr_update_utc_interpreted_from_nz_local_claim":None,
+        "nz_local_to_utc_interpretation_is_not_issuer_first_seen_proof":True,
         "october_hold_decision_independently_attested":False,
         "september_change_publication_time_attested":False,
         "forecast_or_commentary_used_as_actual_ocr":False,
@@ -118,6 +122,16 @@ def _day(raw:Any)->date|None:
         return datetime.strptime(raw,"%d %b %Y").date()
     except ValueError:
         return None
+
+def _nz_1400_utc(day:date)->datetime:
+    """Interpret the issuer's *claimed* 2pm Auckland time, never attest it.
+
+    Requires IANA Pacific/Auckland rules including DST. If unavailable,
+    the caller must fail closed rather than assume a UTC offset.
+    """
+    local=datetime(day.year,day.month,day.day,14,0,
+                   tzinfo=ZoneInfo("Pacific/Auckland"))
+    return local.astimezone(timezone.utc)
 
 def _rate(raw:Any)->Decimal|None:
     if type(raw) is not str or PCT.fullmatch(raw) is None:
@@ -177,11 +191,16 @@ def inspect_rbnz_official_ocr_receipt_lab(
         next_text=card.group("next")
         published_day=_day(update.split(",",1)[1].strip())
         scheduled_day=_day(next_text.split(",",1)[1].strip())
-        if (amount is None or published_day is None or scheduled_day is None
-            or published_day>=after.date()
-            or scheduled_day<=after.date()):
-            raise ValueError("OCR page stale or future")
-    except (UnicodeError,TypeError,ValueError,InvalidOperation,OverflowError):
+        if amount is None or published_day is None or scheduled_day is None:
+            raise ValueError("OCR page rate/date invalid")
+        publication_utc=_nz_1400_utc(published_day)
+        next_utc=_nz_1400_utc(scheduled_day)
+        # Compare actual instants, not the UTC date: 2pm in NZ is often
+        # 01:00 or 02:00 UTC depending on daylight saving.
+        if not publication_utc <= after < next_utc:
+            raise ValueError("OCR page update window does not cover receipt")
+    except (UnicodeError,TypeError,ValueError,InvalidOperation,OverflowError,
+            OSError,ZoneInfoNotFoundError):
         out["reason"]="RBNZ_OCR_POLICY_CARD_OR_CHRONOLOGY_INVALID"
         return out
     out.update({
@@ -192,6 +211,10 @@ def inspect_rbnz_official_ocr_receipt_lab(
         "ocr_updated_nz_local_claim":update,
         "next_ocr_update_nz_local_claim":next_text,
         "original_source_received_utc_claim":after.isoformat(),
+        "ocr_updated_utc_interpreted_from_nz_local_claim":
+            publication_utc.isoformat(),
+        "next_ocr_update_utc_interpreted_from_nz_local_claim":
+            next_utc.isoformat(),
     })
     return out
 
