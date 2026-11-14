@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from io import BytesIO
+from zoneinfo import ZoneInfoNotFoundError
 from urllib.error import HTTPError
 from unittest.mock import patch
 import json
