@@ -2,7 +2,7 @@
 
 Requires explicit --capture. No login, key, bypass, retries, broker,
 account, market prices, signals, trades, recurring task or deployment.
-Only preserve public issuer HTML bytes + local SHA/clock receipt under
+If explicitly approved in the future, preserve official HTML + SHA receipt under
 %LOCALAPPDATA%/AtlasQuant/LAB/official_macro_receipts.
 
 A capture today NEVER authenticates when the source first existed for
@@ -18,6 +18,9 @@ from pathlib import Path
 from typing import Any,Callable
 from urllib.request import Request,urlopen
 
+from atlasquant_trader_nzd_rbnz_access_terms_lab import (
+    RBNZ_BLOCK_REASON, inspect_rbnz_automated_access_policy_lab,
+)
 from atlasquant_trader_nzd_rbnz_ocr_receipt_lab import (
     URL,MAX_BYTES,inspect_rbnz_official_ocr_receipt_lab,
 )
@@ -29,6 +32,11 @@ def collect_rbnz_ocr_once_lab(
     *,open_url:Callable[...,Any]=urlopen,
     now_utc:Callable[[],str]=_now,
 )->tuple[bytes,dict[str,Any]]:
+    # An injected opener is for offline synthetic tests only.
+    # Production use always supplies the actual urllib.urlopen default.
+    # A CLI flag is NOT the issuer's prior written permission.
+    if open_url is urlopen:
+        raise PermissionError(RBNZ_BLOCK_REASON)
     start=now_utc()
     req=Request(URL,headers={
         "User-Agent":"AtlasQuantTrader-LAB-Research/1.0",
@@ -82,6 +90,12 @@ def main()->int:
     args=p.parse_args()
     if not args.capture:
         print("LAB_NO_HTTP_NO_FILES: explicit --capture required")
+        return 2
+    # Fail before any HTTP or files even with --capture. Review written
+    # allow-list authorization before changing the production collector.
+    terms=inspect_rbnz_automated_access_policy_lab()
+    if not terms["automated_collection_permission_verified"]:
+        print("LAB_RBNZ_PERMISSION_REQUIRED_NO_HTTP_NO_FILES: "+RBNZ_BLOCK_REASON)
         return 2
     try:
         body,receipt=collect_rbnz_ocr_once_lab()
