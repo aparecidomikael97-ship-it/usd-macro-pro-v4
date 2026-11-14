@@ -5,6 +5,8 @@ on:
     paths:
       - "atlasquant_trader_fx28_github_rest_comment_inventory_lab.py"
       - "test_atlasquant_trader_fx28_github_rest_comment_inventory_lab.py"
+      - "atlasquant_trader_fx28_sunday_rest_source_bridge_lab.py"
+      - "test_atlasquant_trader_fx28_sunday_live_rest_cli_lab.py"
       - ".github/workflows/atlasquant-trader-github-rest-witness-readonly-lab.yml"
   workflow_dispatch:
 
@@ -14,7 +16,7 @@ permissions:
 
 jobs:
   inventory:
-    name: Official issue 1884 metadata inventory (NO-GO)
+    name: Official issue 1884 REST + 672 slot preflight (NO-GO)
     runs-on: ubuntu-latest
     timeout-minutes: 4
     env:
@@ -32,13 +34,14 @@ jobs:
       - name: Validate adversarial parser offline
         run: |
           python -m unittest -q \
-            test_atlasquant_trader_fx28_github_rest_comment_inventory_lab
-      - name: Read issue 1884 REST metadata (bounded; never publish a witness)
+            test_atlasquant_trader_fx28_github_rest_comment_inventory_lab \
+            test_atlasquant_trader_fx28_sunday_live_rest_cli_lab
+      - name: Read issue 1884 REST + frozen ledger (bounded; never publish a witness)
         env:
           # Built-in GitHub Actions token: issues READ only, never printed.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          python -m atlasquant_trader_fx28_github_rest_comment_inventory_lab --read-public-github
+          python -m atlasquant_trader_fx28_sunday_rest_source_bridge_lab --read-public-github
 
 # No cron: a workflow added only in a draft PR cannot be relied on as a
 # scheduled job on the default branch. No issue comment posting, secrets
