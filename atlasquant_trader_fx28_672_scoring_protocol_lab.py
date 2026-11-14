@@ -17,7 +17,7 @@ EVERY window has ended and every original/independent source is checked.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
@@ -270,7 +270,7 @@ def precommit_fx28_672_scoring_rules_lab(
 
 # Auxiliary census for unavailable data. This does NOT change the frozen
 # score formula above and NEVER upgrades a source or a self-declared status.
-COVERAGE_SCHEMA = "ATLASQUANT_FX28_672_COVERAGE_TWO_AXIS_CLAIM_ONLY_LAB_V1"
+COVERAGE_SCHEMA = "ATLASQUANT_FX28_672_COVERAGE_TWO_AXIS_CLAIM_ONLY_LAB_V2"
 FORECAST_CLAIMS = frozenset((
     "DIRECTIONAL_CLAIM_ONLY", "ABSTAIN_CLAIM_ONLY",
     "NOT_ISSUED_CLAIM_ONLY",
@@ -287,8 +287,10 @@ def inspect_fx28_672_two_axis_coverage_lab(
     """Reconcile all 672 fixed opportunities even when sources are missing.
 
     A supplied record is an untrusted *claim*, NEVER authenticated proof
-    of pre-window issuance or Pepperstone historical price. Omitted records
-    mean UNKNOWN, NOT 'NOT_ISSUED'. Price reports are inadmissible before
+    of pre-window issuance or Pepperstone historical price. DIRECTIONAL and
+    ABSTAIN claims must carry a purported issue time in the last 12h before
+    the nominal open: it may be forged and is NOT an external witness.
+    Omitted records mean UNKNOWN, NOT 'NOT_ISSUED'. Price reports are inadmissible before
     the corresponding nominal window has CLOSED. This is a coverage-only
     diagnostic, not a scorer and not a replacement for real archive joins.
     """
@@ -300,6 +302,8 @@ def inspect_fx28_672_two_axis_coverage_lab(
         "per_horizon": {},
         "all_slots_accounted": False,
         "source_claims_not_issuer_or_broker_attestation": True,
+        "forecast_issuance_clock_is_untrusted_caller_claim": True,
+        "backdated_clock_without_external_witness_is_not_authenticated": True,
         "absence_of_supplied_claim_is_not_proof_of_nonissuance": True,
         "forecast_and_price_availability_are_independent_axes": True,
         "price_gap_cannot_be_a_hit_or_abstention": True,
@@ -338,12 +342,14 @@ def inspect_fx28_672_two_axis_coverage_lab(
     supplied = {}
     for record in supplied_slot_claims:
         if type(record) is not dict or set(record) != {
-                "slot_id", "forecast_status_claim", "price_status_claim"}:
+                "slot_id", "forecast_status_claim", "price_status_claim",
+                "forecast_issued_at_utc_claim"}:
             out["reason"] = "INVALID_SLOT_CLAIM_SHAPE"
             return out
         sid = record["slot_id"]
         fc = record["forecast_status_claim"]
         price = record["price_status_claim"]
+        issue_raw = record["forecast_issued_at_utc_claim"]
         if (type(sid) is not str or sid not in ids or sid in supplied
                 or type(fc) is not str or fc not in FORECAST_CLAIMS
                 or price is not None and (
@@ -353,9 +359,21 @@ def inspect_fx28_672_two_axis_coverage_lab(
         # A future window can still receive a valid prospective forecast.
         # Even an *untrusted claim* of non-issuance is premature until
         # the nominal opportunity starts; do not pre-label it as missed.
-        if fc == "NOT_ISSUED_CLAIM_ONLY" and now < ids[sid][1]:
-            out["reason"] = "FORECAST_NOT_ISSUED_BEFORE_NOMINAL_WINDOW_OPEN"
-            return out
+        if fc == "NOT_ISSUED_CLAIM_ONLY":
+            if issue_raw is not None:
+                out["reason"] = "NOT_ISSUED_MUST_NOT_CLAIM_A_FORECAST_TIME"
+                return out
+            if now < ids[sid][1]:
+                out["reason"] = "FORECAST_NOT_ISSUED_BEFORE_NOMINAL_WINDOW_OPEN"
+                return out
+        else:
+            issued = _parse_time(issue_raw)
+            start = ids[sid][1]
+            if (issued is None
+                    or not start - timedelta(hours=12) <= issued < start
+                    or issued > now):
+                out["reason"] = "FORECAST_ISSUANCE_CLAIM_NOT_IN_12H_BEFORE_OPEN"
+                return out
         if price is not None and now < ids[sid][2]:
             out["reason"] = "PRICE_CLAIM_BEFORE_NOMINAL_WINDOW_CLOSE"
             return out
