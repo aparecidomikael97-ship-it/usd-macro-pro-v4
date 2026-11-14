@@ -135,6 +135,9 @@ def _base(reason: str) -> dict[str, Any]:
         "stale_policy_document_is_still_documentary_not_current": True,
         "factors_expected": 32,
         "factors_with_any_relevant_local_document": 0,
+        "ppi_original_local_replayed_for_context": False,
+        "cpi_original_local_replayed_for_context": False,
+        "ppi_cpi_documents_are_not_signed_usd_impacts": True,
         "factors_with_independently_accepted_signed_effect": 0,
         "factors_with_independent_pre_event_consensus": 0,
         "factors_with_calibrated_directional_effect": 0,
@@ -171,6 +174,7 @@ def _base(reason: str) -> dict[str, Any]:
 
 def inspect_fx28_single_readiness_panel_lab(
     *, local_appdata: Any, inspected_at_utc: Any,
+    ppi_archive_basename: Any = None, cpi_archive_basename: Any = None,
 ) -> dict[str, Any]:
     """Read only local originals, then reconcile coverage and future slots.
 
@@ -181,7 +185,12 @@ def inspect_fx28_single_readiness_panel_lab(
     out = _base("INVALID_LOCAL_ROOT_CLOCK_OR_FROZEN_SCOPE")
     now = _utc(inspected_at_utc)
     if (now is None or not isinstance(local_appdata, str)
-            or not local_appdata or len(OFFICIAL_PAIRS) != 28
+            or not local_appdata
+            or type(ppi_archive_basename) not in (str, type(None))
+            or ppi_archive_basename == ""
+            or type(cpi_archive_basename) not in (str, type(None))
+            or cpi_archive_basename == ""
+            or len(OFFICIAL_PAIRS) != 28
             or len(CURRENCIES) != 8
             or EXPECTED_PAIR_HORIZON_SLOTS != 672):
         return out
@@ -190,7 +199,8 @@ def inspect_fx28_single_readiness_panel_lab(
             local_appdata=local_appdata, decision_at_utc=now)
         factors = inspect_fx28_32_factor_source_admission_lab(
             local_appdata=local_appdata, decision_at_utc=now,
-            ppi_archive_basename=None, cpi_archive_basename=None,
+            ppi_archive_basename=ppi_archive_basename,
+            cpi_archive_basename=cpi_archive_basename,
             hypothetical_factors=None)
         ledger = inspect_fx28_ny17_672_slot_issuance_ledger_lab(
             window_claims=(), inspected_at_utc=now)
@@ -252,11 +262,15 @@ def inspect_fx28_single_readiness_panel_lab(
                 != "LAB_FX28_POLICY_PPI_COMBINED_READONLY_NO_GO"
             or factors.get("locally_replayed_policy_issuer_count")
                 != len(accepted)
-            or factors.get("locally_replayed_ppi_document_count") != 0
-            or factors.get("locally_replayed_cpi_u_nsa_document_count") != 0
+            or factors.get("locally_replayed_ppi_document_count")
+               != int(ppi_archive_basename is not None)
+            or factors.get("locally_replayed_cpi_u_nsa_document_count")
+               != int(cpi_archive_basename is not None)
             or factors.get("factor_slots_inspected") != 32
             or factors.get("factor_slots_with_any_relevant_local_document")
-               != len(accepted)
+               != (len(accepted) + int(
+                   ppi_archive_basename is not None
+                   or cpi_archive_basename is not None))
             or factors.get("factor_slots_with_signed_impact_independently_admissible")
                 != 0
             or factors.get("factor_slots_with_pre_event_consensus_verified") != 0
@@ -315,6 +329,10 @@ def inspect_fx28_single_readiness_panel_lab(
         "local_document_capture_age_status_by_currency": age_rows,
         "factors_with_any_relevant_local_document":
             factors["factor_slots_with_any_relevant_local_document"],
+        "ppi_original_local_replayed_for_context":
+            ppi_archive_basename is not None,
+        "cpi_original_local_replayed_for_context":
+            cpi_archive_basename is not None,
         "slots_accounted": 672,
         "slots_future_no_supplied_witness": future,
         "slots_past_no_supplied_witness": past,
@@ -328,11 +346,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="FX28 single-source read-only lab report; never a signal")
     parser.add_argument("--audit", action="store_true")
+    parser.add_argument("--ppi-archive", default=None, metavar="BASENAME")
+    parser.add_argument("--cpi-archive", default=None, metavar="BASENAME")
     args = parser.parse_args(argv)
     report = (
         inspect_fx28_single_readiness_panel_lab(
             local_appdata=os.environ.get("LOCALAPPDATA", ""),
-            inspected_at_utc=datetime.now(timezone.utc).replace(microsecond=0))
+            inspected_at_utc=datetime.now(timezone.utc).replace(microsecond=0),
+            ppi_archive_basename=args.ppi_archive,
+            cpi_archive_basename=args.cpi_archive)
         if args.audit else _base("EXPLICIT_AUDIT_FLAG_REQUIRED"))
     print(json.dumps(report, sort_keys=True, indent=2, ensure_ascii=False))
     return 2  # Always NO-GO; never mistaken for authorization
