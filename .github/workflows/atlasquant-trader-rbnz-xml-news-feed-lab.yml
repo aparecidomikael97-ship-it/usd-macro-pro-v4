@@ -1,0 +1,41 @@
+name: AtlasQuant RBNZ Official XML News Feed LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_trader_nzd_rbnz_xml_news_feed_lab.py"
+      - "test_atlasquant_trader_nzd_rbnz_xml_news_feed_lab.py"
+      - ".github/workflows/atlasquant-trader-rbnz-xml-news-feed-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compliant-issuer-feed:
+    name: One compliant XML feed GET after offline tests — NO-GO
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout read-only without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Test RSS and Atom hostile synthetic XML before any network
+        run: |
+          python -m unittest -q test_atlasquant_trader_nzd_rbnz_xml_news_feed_lab
+      - name: Read explicitly documented issuer XML feed once, never HTML OCR route
+        run: |
+          python -m atlasquant_trader_nzd_rbnz_xml_news_feed_lab --inspect-official-once
+
+# RBNZ current terms: <=120 requests/hour, custom RBNZ-Automated-Agent UA,
+# no disruptive polling. One XML feed GET only per explicitly triggered run;
+# no retries, redirects, alternate URLs, OCR HTML 403 GET, raw XML artifacts,
+# cron, issue mutations, signaling, trading, or forecast backfill.
