@@ -16,7 +16,9 @@ import argparse
 from datetime import datetime, timedelta, timezone
 import json
 import os
+import re
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from typing import Any, Callable
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS, split_pair
@@ -92,6 +94,7 @@ def _base(reason: str) -> dict[str, Any]:
         "planned_https_get_limit": 5,
         "https_gets_attempted_or_started": 0,
         "currency_results": {},
+        "failure_diagnostics_by_currency": {},
         "replayed_source_codes_after_run": [],
         "replayed_currency_count_after_run": 0,
         "max_local_capture_age_hours_claim": 24,
@@ -211,11 +214,15 @@ def collect_five_missing_policy_sources_once_lab(
     for currency in _ORDER:
         if currency in already:
             out["currency_results"][currency] = "SKIPPED_ALREADY_LOCALLY_CHECKED"
+            out["failure_diagnostics_by_currency"][currency] = (
+                "RECENT_LOCAL_DOCUMENT_REUSED_NO_NEW_REQUEST")
             continue
         collector, validator, saver, source_key, expected = steps[currency]
+        phase = "FETCH"
         try:
             out["https_gets_attempted_or_started"] += 1
             body, receipt = collector()
+            phase = "VALIDATE"
             finish = datetime.strptime(
                 receipt["finished_at_utc"], "%Y-%m-%dT%H:%M:%SZ"
             ).replace(tzinfo=timezone.utc)
@@ -230,10 +237,12 @@ def collect_five_missing_policy_sources_once_lab(
                     or checked_at.utcoffset() is None
                     or checked_at.microsecond):
                 out["currency_results"][currency] = "POST_CAPTURE_CLOCK_INVALID"
+                out["failure_diagnostics_by_currency"][currency] = "INVALID_LOCAL_CLOCK"
                 continue
             checked_at = checked_at.astimezone(timezone.utc)
             if finish > checked_at or checked_at < now:
                 out["currency_results"][currency] = "CAPTURE_CLAIMED_FUTURE_OR_CLOCK_REWIND"
+                out["failure_diagnostics_by_currency"][currency] = "LOCAL_CLOCK_REWIND_OR_FUTURE"
                 continue
             checked = validator(
                 **{source_key: body}, receipt=receipt, decision_at_utc=checked_at)
@@ -241,12 +250,39 @@ def collect_five_missing_policy_sources_once_lab(
                     or checked.get("trade_authorized") is not False
                     or checked.get("publishable") is not False):
                 out["currency_results"][currency] = "ISSUER_BYTES_OR_RECEIPT_REJECTED"
+                # Only issuer-validator reason CODES, never raw HTML, URLs,
+                # exception strings, HTTP headers, or personally identifying data.
+                why = checked.get("reason") if type(checked) is dict else None
+                code = (why if type(why) is str
+                        and re.fullmatch(r"[A-Z0-9_]{1,96}", why)
+                        else "INVALID_OR_MISSING_VALIDATOR_REASON")
+                out["failure_diagnostics_by_currency"][currency] = (
+                    "VALIDATOR_REJECTED_" + code)
                 continue
+            phase = "SAVE"
             saver(body=body, receipt=receipt, local_appdata=local_appdata)
             out["currency_results"][currency] = "WRITTEN_RECHECK_PENDING"
+            out["failure_diagnostics_by_currency"][currency] = (
+                "AWAIT_LOCAL_REPLAY_NOT_ISSUER_AUTHENTICATION")
+        except HTTPError as exc:
+            out["currency_results"][currency] = "FETCH_VALIDATE_OR_SAVE_FAILED"
+            code = exc.code
+            out["failure_diagnostics_by_currency"][currency] = (
+                "OFFICIAL_HTTP_STATUS_" + str(code)
+                if type(code) is int and 400 <= code <= 599
+                else "OFFICIAL_HTTP_ERROR_STATUS_UNUSABLE")
+        except URLError:
+            out["currency_results"][currency] = "FETCH_VALIDATE_OR_SAVE_FAILED"
+            out["failure_diagnostics_by_currency"][currency] = (
+                "OFFICIAL_URL_TLS_OR_NETWORK_FAILURE")
         except (OSError, TypeError, ValueError, KeyError, OverflowError,
                 RuntimeError, UnicodeError):
             out["currency_results"][currency] = "FETCH_VALIDATE_OR_SAVE_FAILED"
+            out["failure_diagnostics_by_currency"][currency] = {
+                "FETCH": "FETCH_TRANSPORT_OR_RESPONSE_EXCEPTION",
+                "VALIDATE": "RECEIPT_OR_VALIDATOR_EXCEPTION",
+                "SAVE": "LAB_LOCAL_SAVE_EXCEPTION",
+            }[phase]
 
     # The post-run audit must not discard just-captured files merely
     # because their timestamps are later than the INITIAL preflight.
@@ -288,6 +324,10 @@ def collect_five_missing_policy_sources_once_lab(
                 "SAVED_AND_LOCALLY_REPLAYED_ONLY_NO_GO"
                 if currency in postchecked
                 else "SAVED_BUT_REPLAY_DID_NOT_ACCEPT")
+            out["failure_diagnostics_by_currency"][currency] = (
+                "LOCAL_REPLAY_PASSED_NOT_FIRST_SEEN_OR_ISSUER_PROOF"
+                if currency in postchecked
+                else "POST_SAVE_SOURCE_REPLAY_REJECTED")
     out["state"] = (
         "LAB_FX28_FIVE_SOURCE_CAPTURE_LOCAL_REPLAY_ONLY_NO_GO"
         if all(out["currency_results"][c] in (
