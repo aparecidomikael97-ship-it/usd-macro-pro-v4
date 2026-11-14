@@ -36,6 +36,9 @@ jobs:
             test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab \
             test_atlasquant_trader_us_ppi_oct2026_original_capture_lab
       - name: Exactly one official post-event BLS HTML GET and verified local replay
+        # PR updates run offline validation only; no repeated issuer GETs or
+        # expiring ZIP artifacts. External collection requires explicit dispatch.
+        if: github.event_name == 'workflow_dispatch'
         id: source
         env:
           # runner.temp is available at STEP scope, not job env scope.
@@ -44,7 +47,7 @@ jobs:
         run: |
           python -m atlasquant_trader_us_ppi_oct2026_original_capture_lab --capture-official
       - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research
-        if: steps.source.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && steps.source.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: atlasquant-bls-ppi-oct2026-postrelease-original-lab
@@ -52,6 +55,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+# PR event runs only offline validators; manual workflow_dispatch is the only
+# authorized network path (where dispatch is available for that workflow).
 # Explicit research probe; no retry, redirect or alternative/paid endpoint.
 # The ONLY network request to the economic issuer is the exact BLS HTML URL
 # hard-coded in the already-reviewed --capture-official command. An HTTP403,
