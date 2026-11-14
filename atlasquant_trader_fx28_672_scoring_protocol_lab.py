@@ -345,8 +345,9 @@ def inspect_fx28_672_two_axis_coverage_lab(
         fc = record["forecast_status_claim"]
         price = record["price_status_claim"]
         if (type(sid) is not str or sid not in ids or sid in supplied
-                or fc not in FORECAST_CLAIMS
-                or price is not None and price not in PRICE_CLAIMS):
+                or type(fc) is not str or fc not in FORECAST_CLAIMS
+                or price is not None and (
+                    type(price) is not str or price not in PRICE_CLAIMS)):
             out["reason"] = "DUPLICATE_UNKNOWN_OR_UNSUPPORTED_SLOT_CLAIM"
             return out
         if price is not None and now < ids[sid][2]:
