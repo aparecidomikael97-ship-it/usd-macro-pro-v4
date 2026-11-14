@@ -1,4 +1,4 @@
-name: AtlasQuant G8 Source Access Compliance Offline LAB
+name: AtlasQuant G8 Source 403 Route Compliance Offline LAB
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   issuer-diagnostics:
-    name: Offline source validation + RBNZ written-permission gate
+    name: Offline source validation + RBNZ prior-403 route gate
     runs-on: ubuntu-latest
     timeout-minutes: 4
     env:
@@ -61,13 +61,13 @@ jobs:
           assert r["requests_started_claim"]==2
           assert r["planned_official_https_get_max"]==2
           assert (r["source_results"]["NZD"]["status"] ==
-                  "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO")
+                  "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO")
           assert not r["trade_authorized"]
-          print("LAB_RBNZ_NO_HTTP_WRITTEN_PERMISSION_GATE_VERIFIED")
+          print("LAB_RBNZ_NO_HTTP_PRIOR_403_ROUTE_GATE_VERIFIED")
           PY
 
 # Never GET any issuer in PR/CI. The previous one-shot live results
 # remain in immutable GitHub run #43586776906 for traceability.
-# NZD no GET, even on workflow_dispatch; written RBNZ approval is
-# required before considering a separately reviewed future design.
+# NZD no GET, even on workflow_dispatch; revised RBNZ terms permit conditioned low-rate automation; prior 403
+# route is suspended until separately reviewed for legitimate access.
 # No cron, artifacts, issue writes, MT5, GO or trades.
