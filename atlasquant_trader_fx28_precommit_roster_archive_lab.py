@@ -133,7 +133,7 @@ def archive_explicit_roster_lab(
     """Only real explicit input; never synthesize any of the 28 directions."""
     out = _blocked("INVALID_INPUT_OR_OUTSIDE_FROZEN_12H_WINDOW")
     now = _utc(inspected_at_utc)
-    if (now is None or type(output_root) is not Path
+    if (now is None or not isinstance(output_root, Path)
             or not output_root.is_absolute()):
         return out
     validated = _load_input(raw_input, now)
@@ -204,7 +204,7 @@ def archive_explicit_roster_lab(
 
 def verify_roster_archive_lab(directory: Path) -> dict[str, Any]:
     """Recheck retained original bytes vs canonical data, witness and receipt."""
-    if type(directory) is not Path or not directory.is_dir() or directory.is_symlink():
+    if not isinstance(directory, Path) or not directory.is_dir() or directory.is_symlink():
         raise ValueError("ROSTER_ARCHIVE_NOT_DIRECTORY")
     names = ("original_input.json", "canonical_forecasts.json",
              "witness_body_NOT_POSTED.txt", "receipt.json")
