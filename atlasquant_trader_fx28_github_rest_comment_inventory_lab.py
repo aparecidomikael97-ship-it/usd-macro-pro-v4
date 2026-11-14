@@ -288,7 +288,7 @@ def collect_public_github_issue_snapshot_once_lab(
             if token:
                 # Never print, return, hash, write or interpolate secrets.
                 # Reject CRLF so an environment string cannot add headers.
-                if (len(token) > 2048 or "\\r" in token or "\\n" in token):
+                if (len(token) > 2048 or "\r" in token or "\n" in token):
                     out["reason"] = "UNSAFE_GITHUB_TOKEN_FORMAT_NO_REQUEST"
                     return out
                 headers["Authorization"] = "Bearer " + token
