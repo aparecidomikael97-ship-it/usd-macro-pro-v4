@@ -348,9 +348,27 @@ def main(
         report = inspect_sunday_fx28_cross_source_preflight_lab(
             inspected_at_utc=now, github_rest_inventory=inventory,
             local_document_panel=None)
-        report["github_rest_gets_attempted_claim"] = (
+        # This CLI is different from the pure function above: its GitHub
+        # reader HAS attempted HTTP. The pure gate's 'http_requests=0'
+        # means only that the gate itself never fetched anything. Reuse
+        # the collector's bounded count rather than outputting an
+        # apparently contradictory zero after a real REST request.
+        reported_gets = (
             inventory.get("http_requests_started")
             if type(inventory) is dict else None)
+        if (type(reported_gets) is not int or
+                not 0 <= reported_gets <= 5):
+            report.update({
+                "state": "LAB_SUNDAY_FX28_GITHUB_HTTP_COUNT_INVALID_NO_GO",
+                "reason": "REST_READER_REQUEST_COUNT_MISSING_OR_UNBOUNDED",
+                "http_requests": None,
+            })
+        else:
+            report["http_requests"] = reported_gets
+        report["http_requests_provenance"] = (
+            "GITHUB_REST_COLLECTOR_ATTEMPTED_GETS_NOT_NETWORK_INDEPENDENT_ATTESTATION"
+        )
+        report["github_rest_gets_attempted_claim"] = reported_gets
         report["am12_directly_contacted"] = False
         report["raw_issue_comment_bodies_disclosed"] = False
         print(json.dumps(report, sort_keys=True, ensure_ascii=False))
