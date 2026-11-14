@@ -17,8 +17,7 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
-      # Ephemeral runner archive, NOT the user's AM12 and NOT 13-Nov first-seen.
-      LOCALAPPDATA: ${{ runner.temp }}
+      # No runner-specific context in job-level env.
     steps:
       - name: Checkout without retained credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -35,6 +34,10 @@ jobs:
             test_atlasquant_trader_us_ppi_oct2026_original_capture_lab
       - name: Exactly one official post-event BLS HTML GET and verified local replay
         id: source
+        env:
+          # runner.temp is available at STEP scope, not job env scope.
+          # Ephemeral runner archive, not AM12 and not 13-Nov first-seen.
+          LOCALAPPDATA: ${{ runner.temp }}
         run: |
           python -m atlasquant_trader_us_ppi_oct2026_original_capture_lab --capture-official
       - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research
