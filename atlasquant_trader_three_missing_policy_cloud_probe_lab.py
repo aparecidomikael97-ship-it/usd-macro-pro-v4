@@ -2,8 +2,9 @@
 
 Offline on CI by default; explicit manual probe permits at most 2 GETs.
 Reuse EXISTING issuer-specific collectors and original-byte validators.
-RBNZ automated access requires prior written issuer permission; never
-attempt the NZD URL while blocked, even if a fake synthetic collector exists.
+The RBNZ now permits ORDINARY automated access on conditions (Nov 12
+terms); however THIS OCR HTML route returned 403, so it is suspended here.
+Never retry or change URL merely to evade that denial, even with mocks.
 No retries, mirror, challenges bypass, browser impersonation, fallbacks,
 source HTML logging, file writing, upload, MT5, trades, API subscriptions,
 model direction or archive recency claim on the user's disconnected AM12.
@@ -92,8 +93,8 @@ def _base(reason: str) -> dict[str, Any]:
         "state": "LAB_THREE_ISSUER_CLOUD_PROBE_NO_REQUEST",
         "reason": reason,
         "planned_official_https_get_max": 2,
-        "rbnz_automated_access_permission_verified": False,
-        "rbnz_automated_get_skipped_by_terms": True,
+        "rbnz_ordinary_automation_permitted_by_issuer_terms": True,
+        "rbnz_prior_403_route_is_suspended": True,
         "requests_started_claim": 0,
         "source_results": {},
         "valid_ephemeral_original_checks": 0,
@@ -154,10 +155,12 @@ def probe_three_missing_policy_sources_once_lab(
     out["reason"] = "EPHEMERAL_POLICY_CHECKS_NO_LOCAL_AM12_ARCHIVE_OR_TRADE"
     for currency in ORDER:
         if currency == "NZD":
-            # RBNZ written authorization has not been verified. Never GET
-            # this issuer through the cloud probe, even via injected steps.
+            # Existing RBNZ URL returned HTTP 403; do not retry or bypass.
+            # The issuer's revised Nov 12 terms permit other compliant
+            # ordinary automation, but this previously denied route remains
+            # suspended here, even with injected steps.
             out["source_results"][currency] = {
-                "status": "RBNZ_WRITTEN_PERMISSION_REQUIRED_NO_HTTP_NO_GO",
+                "status": "RBNZ_PREVIOUS_HTTP403_ROUTE_SUSPENDED_NO_GO",
                 "reason": RBNZ_BLOCK_REASON,
                 "official_policy_pct_claim": None,
             }
