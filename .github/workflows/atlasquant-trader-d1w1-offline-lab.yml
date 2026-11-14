@@ -49,6 +49,7 @@ jobs:
           from atlasquant_fx_universe import OFFICIAL_PAIRS
           assert len(OFFICIAL_PAIRS) == len(set(OFFICIAL_PAIRS)) == 28
           assert ZoneInfo('America/New_York') is not None
+          assert ZoneInfo('Pacific/Auckland') is not None  # RBNZ OCR at 14:00 NZ local
           assert sys.version_info[:2] in ((3, 11), (3, 12))
           print('OFFLINE_LAB_PYTHON_READY', sys.version)
           PY
