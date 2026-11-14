@@ -223,5 +223,26 @@ class ExplicitRosterArchiveTests(unittest.TestCase):
             self.assertFalse(root.exists())
 
 
+    def test_15_receipt_semantic_window_metadata_tampering_rejected(self):
+        for key, value in (
+            ("horizon","W1"),
+            ("start_utc","2026-11-22T22:00:00+00:00"),
+            ("end_utc","2026-11-20T22:00:00+00:00"),
+            ("research_only",False),
+            ("model_prediction_accuracy",1.0),
+            ("input_schema","UNKNOWN"),
+        ):
+            with self.subTest(key=key),TemporaryDirectory() as folder:
+                report=self.run_archive(fixture(),Path(folder)/"archives")
+                archive=Path(report["archive_dir"])
+                receipt=archive/"receipt.json"
+                data=json.loads(receipt.read_text(encoding="utf-8"))
+                data[key]=value
+                receipt.write_text(json.dumps(data),encoding="utf-8")
+                with self.assertRaisesRegex(ValueError,
+                                            "RECEIPT_CAMPAIGN_WINDOW_METADATA_MISMATCH"):
+                    verify_roster_archive_lab(archive)
+
+
 if __name__ == "__main__":
     unittest.main()
