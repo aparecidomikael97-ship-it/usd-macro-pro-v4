@@ -215,6 +215,58 @@ class GenericMacroSurpriseEventTests(unittest.TestCase):
         self.assertFalse(r["pre_event_consensus_independently_authenticated"])
         self.assertFalse(r["first_print_actual_independently_authenticated"])
 
+    def test_11d_federal_reserve_official_policy_domain_admitted_as_document_only(self):
+        metric=replace(METRIC,series_id="US_FED_POLICY_RATE",
+                       transformation="LEVEL")
+        actual=replace(ACTUAL,metric=metric,
+                       official_source_url=(
+                           "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261113a.htm"))
+        consensus=replace(CONSENSUS,metric=metric)
+        result=self.safety(self.run_event(actual=actual,consensus=consensus))
+        self.assertEqual(result["state"],
+            "LAB_FX28_SINGLE_EVENT_SURPRISE_DOCUMENTARY_ONLY_NO_GO")
+        self.assertFalse(result["pre_event_consensus_independently_authenticated"])
+        self.assertFalse(result["trade_authorized"])
+
+    def test_11e_fed_official_not_allowed_to_masquerade_as_bls_ppi(self):
+        fake=replace(ACTUAL,official_source_url=(
+            "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261113a.htm"))
+        result=self.blocked(actual=fake)
+        self.assertEqual(result["reason"],
+            "OFFICIAL_PUBLISHER_DOES_NOT_MATCH_US_METRIC")
+
+    def test_11f_bea_official_not_allowed_to_masquerade_as_bls_cpi_or_ppi(self):
+        for series in ("US_PPI_FINAL_DEMAND","US_CPI_U_ALL_ITEMS"):
+            with self.subTest(series=series):
+                metric=replace(METRIC,series_id=series)
+                actual=replace(ACTUAL,metric=metric,
+                    official_source_url="https://www.bea.gov/data/consumer-spending")
+                consensus=replace(CONSENSUS,metric=metric)
+                result=self.blocked(actual=actual,consensus=consensus)
+                self.assertEqual(result["reason"],
+                    "OFFICIAL_PUBLISHER_DOES_NOT_MATCH_US_METRIC")
+
+    def test_11g_pce_must_be_bea_and_not_bls(self):
+        metric=replace(METRIC,series_id="US_PCE_CORE_MOM")
+        consensus=replace(CONSENSUS,metric=metric)
+        correct=replace(ACTUAL,metric=metric,
+                        official_source_url="https://www.bea.gov/data/personal-consumption-expenditures-price-index")
+        self.assertEqual(self.safety(self.run_event(actual=correct,consensus=consensus))["state"],
+            "LAB_FX28_SINGLE_EVENT_SURPRISE_DOCUMENTARY_ONLY_NO_GO")
+        wrong=replace(correct,official_source_url="https://www.bls.gov/news.release/ppi.toc.htm")
+        self.assertEqual(self.blocked(actual=wrong,consensus=consensus)["reason"],
+            "OFFICIAL_PUBLISHER_DOES_NOT_MATCH_US_METRIC")
+
+    def test_11h_fed_consensus_subdomain_is_not_independent_source(self):
+        metric=replace(METRIC,series_id="US_FOMC_TARGET_RATE",transformation="LEVEL")
+        consensus=replace(CONSENSUS,metric=metric,
+            source_url="https://www.federalreserve.gov/monetarypolicy")
+        actual=replace(ACTUAL,metric=metric,
+            official_source_url="https://www.federalreserve.gov/newsevents/pressreleases/monetary20261113a.htm")
+        result=self.blocked(actual=actual,consensus=consensus)
+        self.assertEqual(result["reason"],
+            "UNTRUSTED_OR_ISSUER_COLLIDING_CONSENSUS_OR_OFFICIAL_URL")
+
     def test_12_wrong_https_or_embedded_credentials_rejected(self):
         for bad in ("http://www.bls.gov/news.release/ppi.toc.htm",
                     "https://username:pass@www.bls.gov/news.release/ppi.toc.htm",
