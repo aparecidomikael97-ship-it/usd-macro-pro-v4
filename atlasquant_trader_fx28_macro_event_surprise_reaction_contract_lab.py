@@ -186,10 +186,15 @@ def inspect_macro_event_surprise_reaction_lab(
     metric = consensus.metric
     consensus_host = _https_host(consensus.source_url)
     official_host = _https_host(actual.official_source_url)
+    # Different host strings do not prove independent source organizations:
+    # api.bls.gov, www.bls.gov and bls.gov all belong to the same issuer.
+    issuer_domains = _HOSTS[metric.currency]
+    def issuer_owned_host(host: str) -> bool:
+        return any(host == root or host.endswith("." + root)
+                   for root in issuer_domains)
     if (consensus_host is None or official_host is None
-            or not any(official_host == root or official_host.endswith("." + root)
-                       for root in _HOSTS[metric.currency])
-            or consensus_host == official_host):
+            or not issuer_owned_host(official_host)
+            or issuer_owned_host(consensus_host)):
         result["reason"] = "UNTRUSTED_OR_ISSUER_COLLIDING_CONSENSUS_OR_OFFICIAL_URL"
         return result
     if any(type(h) is not str or _SHA.fullmatch(h) is None for h in (
