@@ -89,7 +89,7 @@ def inspect_fx28_672_temporal_scoring_ingress_lab(
     as a score or accepted as a bypass of the temporal guard.
     """
     out = _base("INVALID_ARCHIVE_CLOCK_OR_FORECAST_CLAIM_INPUT")
-    if (type(archive_root) is not Path or not archive_root.is_absolute()
+    if (not isinstance(archive_root, Path) or not archive_root.is_absolute()
             or type(window_claims) not in (tuple,list)
             or type(inspected_at_utc) is not datetime
             or inspected_at_utc.tzinfo is None
