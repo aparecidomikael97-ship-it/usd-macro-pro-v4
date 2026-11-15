@@ -10,7 +10,7 @@ from io import StringIO
 import json
 
 from atlasquant_trader_fx28_first_m15_claimed_cli_lab import (
-    execute_cli_lab, main as cli_main,
+    execute_cli_lab, main as cli_main, _pinned_mt5_reader_deps_lab,
 )
 from atlasquant_trader_fx28_first_m15_atomic_claim_lab import CLAIM_NAME, WINDOW
 from test_atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab import (
@@ -119,6 +119,34 @@ class FirstM15ClaimedCliTests(TestCase):
         self.assertFalse(result["claim_created"])
         self.assertEqual(fake.calls,[])
         self.assertFalse((self.root/CLAIM_NAME).exists())
+
+    def test_am12_bundle_path_only_inside_atlasquant_layout(self):
+        with TemporaryDirectory() as td:
+            parent=Path(td)/"AtlasQuant"
+            cli_dir=parent/"lab_capture_modules"
+            cli_dir.mkdir(parents=True)
+            root=parent/"lab_mt5_reader_deps"
+            package=root/"MetaTrader5"
+            package.mkdir(parents=True)
+            (package/"__init__.py").write_text("# dummy, never imported")
+            candidate=cli_dir/"atlasquant_trader_fx28_first_m15_claimed_cli_lab.py"
+            self.assertEqual(_pinned_mt5_reader_deps_lab(candidate),root)
+            self.assertIsNone(_pinned_mt5_reader_deps_lab(
+                Path(td)/"other"/"cli.py"))
+
+    def test_missing_or_linked_mt5_bundle_fails_closed(self):
+        with TemporaryDirectory() as td:
+            parent=Path(td)/"AtlasQuant"
+            cli_dir=parent/"lab_capture_modules"
+            cli_dir.mkdir(parents=True)
+            root=parent/"lab_mt5_reader_deps"
+            package=root/"MetaTrader5"
+            candidate=cli_dir/"atlasquant_trader_fx28_first_m15_claimed_cli_lab.py"
+            self.assertIsNone(_pinned_mt5_reader_deps_lab(candidate))
+            package.mkdir(parents=True)
+            self.assertIsNone(_pinned_mt5_reader_deps_lab(candidate))
+            (package/"__init__.py").write_text("not an imported package")
+            self.assertEqual(_pinned_mt5_reader_deps_lab(candidate),root)
 
     def test_missing_mt5_api_does_not_create_claim(self):
         r = self.execute(None)
