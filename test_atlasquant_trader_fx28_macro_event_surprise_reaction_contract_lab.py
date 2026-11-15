@@ -211,6 +211,40 @@ class GenericMacroSurpriseEventTests(unittest.TestCase):
         pp[0]=replace(pp[0],endpoint_at_utc=RELEASE+timedelta(minutes=239))
         self.blocked(price_claims=pp)
 
+    def test_22a_mixed_price_baseline_clocks_block_entire_cohort(self):
+        pp=prices()
+        pp[0]=replace(pp[0],baseline_at_utc=RELEASE-timedelta(minutes=14))
+        r=self.blocked(price_claims=pp)
+        self.assertEqual(r["reason"],
+            "SEVEN_FX_REACTIONS_HAVE_DIFFERENT_PRICE_WINDOWS")
+
+    def test_22b_mixed_endpoint_clocks_block_even_inside_tolerance(self):
+        pp=prices()
+        pp[0]=replace(pp[0],endpoint_at_utc=RELEASE+timedelta(minutes=16))
+        r=self.blocked(price_claims=pp)
+        self.assertEqual(r["reason"],
+            "SEVEN_FX_REACTIONS_HAVE_DIFFERENT_PRICE_WINDOWS")
+
+    def test_22c_all_m15_endpoints_hours_late_are_not_m15(self):
+        pp=[replace(row,endpoint_at_utc=RELEASE+timedelta(hours=3))
+            for row in prices()]
+        r=self.blocked(price_claims=pp)
+        self.assertEqual(r["reason"],
+            "FX_PRICE_CLAIM_NUMERIC_TIME_OR_SOURCE_HASH_INVALID")
+
+    def test_22d_one_synchronized_endpoint_within_alignment_tolerance(self):
+        pp=[replace(row,endpoint_at_utc=RELEASE+timedelta(minutes=16))
+            for row in prices()]
+        r=self.safety(self.run_event(price_claims=pp))
+        self.assertTrue(
+            r["all_seven_pairs_share_identical_baseline_and_endpoint_clocks"])
+        self.assertEqual(r["shared_price_baseline_utc_claim"],
+                         (RELEASE-timedelta(minutes=15)).isoformat())
+        self.assertEqual(r["shared_price_endpoint_utc_claim"],
+                         (RELEASE+timedelta(minutes=16)).isoformat())
+        self.assertEqual(r["fx_pair_outcome_claim_count"],7)
+        self.assertFalse(r["broker_price_and_bid_ask_independently_authenticated"])
+
     def test_22_timezone_equivalence_is_reproducible(self):
         mt=timezone(timedelta(hours=-4))
         consensus=replace(CONSENSUS,
