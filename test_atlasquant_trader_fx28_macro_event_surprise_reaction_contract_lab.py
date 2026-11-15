@@ -148,6 +148,35 @@ class GenericMacroSurpriseEventTests(unittest.TestCase):
             source_url="https://www.bls.gov/news.release/ppi.toc.htm")
         self.blocked(consensus=consensus)
 
+    def test_11a_consensus_official_sibling_subdomain_is_not_independent(self):
+        for source in (
+            "https://api.bls.gov/publicAPI/v2/timeseries/data",
+            "https://bls.gov/news.release/ppi.toc.htm",
+            "https://data.bls.gov/forecast",
+            "https://www.bea.gov/data/inflation",
+        ):
+            with self.subTest(source=source):
+                r=self.blocked(consensus=replace(CONSENSUS,source_url=source))
+                self.assertEqual(
+                    r["reason"],
+                    "UNTRUSTED_OR_ISSUER_COLLIDING_CONSENSUS_OR_OFFICIAL_URL")
+
+    def test_11b_official_and_consensus_different_issuer_subdomains_blocked(self):
+        official=replace(ACTUAL,official_source_url=
+                         "https://data.bls.gov/news.release/ppi.toc.htm")
+        consensus=replace(CONSENSUS,source_url=
+                          "https://www.bls.gov/forecasts")
+        r=self.blocked(actual=official,consensus=consensus)
+        self.assertEqual(r["reason"],
+                         "UNTRUSTED_OR_ISSUER_COLLIDING_CONSENSUS_OR_OFFICIAL_URL")
+
+    def test_11c_external_consensus_still_only_documentary(self):
+        r=self.safety(self.run_event(consensus=CONSENSUS))
+        self.assertEqual(r["state"],
+                         "LAB_FX28_SINGLE_EVENT_SURPRISE_DOCUMENTARY_ONLY_NO_GO")
+        self.assertFalse(r["pre_event_consensus_independently_authenticated"])
+        self.assertFalse(r["first_print_actual_independently_authenticated"])
+
     def test_12_wrong_https_or_embedded_credentials_rejected(self):
         for bad in ("http://www.bls.gov/news.release/ppi.toc.htm",
                     "https://username:pass@www.bls.gov/news.release/ppi.toc.htm",
