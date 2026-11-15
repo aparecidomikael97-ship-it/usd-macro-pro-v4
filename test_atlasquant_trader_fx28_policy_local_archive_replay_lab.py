@@ -160,6 +160,62 @@ class EightIssuerLocalReceiptFolderTests(unittest.TestCase):
                          "SOURCE_FILE_SHA256_OR_FILENAME_MISMATCH")
         self.assertEqual(r["pairs_with_both_policy_originals_locally_checked"],0)
 
+    def test_newer_orphan_original_blocks_fallback_to_old_valid_receipt(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=archive_dir(td)
+            save_fixture(folder,"USD",self.synthetic["USD"])
+            rec=deepcopy(self.synthetic["USD"]["receipt"])
+            rec["finished_at_utc"]="2026-11-13T11:19:02Z"
+            rec["started_at_utc"]="2026-11-13T11:19:01Z"
+            raw,meta=save_fixture(folder,"USD",self.synthetic["USD"],
+                                  override_receipt=rec)
+            meta.unlink()  # interrupted two-file archive
+            r=inspect(local_appdata=td,decision_at_utc=NOW)
+            self.assertTrue(raw.is_file())
+        self.no_trade(r)
+        self.assertEqual(r["currencies_with_local_original_bytes_validated"],0)
+        self.assertEqual(r["currencies_rejected"]["USD"],
+                         "ORPHANED_ORIGINAL_WITHOUT_RECEIPT_NO_FALLBACK")
+        self.assertEqual(r["pairs_with_both_policy_originals_locally_checked"],0)
+
+    def test_orphan_original_with_no_receipts_is_rejected_not_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=archive_dir(td)
+            raw,meta=save_fixture(folder,"CHF",self.synthetic["CHF"])
+            meta.unlink()
+            r=inspect(local_appdata=td,decision_at_utc=NOW)
+            self.assertTrue(raw.is_file())
+        self.no_trade(r)
+        self.assertEqual(r["currencies_rejected"]["CHF"],
+                         "ORPHANED_ORIGINAL_WITHOUT_RECEIPT_NO_FALLBACK")
+        self.assertNotIn("CHF",r["currencies_missing"])
+
+    def test_future_orphan_does_not_poison_past_point_in_time_reader(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=archive_dir(td)
+            save_fixture(folder,"USD",self.synthetic["USD"])
+            future=deepcopy(self.synthetic["USD"]["receipt"])
+            future["finished_at_utc"]="2026-11-13T11:50:00Z"
+            future["started_at_utc"]="2026-11-13T11:49:59Z"
+            source,meta=save_fixture(folder,"USD",self.synthetic["USD"],
+                                    override_receipt=future)
+            meta.unlink()
+            r=inspect(local_appdata=td,decision_at_utc=NOW)
+            self.assertTrue(source.is_file())
+        self.no_trade(r)
+        self.assertEqual(r["currencies_with_local_original_bytes_validated"],1)
+        self.assertNotIn("USD",r["currencies_rejected"])
+
+    def test_malformed_original_filename_is_rejected_even_with_valid_old_one(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=archive_dir(td)
+            save_fixture(folder,"CHF",self.synthetic["CHF"])
+            (folder/"CHF_SNB_CURRENT_POLICY_broken.html").write_bytes(b"garbage")
+            r=inspect(local_appdata=td,decision_at_utc=NOW)
+        self.no_trade(r)
+        self.assertEqual(r["currencies_rejected"]["CHF"],
+                         "UNSAFE_OR_MALFORMED_ISSUER_ORIGINAL_FILENAME")
+
     def test_correct_sha_but_unauthorized_url_is_rejected_by_issuer_parser(self):
         with tempfile.TemporaryDirectory() as td:
             folder=archive_dir(td)
