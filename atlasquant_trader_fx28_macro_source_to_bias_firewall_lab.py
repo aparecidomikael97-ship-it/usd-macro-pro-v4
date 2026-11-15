@@ -11,6 +11,7 @@ No HTTP, MT5, GitHub, files, orders, background jobs, scheduler or deploy.
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_fx28_32_factor_source_admission_lab import (
@@ -29,6 +30,7 @@ EXPECTED_SLOTS = tuple((currency, factor)
 _EXPECTED_PAIRS = tuple(OFFICIAL_PAIRS)
 _STATE = "LAB_FX28_32_FACTOR_DOCUMENTARY_GAP_RECONCILED_NO_GO"
 _HYP_STATE = "LAB_FX28_HYPOTHETICAL_MACRO_SCORE_COHERENT_NO_GO"
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}\\Z")
 
 
 def _base(reason: str) -> dict[str, Any]:
@@ -128,7 +130,13 @@ def audit_macro_source_to_bias_firewall_lab(
         kind = row.get("documentary_source_kind")
         if (type(source) is not bool
                 or (source and
-                    (type(digest) is not str or len(digest) != 64 or kind is None))
+                    (type(digest) is not str
+                     or _SHA256_HEX.fullmatch(digest) is None
+                     or digest == "0" * 64
+                     or type(kind) is not str
+                     or not 1 <= len(kind) <= 128
+                     or not kind.isascii()
+                     or not all(c.isalnum() or c == "_" for c in kind)))
                 or (not source and (digest is not None or kind is not None))
                 or row.get("source_semantics_support_signed_factor") is not False
                 or row.get("pre_event_consensus_independently_attested") is not False
