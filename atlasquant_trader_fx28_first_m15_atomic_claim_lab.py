@@ -18,6 +18,8 @@ SCHEMA="ATLASQUANT_FX28_FIRST_M15_ATOMIC_ATTEMPT_CLAIM_LAB_V1"
 WINDOW="CAMPAIGN_FIRST_M15_20261115"
 CLAIM_NAME=WINDOW+"_ATOMIC_ATTEMPT_CLAIM.json"
 MAX_CLAIM_BYTES=2048
+CLAIM_EARLIEST_UTC=datetime(2026,11,15,22,15,tzinfo=timezone.utc)
+CLAIM_DEADLINE_UTC=datetime(2026,11,15,23,0,tzinfo=timezone.utc) # exclusive; local-clock claim, not attestation
 
 def _out(reason: str) -> dict[str,Any]:
     return {
@@ -60,8 +62,13 @@ def claim_once_lab(*,archive_root:Any,clock:Callable[[],datetime]) -> dict[str,A
         now=now.astimezone(timezone.utc)
         # Do not make the first actual prospective claim before the
         # 22:00-22:15 UTC first M15 has closed.
-        if now<datetime(2026,11,15,22,15,tzinfo=timezone.utc):
+        if now<CLAIM_EARLIEST_UTC:
             return _out("FROZEN_M15_NOT_CLOSED_NO_CLAIM")
+        # A late historical read cannot masquerade as a prospective
+        # Sunday-open observation. Allow a bounded 45-min reporting lag
+        # after M15 close (the frozen 22:00-22:15 sample is unchanged).
+        if now>=CLAIM_DEADLINE_UTC:
+            return _out("PROSPECTIVE_CLAIM_AFTER_DEADLINE_NO_BACKFILL")
         first=inspect_claim_lab(archive_root=archive_root)
         if not first.get("single_attempt_start_precheck_clear"):
             blocked=_out("PRIOR_OR_UNKNOWN_ARCHIVE_OR_CLAIM_FAIL_CLOSED")
@@ -113,4 +120,4 @@ def claim_once_lab(*,archive_root:Any,clock:Callable[[],datetime]) -> dict[str,A
     except (OSError,ValueError,TypeError,RuntimeError):
         return _out("INSPECTION_OR_CLOCK_FAILED_FAIL_CLOSED")
 
-__all__=("SCHEMA","WINDOW","CLAIM_NAME","claim_once_lab","inspect_claim_lab")
+__all__=("SCHEMA","WINDOW","CLAIM_NAME","CLAIM_EARLIEST_UTC","CLAIM_DEADLINE_UTC","claim_once_lab","inspect_claim_lab")
