@@ -76,6 +76,14 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(r["claim_created"])
         self.assertEqual(fake.calls,[])
         self.assertFalse((self.root/CLAIM_NAME).exists())
+    def test_next_day_late_m15_never_queries_mt5_or_creates_claim(self):
+        fake=StrictMock([])
+        late=datetime(2026,11,16,9,0,tzinfo=timezone.utc)
+        r=self.run_one(fake,clock=lambda:late)
+        self.assertEqual(r["reason"],"PROSPECTIVE_CLAIM_AFTER_DEADLINE_NO_BACKFILL")
+        self.assertFalse(r["claim_created"])
+        self.assertFalse(fake.calls)
+        self.assertFalse((self.root/CLAIM_NAME).exists())
     def test_existing_incomplete_directory_blocks_preclaim(self):
         (self.root/(WINDOW+"_partial")).mkdir()
         fake=StrictMock([])
