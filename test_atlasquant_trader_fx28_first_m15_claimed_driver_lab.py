@@ -11,6 +11,9 @@ from atlasquant_trader_fx28_first_m15_claimed_driver_lab import run_claimed_firs
 from test_atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab import (
     StrictMock,TERMINAL,CLOSED,
 )
+from test_atlasquant_trader_fx28_first_m15_archive_census_readonly_lab import (
+    OneCandleMock,
+)
 
 class DriverTests(unittest.TestCase):
     def setUp(self):
@@ -24,13 +27,27 @@ class DriverTests(unittest.TestCase):
     def test_one_empty_cohort_created_as_28_documented_gaps(self):
         mock=StrictMock([])
         r=self.run_one(mock)
-        self.assertEqual(r["state"],"LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO")
+        self.assertEqual(r["state"],"LAB_CLAIMED_FIRST_M15_ZERO_PRICE_OBSERVED_NO_GO")
+        self.assertEqual(r["reason"],"ZERO_OF_28_NOMINAL_BARS_NO_MARKET_PRICE_NO_RETRY")
         self.assertTrue(r["claim_created"])
         self.assertEqual(r["captured_m15_total"],0)
         self.assertEqual(r["missing_m15_total"],28)
         self.assertEqual(r["semantically_verified_symbols"],28)
         self.assertEqual(mock.calls.count("copy_rates_range"),28)
         self.assertTrue((self.root/CLAIM_NAME).is_file())
+        self.assertFalse(r["trade_authorized"])
+    def test_fully_observed_28_bars_are_structural_only(self):
+        r=self.run_one(OneCandleMock())
+        self.assertEqual(r["captured_m15_total"],28)
+        self.assertEqual(r["missing_m15_total"],0)
+        self.assertEqual(r["state"],"LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO")
+        self.assertFalse(r["prediction_witness_authenticated"])
+        self.assertFalse(r["trade_authorized"])
+    def test_partial_observation_is_not_full_capture(self):
+        r=self.run_one(OneCandleMock(empty_symbol="EURUSD"))
+        self.assertEqual(r["captured_m15_total"],27)
+        self.assertEqual(r["missing_m15_total"],1)
+        self.assertEqual(r["state"],"LAB_CLAIMED_FIRST_M15_PARTIAL_PRICE_OBSERVED_NO_GO")
         self.assertFalse(r["trade_authorized"])
     def test_no_second_call_to_mt5_after_completed_archive(self):
         first=StrictMock([])
