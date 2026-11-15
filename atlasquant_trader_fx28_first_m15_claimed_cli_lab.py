@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import importlib
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -23,6 +24,48 @@ from atlasquant_trader_fx28_first_m15_claimed_driver_lab import (
 
 SCHEMA = "ATLASQUANT_FX28_FIRST_M15_EXPLICIT_CLAIMED_CLI_LAB_V1"
 END_UTC = datetime(2026, 11, 15, 22, 15, tzinfo=timezone.utc)
+
+
+def _pinned_mt5_reader_deps_lab(script_path: Path) -> Path | None:
+    """Only the local, already installed AtlasQuant MT5 read-only bundle.
+
+    Never scan a computer for alternate terminals/packages; no network,
+    installation, or terminal call. This is evaluated only when an explicit
+    capture has already passed its timestamp and argument checks.
+    """
+    if not isinstance(script_path, Path):
+        return None
+    try:
+        module_dir = script_path.resolve().parent
+        parent = module_dir.parent
+        if (module_dir.name != "lab_capture_modules"
+                or parent.name != "AtlasQuant"
+                or module_dir.is_symlink()):
+            return None
+        dependencies = parent / "lab_mt5_reader_deps"
+        package_dir = dependencies / "MetaTrader5"
+        if (dependencies.is_symlink() or not dependencies.is_dir()
+                or package_dir.is_symlink() or not package_dir.is_dir()
+                or not (package_dir / "__init__.py").is_file()):
+            return None
+        return dependencies
+    except (OSError, ValueError, RuntimeError):
+        return None
+
+
+def _load_pinned_mt5_lab() -> Any:
+    root = _pinned_mt5_reader_deps_lab(Path(__file__))
+    if root is None:
+        return None
+    sys.path.insert(0, str(root))
+    try:
+        mod = importlib.import_module("MetaTrader5")
+        origin = Path(getattr(mod, "__file__", "")).resolve()
+        if origin == root.resolve() or not origin.is_relative_to(root.resolve()):
+            return None
+        return mod
+    except (ImportError, OSError, TypeError, ValueError, RuntimeError):
+        return None
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -117,10 +160,11 @@ def main(argv: Sequence[str] | None = None, *,
         except (TypeError, ValueError, RuntimeError, OverflowError):
             ready = False
         if ready and mt5 is None and args.terminal_path:
-            try:
-                mt5 = importlib.import_module("MetaTrader5")
-            except (ImportError, OSError):
-                mt5 = None
+            # Windows AM12 keeps its installed MT5 Python package in a
+            # dedicated AtlasQuant LAB folder, not global Python 3.12.
+            # Require this exact local shape; never pip-install or search
+            # fallback system packages during the one-shot task.
+            mt5 = _load_pinned_mt5_lab()
         if not ready:
             result = _blocked("FIRST_M15_OUTSIDE_BOUNDED_WINDOW_OR_CLOCK_INVALID_NO_IO")
             print(json.dumps(result, sort_keys=True))
