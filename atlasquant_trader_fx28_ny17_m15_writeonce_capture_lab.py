@@ -292,6 +292,10 @@ def verify_archive_lab(path: Path) -> dict[str, Any]:
         if (len(times) != row["m15_returned"] or
                 len(missing) != row["m15_missing"] or
                 missing != row["missing_open_epochs_utc"] or
+                type(row.get("first_expected_open_present")) is not bool or
+                row["first_expected_open_present"] != (min(expected) in times) or
+                type(row.get("last_expected_open_present")) is not bool or
+                row["last_expected_open_present"] != (max(expected) in times) or
                 ("mt5_query_returned_none" in row and
                  row["mt5_query_returned_none"] is not False) or
                 type(row.get("mt5_no_bars_returned")) is not bool or
