@@ -177,7 +177,11 @@ def inspect_fx28_official_policy_archive_replay_lab(
             # first exclusive write may leave a newer original without its
             # JSON receipt. Never silently select an older, apparently valid
             # capture in that case.
-            originals = list(folder.glob(prefix + "_*" + extension))
+            # CAD original is .json; its .receipt.json companion also
+            # matches a naive *.json glob. Keep receipt files separate.
+            originals = [entry for entry in folder.glob(
+                prefix + "_*" + extension)
+                if not entry.name.endswith(".receipt.json")]
         except (OSError, RuntimeError, ValueError):
             rejected[currency] = "ARCHIVE_RECEIPT_OR_SOURCE_SEARCH_FAILED"
             continue
@@ -194,9 +198,13 @@ def inspect_fx28_official_policy_archive_replay_lab(
         )
         orphaned = False
         malformed_original = False
+        symlink_original = False
         for original in originals:
             matched = expected_original.fullmatch(original.name)
-            if matched is None or original.is_symlink() or not original.is_file():
+            if original.is_symlink():
+                symlink_original = True
+                break
+            if matched is None or not original.is_file():
                 malformed_original = True
                 break
             try:
@@ -211,6 +219,9 @@ def inspect_fx28_official_policy_archive_replay_lab(
                     original.name[:-len(extension)] + ".receipt.json")
                 if companion.is_symlink() or not companion.is_file():
                     orphaned = True
+        if symlink_original:
+            rejected[currency] = "LOCAL_SOURCE_OR_RECEIPT_FILE_MISSING_OR_SYMLINK"
+            continue
         if malformed_original:
             rejected[currency] = "UNSAFE_OR_MALFORMED_ISSUER_ORIGINAL_FILENAME"
             continue
