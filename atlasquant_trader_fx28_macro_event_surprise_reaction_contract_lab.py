@@ -35,6 +35,10 @@ _ROOT = re.compile(r"[A-Z][A-Z0-9_.:-]{5,79}\Z")
 _NUM = re.compile(r"-?(?:0|[1-9][0-9]{0,5})(?:\.[0-9]{1,6})?\Z")
 _PRICE = re.compile(r"(?:0|[1-9][0-9]{0,5})(?:\.[0-9]{1,8})?\Z")
 _HORIZONS = {"M15": 15, "H1": 60, "H4": 240}
+# Same conservative maximum consensus lookback as the independent
+# OOS event-cluster ledger. An ancient forecast is not a contemporaneous
+# pre-release consensus, even if its original bytes can still be replayed.
+_CONSENSUS_LOOKBACK = timedelta(days=60)
 _HOSTS = {
     "USD": ("bls.gov", "bea.gov"),
     "EUR": ("ecb.europa.eu", "europa.eu"),
@@ -148,6 +152,7 @@ def _blocked(reason: str) -> dict[str, Any]:
         "single_independent_economic_event_count": 0,
         "consensus_minus_actual_is_not_directional_effect": True,
         "pre_event_consensus_independently_authenticated": False,
+        "consensus_publication_within_60_day_pre_event_window_claim": False,
         "first_print_actual_independently_authenticated": False,
         "issuer_first_seen_independently_authenticated": False,
         "source_digest_authenticates_only_claimed_local_bytes": True,
@@ -213,6 +218,9 @@ def inspect_macro_event_surprise_reaction_lab(
             or not cpub <= ccap < rel <= apub <= acap <= now):
         result["reason"] = "CONSENSUS_NOT_PRE_EVENT_OR_ACTUAL_NOT_POST_RELEASE"
         return result
+    if cpub < rel - _CONSENSUS_LOOKBACK:
+        result["reason"] = "STALE_PRE_EVENT_CONSENSUS_PUBLISHED_OVER_60_DAYS_EARLY"
+        return result
     if (actual.first_print_vintage_claim != "FIRST_PRINT_CLAIM_ONLY"
             or acap - apub > timedelta(days=90)):
         result["reason"] = "ACTUAL_VINTAGE_NOT_FIRST_PRINT_CLAIM_OR_AGE_INVALID"
@@ -240,6 +248,7 @@ def inspect_macro_event_surprise_reaction_lab(
             "unit": metric.unit,
         },
         "single_independent_economic_event_count": 1,
+        "consensus_publication_within_60_day_pre_event_window_claim": True,
         "actual_minus_consensus_metric_units": format(difference, "f"),
         "economic_surprise_label_documentary_only": label,
     })
