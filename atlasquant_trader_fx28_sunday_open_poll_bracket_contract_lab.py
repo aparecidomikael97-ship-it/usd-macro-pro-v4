@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 from atlasquant_trader_fx28_sunday_open_research_protocol_lab import (
@@ -28,6 +29,7 @@ EMPTY = "EMPTY_ARRAY"
 BAR = "CLOSED_M15_BAR_RETURNED"
 ERROR = "MT5_RETURNED_NONE"
 UTC = timezone.utc
+NY = ZoneInfo("America/New_York")
 BAR_TIME = timedelta(minutes=15)
 MAX_QUERY_TIME = timedelta(seconds=20)
 MAX_BATCH_SPAN = timedelta(minutes=10)
@@ -118,6 +120,7 @@ def _valid_cohort(
         if (begin is None or end is None
                 or begin < nominal + BAR_TIME
                 or not begin <= end <= inspected
+                or end > nominal + timedelta(hours=MAX_HOURS) + BAR_TIME
                 or end - begin > MAX_QUERY_TIME
                 or item.mt5_terminal_path_claim != EXPECTED_TERMINAL
                 or item.source_kind_claim != SOURCE
@@ -157,8 +160,10 @@ def inspect_fx28_sunday_open_two_poll_bracket_lab(
     now = _utc(inspected_at_utc)
     if (nominal is None or now is None or nominal < FIRST_SEPARATE_SUNDAY
             or nominal <= CAMPAIGN_END
-            or nominal.weekday() != 6 or nominal.hour != 22
-            or nominal.minute or nominal.second
+            or nominal.astimezone(NY).weekday() != 6
+            or nominal.astimezone(NY).hour != 17
+            or nominal.astimezone(NY).minute
+            or nominal.minute % 15 or nominal.second
             or now < nominal + BAR_TIME):
         return out
     first = _valid_cohort(prior_cohort, nominal=nominal, inspected=now)
@@ -186,7 +191,9 @@ def inspect_fx28_sunday_open_two_poll_bracket_lab(
             state = "STILL_NO_CLOSED_M15_IN_BOTH_POLLS_CLAIM_ONLY"
             still_empty += 1
         else:
-            assert later_open is not None
+            if later_open is None:
+                out["reason"] = "MISSING_LATER_FIRST_CLOSED_BAR_TIMESTAMP"
+                return out
             appeared += 1
             if prior_end >= later_open + BAR_TIME:
                 state = "CLOSED_M15_WAS_NOT_RETURNED_IN_EARLIER_LOCAL_POLL_CLAIM_ONLY"
