@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO
+from pathlib import Path
+from unittest.mock import patch
 import json
 import tempfile
 import unittest
@@ -255,6 +257,49 @@ class SNBSourceReceiptTests(unittest.TestCase):
             self.assertIn("LAB",body.parts)
             with self.assertRaises(FileExistsError):
                 save(body=self.body,receipt=self.rc,local_appdata=td)
+
+    def test_direct_saver_rejects_modified_source_before_any_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            altered=self.body+b"<p>forged</p>"
+            with self.assertRaisesRegex(ValueError,"NOT_VALIDATED"):
+                save(body=altered,receipt=self.rc,local_appdata=td)
+            self.assertFalse((Path(td)/"AtlasQuant").exists())
+
+    def test_direct_saver_rejects_malformed_receipt_before_any_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            bad=deepcopy(self.rc)
+            bad["source_url"]="https://fake.invalid"
+            with self.assertRaisesRegex(ValueError,"NOT_VALIDATED"):
+                save(body=self.body,receipt=bad,local_appdata=td)
+            self.assertFalse((Path(td)/"AtlasQuant").exists())
+
+    def test_saver_rejects_symlinked_lab_parent_without_escaping(self):
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as elsewhere:
+            parent=Path(td)/"AtlasQuant"
+            try:
+                parent.symlink_to(Path(elsewhere),target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("symlink not available on test filesystem")
+            with self.assertRaisesRegex(ValueError,"SYMLINK_REFUSED"):
+                save(body=self.body,receipt=self.rc,local_appdata=td)
+            self.assertEqual(list(Path(elsewhere).iterdir()),[])
+
+    def test_second_file_failure_removes_just_created_source(self):
+        with tempfile.TemporaryDirectory() as td:
+            old_open=Path.open
+            def write_second_fails(path,*args,**kwargs):
+                if path.name.endswith(".receipt.json"):
+                    raise OSError("simulated receipt write failure")
+                return old_open(path,*args,**kwargs)
+            with patch.object(Path,"open",write_second_fails):
+                with self.assertRaisesRegex(OSError,"receipt write failure"):
+                    save(body=self.body,receipt=self.rc,local_appdata=td)
+            folder=Path(td)/"AtlasQuant"/"LAB"/"official_macro_receipts"
+            self.assertEqual(list(folder.iterdir()),[])
+            # A new attempt is not blocked by a leftover half-archive.
+            original,receipt_file=save(body=self.body,receipt=self.rc,local_appdata=td)
+            self.assertTrue(original.is_file())
+            self.assertTrue(receipt_file.is_file())
 
     def test_oversized_capture_rejected_prewrite(self):
         def fake(req,*,timeout):
