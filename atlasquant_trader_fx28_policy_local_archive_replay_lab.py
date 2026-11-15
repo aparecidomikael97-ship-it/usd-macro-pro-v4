@@ -173,11 +173,49 @@ def inspect_fx28_official_policy_archive_replay_lab(
         )
         try:
             found = list(folder.glob(prefix + "_*.receipt.json"))
+            # Check ORIGINALS as well as receipts. A power failure after the
+            # first exclusive write may leave a newer original without its
+            # JSON receipt. Never silently select an older, apparently valid
+            # capture in that case.
+            originals = list(folder.glob(prefix + "_*" + extension))
         except (OSError, RuntimeError, ValueError):
-            rejected[currency] = "ARCHIVE_RECEIPT_SEARCH_FAILED"
+            rejected[currency] = "ARCHIVE_RECEIPT_OR_SOURCE_SEARCH_FAILED"
             continue
         if len(found) > MAX_RECEIPTS_PER_CURRENCY:
             rejected[currency] = "EXCESS_RECEIPT_FILES_FOR_ONE_ISSUER"
+            continue
+        if len(originals) > MAX_RECEIPTS_PER_CURRENCY:
+            rejected[currency] = "EXCESS_ORIGINAL_FILES_FOR_ONE_ISSUER"
+            continue
+        expected_original = re.compile(
+            re.escape(prefix)
+            + r"_(20\\d{6}T\\d{6}Z)_([0-9a-f]{12})"
+            + re.escape(extension) + r"\\Z"
+        )
+        orphaned = False
+        malformed_original = False
+        for original in originals:
+            matched = expected_original.fullmatch(original.name)
+            if matched is None or original.is_symlink() or not original.is_file():
+                malformed_original = True
+                break
+            try:
+                original_stamp = datetime.strptime(
+                    matched.group(1), "%Y%m%dT%H%M%SZ"
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                malformed_original = True
+                break
+            if original_stamp <= cutoff:
+                companion = folder / (
+                    original.name[:-len(extension)] + ".receipt.json")
+                if companion.is_symlink() or not companion.is_file():
+                    orphaned = True
+        if malformed_original:
+            rejected[currency] = "UNSAFE_OR_MALFORMED_ISSUER_ORIGINAL_FILENAME"
+            continue
+        if orphaned:
+            rejected[currency] = "ORPHANED_ORIGINAL_WITHOUT_RECEIPT_NO_FALLBACK"
             continue
         if not found:
             status[currency] = {"status": "NO_LOCAL_RECEIPT_FOUND"}
