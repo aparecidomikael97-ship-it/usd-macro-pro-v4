@@ -75,9 +75,11 @@ def execute_cli_lab(
     if api is None:
         return _blocked("MT5_API_UNAVAILABLE_NO_CLAIM")
     # The driver atomically claims before it invokes the read-only collector.
+    # Pass the LIVE clock: freezing it at the first check could disguise a
+    # process paused until after the 23:00 UTC prospective cutoff.
     # We do NOT use a separate preflight as a substitute for atomic locking.
     return run_claimed_first_m15_lab(
-        api, terminal_path=terminal_path, output_root=root, clock=lambda: now,
+        api, terminal_path=terminal_path, output_root=root, clock=clock,
     )
 
 
