@@ -13,6 +13,7 @@ from atlasquant_trader_fx28_first_m15_archive_census_readonly_lab import (
     WINDOW, inspect_first_m15_archive_census_lab as audit,
 )
 from atlasquant_trader_fx28_ny17_m15_writeonce_capture_lab import collect_window_lab
+from atlasquant_trader_fx28_first_m15_atomic_claim_lab import CLAIM_NAME, claim_once_lab
 from test_atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab import (
     StrictMock, TERMINAL, CLOSED,
 )
@@ -188,6 +189,43 @@ class FX28M15ArchiveCensusTests(unittest.TestCase):
         self.assertIsNone(r["validated_accuracy"])
         self.assertIsNone(r["valid_directional_bias"])
         self.assertEqual(r["source_observation_class"],"28_VALID_EMPTY_ARRAY_CLAIMS_LOCAL_ONLY")
+
+    def test_21_valid_claim_marker_and_one_archive_is_not_duplicate(self):
+        self.root.mkdir()
+        claim=claim_once_lab(archive_root=self.root,clock=lambda:STAMPED)
+        self.assertTrue(claim["exclusive_claim_created"])
+        _,capture=self.mock_archive(stamp=STAMPED)
+        self.assertEqual(capture["missing_m15_total"],28)
+        r=self.inspect(at=STAMPED+timedelta(seconds=1))
+        self.assertTrue(r["attempt_claim_marker_present"])
+        self.assertEqual(len(r["attempt_claim_marker_sha256"]),64)
+        self.assertEqual(r["candidate_window_artifact_count"],1)
+        self.assertEqual(r["state"],"LAB_FX28_FIRST_M15_ALL_28_MISSING_PRICE_INSUFFICIENT_NO_GO")
+        self.assertFalse(r["broker_source_independently_authenticated"])
+    def test_22_claim_without_archive_is_no_go_and_no_retry(self):
+        self.root.mkdir()
+        claim=claim_once_lab(archive_root=self.root,clock=lambda:STAMPED)
+        self.assertTrue(claim["exclusive_claim_created"])
+        r=self.inspect(at=STAMPED+timedelta(seconds=1))
+        self.assertTrue(r["attempt_claim_marker_present"])
+        self.assertEqual(r["candidate_window_artifact_count"],0)
+        self.assertEqual(r["reason"],"ATTEMPT_CLAIM_EXISTS_WITHOUT_ARCHIVE_NO_RETRY")
+        self.assertIsNone(r["all_28_nominal_m15_missing"])
+    def test_23_corrupt_claim_and_valid_archive_must_block(self):
+        self.mock_archive(stamp=STAMPED)
+        (self.root/CLAIM_NAME).write_text("invalid json",encoding="utf-8")
+        r=self.inspect(at=STAMPED+timedelta(seconds=1))
+        self.assertEqual(r["state"],"LAB_FX28_FIRST_M15_ARCHIVE_CENSUS_BLOCKED_NO_GO")
+        self.assertEqual(r["symbol_hashes_verified"],0)
+        self.assertIsNone(r["missing_expected_m15_open_count"])
+    def test_24_claim_with_two_archives_remains_duplicate(self):
+        self.root.mkdir()
+        self.assertTrue(claim_once_lab(archive_root=self.root,clock=lambda:STAMPED)["exclusive_claim_created"])
+        self.mock_archive(stamp=STAMPED)
+        (self.root/(WINDOW+"_second_attempt_partial")).mkdir()
+        r=self.inspect(at=STAMPED+timedelta(seconds=1))
+        self.assertEqual(r["candidate_window_artifact_count"],2)
+        self.assertEqual(r["reason"],"MULTIPLE_WINDOW_ARTIFACTS_NO_GO_NO_SECOND_CAPTURE")
 
 if __name__=="__main__":
     unittest.main(verbosity=2)
