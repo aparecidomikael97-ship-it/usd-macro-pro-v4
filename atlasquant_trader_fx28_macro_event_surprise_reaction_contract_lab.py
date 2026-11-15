@@ -251,6 +251,11 @@ def inspect_macro_event_surprise_reaction_lab(
     horizon = price_claims[0].horizon
     if horizon not in _HORIZONS or any(p.horizon != horizon for p in price_claims):
         return _blocked("MIXED_OR_UNKNOWN_FX_REACTION_HORIZON")
+    # A seven-cross 'M15' reaction must represent ONE synchronized price
+    # experiment, not seven separately chosen baselines/endpoints. Keep a
+    # bounded end-point tolerance for bar alignment, never hours/days late.
+    paired_baseline_utc = None
+    paired_endpoint_utc = None
     output = []
     for pair in expected:
         p = next(r for r in price_claims if r.pair == pair)
@@ -261,9 +266,14 @@ def inspect_macro_event_surprise_reaction_lab(
         if (baseline is None or endpoint is None or t0 is None or t1 is None
                 or not rel - timedelta(minutes=15) <= t0 <= rel
                 or not rel + timedelta(minutes=_HORIZONS[horizon]) <= t1 <= now
+                or t1 > rel + timedelta(minutes=_HORIZONS[horizon] + 15)
                 or type(p.local_price_original_sha256_claim) is not str
                 or _SHA.fullmatch(p.local_price_original_sha256_claim) is None):
             return _blocked("FX_PRICE_CLAIM_NUMERIC_TIME_OR_SOURCE_HASH_INVALID")
+        if paired_baseline_utc is None:
+            paired_baseline_utc, paired_endpoint_utc = t0, t1
+        elif t0 != paired_baseline_utc or t1 != paired_endpoint_utc:
+            return _blocked("SEVEN_FX_REACTIONS_HAVE_DIFFERENT_PRICE_WINDOWS")
         bps = ((endpoint / baseline - 1) * Decimal(10000)).quantize(
             Decimal("0.0001"), rounding=ROUND_HALF_UP)
         output.append({
@@ -278,6 +288,9 @@ def inspect_macro_event_surprise_reaction_lab(
         "reason": "ONE_EVENT_SEVEN_CORRELATED_PRICE_MOVEMENT_CLAIMS_NOT_FX_FORECAST",
         "fx_pair_outcome_claim_count": 7,
         "full_seven_pair_cohort_documentary": True,
+        "all_seven_pairs_share_identical_baseline_and_endpoint_clocks": True,
+        "shared_price_baseline_utc_claim": paired_baseline_utc.isoformat(),
+        "shared_price_endpoint_utc_claim": paired_endpoint_utc.isoformat(),
         "fx_reaction_claims": output,
     })
     return result
