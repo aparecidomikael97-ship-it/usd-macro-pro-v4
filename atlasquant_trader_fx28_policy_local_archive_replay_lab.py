@@ -189,8 +189,8 @@ def inspect_fx28_official_policy_archive_replay_lab(
             continue
         expected_original = re.compile(
             re.escape(prefix)
-            + r"_(20\\d{6}T\\d{6}Z)_([0-9a-f]{12})"
-            + re.escape(extension) + r"\\Z"
+            + r"_(20\d{6}T\d{6}Z)_([0-9a-f]{12})"
+            + re.escape(extension) + r"\Z"
         )
         orphaned = False
         malformed_original = False
