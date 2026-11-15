@@ -6,6 +6,7 @@ collector; no trading API is invoked here. All failures preserve the marker.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
+import ntpath
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,6 +15,7 @@ from atlasquant_trader_fx28_first_m15_atomic_claim_lab import (
 )
 from atlasquant_trader_fx28_ny17_m15_writeonce_capture_lab import collect_window_lab
 from atlasquant_mt5_xauusd_closedbar_capture_lab import _terminal_path_ok
+from atlasquant_trader_fx28_first_m15_scheduler_guard_lab import EXPECTED_TERMINAL
 from atlasquant_trader_fx28_m15_semantic_postcheck_lab import assert_semantics
 
 SCHEMA="ATLASQUANT_FX28_FIRST_M15_CLAIMED_CAPTURE_DRIVER_LAB_V1"
@@ -48,7 +50,12 @@ def run_claimed_first_m15_lab(
         "currently_connected_to_scheduled_runner":False,
         "automatic_retries_allowed":False,
     }
+    # A generic terminal64.exe elsewhere on the computer is not the
+    # Pepperstone terminal specified in this frozen collection contract.
+    # A path match STILL does not authenticate the broker server/account.
     if (type(terminal_path) is not str or not _terminal_path_ok(terminal_path)
+            or ntpath.normcase(ntpath.normpath(terminal_path))
+               != ntpath.normcase(ntpath.normpath(EXPECTED_TERMINAL))
             or not isinstance(output_root,Path) or not callable(clock)):
         out["reason"]="INVALID_CALL_PARAMETERS_NO_CLAIM"
         return out
