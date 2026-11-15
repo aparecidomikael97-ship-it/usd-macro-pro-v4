@@ -40,7 +40,7 @@ _HORIZONS = {"M15": 15, "H1": 60, "H4": 240}
 # pre-release consensus, even if its original bytes can still be replayed.
 _CONSENSUS_LOOKBACK = timedelta(days=60)
 _HOSTS = {
-    "USD": ("bls.gov", "bea.gov"),
+    "USD": ("bls.gov", "bea.gov", "federalreserve.gov"),
     "EUR": ("ecb.europa.eu", "europa.eu"),
     "GBP": ("ons.gov.uk", "bankofengland.co.uk"),
     "JPY": ("boj.or.jp", "stat.go.jp"),
@@ -48,6 +48,19 @@ _HOSTS = {
     "CAD": ("statcan.gc.ca", "bankofcanada.ca"),
     "AUD": ("abs.gov.au", "rba.gov.au"),
     "NZD": ("stats.govt.nz", "rbnz.govt.nz"),
+}
+# For recognized US economic series, a genuine-looking federal domain
+# must still be the agency that publishes THIS series. E.g. BEA does not
+# issue BLS PPI, and the Federal Reserve statement is not the CPI release.
+# Unknown series remain documentary-only and cannot turn into FX signals.
+_US_ISSUER_BY_SERIES_PREFIX = {
+    "US_PPI_": "bls.gov",
+    "US_CPI_": "bls.gov",
+    "US_NFP_": "bls.gov",
+    "US_PCE_": "bea.gov",
+    "US_GDP_": "bea.gov",
+    "US_FED_": "federalreserve.gov",
+    "US_FOMC_": "federalreserve.gov",
 }
 
 @dataclass(frozen=True)
@@ -202,6 +215,16 @@ def inspect_macro_event_surprise_reaction_lab(
             or issuer_owned_host(consensus_host)):
         result["reason"] = "UNTRUSTED_OR_ISSUER_COLLIDING_CONSENSUS_OR_OFFICIAL_URL"
         return result
+    if metric.currency == "USD":
+        authority = next((
+            host for prefix, host in _US_ISSUER_BY_SERIES_PREFIX.items()
+            if metric.series_id.startswith(prefix)
+        ), None)
+        if (authority is not None
+                and official_host != authority
+                and not official_host.endswith("." + authority)):
+            result["reason"] = "OFFICIAL_PUBLISHER_DOES_NOT_MATCH_US_METRIC"
+            return result
     if any(type(h) is not str or _SHA.fullmatch(h) is None for h in (
             consensus.original_sha256_claim, actual.original_sha256_claim)):
         result["reason"] = "MISSING_SOURCE_ORIGINAL_SHA_CLAIMS"
