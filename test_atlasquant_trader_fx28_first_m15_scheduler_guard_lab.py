@@ -7,7 +7,7 @@ from atlasquant_trader_fx28_first_m15_scheduler_guard_lab import (
 from atlasquant_trader_fx28_first_m15_atomic_claim_lab import WINDOW
 
 ROOT = r"C:\Users\apare\AppData\Local\AtlasQuant\LAB\FX28_NY17_M15"
-SCRIPTBASE = r"C:\Users\apare\AppData\Local\AtlasQuant\lab_capture_modules\"
+SCRIPTBASE = r"C:\Users\apare\AppData\Local\AtlasQuant\lab_capture_modules" + "\\"
 TERMINAL = r"C:\Program Files\Pepperstone MetaTrader 5\terminal64.exe"
 LEGACY = (
     "py -3.12 -u " + SCRIPTBASE + LEGACY_SCRIPT + " --window " + WINDOW
