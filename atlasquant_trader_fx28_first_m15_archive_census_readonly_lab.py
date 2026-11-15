@@ -68,7 +68,7 @@ def _aware_utc(now: Any) -> datetime | None:
     if not isinstance(now, datetime) or now.tzinfo is None:
         return None
     try:
-        if now.utcoffset() is None or now.microsecond:
+        if now.utcoffset() is None:
             return None
         return now.astimezone(timezone.utc)
     except (TypeError, OverflowError, ValueError):
