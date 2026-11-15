@@ -70,7 +70,7 @@ def _base(reason: str) -> dict[str, Any]:
         "header_exact_matches": 0,
         "prior_metadata_receipt_claims": 0,
         "later_metadata_receipt_claims": 0,
-        "matched_pair_counts": 0,
+        "complete_prior_later_cohort_pairs_claim_only": 0,
         "completed_two_phase_metadata_sets": 0,
         "candidate_receipt_metadata": [],
         "raw_comment_bodies_exposed": False,
@@ -132,7 +132,9 @@ def inspect_sunday_open_github_rest_pages_lab(
     """Pure parser. Passing arbitrary bytes NEVER authenticates an API read."""
     out = _base("INVALID_GITHUB_REST_PAGES_OR_INSPECTION_CLOCK")
     observed = _utc(observed_at_utc)
-    if (observed is None or observed < FIRST_SEPARATE_SUNDAY
+    # Historical/pre-study REST inventory is allowed, but no later poll
+    # witness can be accepted ahead of the separate research window.
+    if (observed is None or observed < datetime(2026,11,15,22,tzinfo=UTC)
             or type(raw_pages) not in (tuple,list)
             or not 1 <= len(raw_pages) <= MAX_PAGES):
         return out
@@ -221,7 +223,7 @@ def inspect_sunday_open_github_rest_pages_lab(
         "header_exact_matches":headers,
         "prior_metadata_receipt_claims":sum(p=="PRIOR" for _,p in matched),
         "later_metadata_receipt_claims":sum(p=="LATER" for _,p in matched),
-        "matched_pair_counts":sum(phases=={"PRIOR","LATER"} for phases in by_nominal.values()),
+        "complete_prior_later_cohort_pairs_claim_only":28*sum(phases=={"PRIOR","LATER"} for phases in by_nominal.values()),
         "completed_two_phase_metadata_sets":sum(phases=={"PRIOR","LATER"} for phases in by_nominal.values()),
         "candidate_receipt_metadata":[matched[k] for k in sorted(matched)],
         "response_page_hashes_claim_only":[sha256(raw).hexdigest() for raw in raw_pages],
@@ -279,6 +281,7 @@ def collect_sunday_open_public_github_once_lab(
             raw_pages=tuple(pages),observed_at_utc=observed_clock())
         checked["http_request_attempts"] = out["http_request_attempts"]
         checked["live_https_get_completed"] = (
+            request_open is urlopen and
             checked["state"]=="LAB_FX28_SUNDAY_GITHUB_REST_RECEIPTS_METADATA_ONLY_NO_GO")
         checked["snapshot_origin_is_caller_supplied"] = not checked["live_https_get_completed"]
         return checked
