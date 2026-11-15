@@ -50,6 +50,21 @@ class TestFX28AtomicClaim(unittest.TestCase):
         a=self.call(clock=lambda:EARLY)
         self.assertIn("NOT_CLOSED",a["reason"])
         self.assertFalse(list(self.root.iterdir()))
+    def test_late_next_day_does_not_claim_or_create_artifacts(self):
+        late=datetime(2026,11,16,9,0,tzinfo=timezone.utc)
+        r=self.call(clock=lambda:late)
+        self.assertEqual(r["reason"],"PROSPECTIVE_CLAIM_AFTER_DEADLINE_NO_BACKFILL")
+        self.assertFalse(r["exclusive_claim_created"])
+        self.assertFalse(list(self.root.iterdir()))
+    def test_exact_deadline_is_exclusive(self):
+        deadline=datetime(2026,11,15,23,0,tzinfo=timezone.utc)
+        self.assertFalse(self.call(clock=lambda:deadline)["exclusive_claim_created"])
+        self.assertFalse(list(self.root.iterdir()))
+    def test_one_second_before_deadline_permitted_only_as_local_claim(self):
+        last=datetime(2026,11,15,22,59,59,tzinfo=timezone.utc)
+        r=self.call(clock=lambda:last)
+        self.assertTrue(r["exclusive_claim_created"])
+        self.assertFalse(r["claim_does_not_authenticate_broker_or_market"] is False)
     def test_naive_clock_does_not_claim(self):
         a=self.call(clock=lambda:datetime(2026,11,15,22,20))
         self.assertFalse(a["exclusive_claim_created"])
