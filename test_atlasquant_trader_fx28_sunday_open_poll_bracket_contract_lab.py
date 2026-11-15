@@ -185,7 +185,7 @@ class SundayFirstAvailabilityBracketTests(unittest.TestCase):
                          "POLL_COHORT_ORDER_GAP_TOO_LARGE_OR_OVERLAPPED")
 
     def test_18_overlap_of_two_cohorts_rejected(self):
-        a=poll(False,mode=BAR,bar=NOMINAL+timedelta(minutes=15))
+        a=poll(False,mode=BAR,bar=NOMINAL)
         a=[replace(x,started_at_utc=x.started_at_utc-timedelta(minutes=16),
                    finished_at_utc=x.finished_at_utc-timedelta(minutes=16))
            for x in a]
