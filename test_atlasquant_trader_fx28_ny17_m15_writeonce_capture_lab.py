@@ -262,5 +262,61 @@ class Fx28ReadOnlyWriteOnceTests(unittest.TestCase):
                 verify_archive_lab(path)
 
 
+    def test_16_endpoint_flags_immutable_against_empty_pair_csv(self):
+        """A missing real first/last bar must not be claimed present.
+
+        All rows here are fake MT5 return values; no broker calls.
+        """
+        import json
+        mutations = (
+            ("first_expected_open_present", True),
+            ("last_expected_open_present", True),
+            ("first_expected_open_present", 1),
+            ("last_expected_open_present", 0),
+            ("first_expected_open_present", "REMOVE"),
+            ("last_expected_open_present", "REMOVE"),
+        )
+        for field, value in mutations:
+            with self.subTest(field=field, value=value), TemporaryDirectory() as folder:
+                root = Path(folder) / "mock_capture"
+                r = self.run_capture(FakeMT5(defective="empty_array"), root)
+                self.assertEqual(r["captured_m15_total"], 27 * 96)
+                archive = Path(r["archive_dir"])
+                manifest_file = archive / "manifest.json"
+                m = json.loads(manifest_file.read_text(encoding="utf-8"))
+                self.assertIs(m["files"]["EURUSD"]["first_expected_open_present"], False)
+                self.assertIs(m["files"]["EURUSD"]["last_expected_open_present"], False)
+                if value == "REMOVE":
+                    m["files"]["EURUSD"].pop(field)
+                else:
+                    m["files"]["EURUSD"][field] = value
+                manifest_file.write_text(json.dumps(m), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ValueError, "MANIFEST_CSV_GAP_DISAGREEMENT_EURUSD"
+                ):
+                    verify_archive_lab(archive)
+
+    def test_17_first_and_last_wickless_m15_open_timestamps_stay_missing(self):
+        """Actual missing M15 opening epochs make both flags false, never shifted."""
+        import json
+        start = datetime.fromisoformat(WINDOWS[HIST][0])
+        end = datetime.fromisoformat(WINDOWS[HIST][1])
+        first, last = int(start.timestamp()), int(end.timestamp()) - 900
+        with TemporaryDirectory() as folder:
+            root = Path(folder) / "mock_capture"
+            r = self.run_capture(
+                FakeMT5(gaps={"EURUSD": {first, last}}), root
+            )
+            self.assertEqual(r["missing_m15_total"], 2)
+            archive = Path(r["archive_dir"])
+            self.assertEqual(verify_archive_lab(archive)["missing_m15_total"], 2)
+            m = json.loads((archive / "manifest.json").read_text(encoding="utf-8"))
+            self.assertIs(m["files"]["EURUSD"]["first_expected_open_present"], False)
+            self.assertIs(m["files"]["EURUSD"]["last_expected_open_present"], False)
+            self.assertEqual(m["files"]["EURUSD"]["missing_open_epochs_utc"],
+                             [first, last])
+
+
+
 if __name__ == "__main__":
     unittest.main()
