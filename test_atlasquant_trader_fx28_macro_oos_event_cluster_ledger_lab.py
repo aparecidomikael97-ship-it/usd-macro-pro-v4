@@ -261,7 +261,28 @@ class MotorAHistoricalEventCohortTests(unittest.TestCase):
     def test_29_future_only_holdout_split_rejected(self):
         self.blocked([event()],split=NOW+timedelta(days=1))
 
-    def test_30_large_untrusted_file_list_rejected_without_work(self):
+    def test_30_forecast_cannot_predate_its_required_consensus_snapshot(self):
+        a=event(
+            pre_event_forecast_direction="UP",
+            pre_event_forecast_issued_at_utc=START-timedelta(days=2),
+        )
+        r=self.blocked([a])
+        self.assertEqual(r["reason"],"MISSING_LATE_OR_REWRITTEN_PRE_EVENT_FORECAST")
+
+    def test_31_same_price_archive_is_shared_observation_not_two_independent(self):
+        a=event()
+        b=event(
+            "US_CPI_NOV2026_MOCK",
+            release=START+timedelta(days=20),
+            price_archive_sha256_claim=a.price_archive_sha256_claim,
+        )
+        r=self.run_cohorts([a,b])
+        self.assertEqual(r["untrusted_event_roots_checked"],2)
+        self.assertEqual(r["untrusted_candidate_cluster_count"],1)
+        self.assertEqual(r["candidate_purged_boundary_cluster_count"],1)
+        self.assertFalse(r["can_train_calibrated_model"])
+
+    def test_32_large_untrusted_file_list_rejected_without_work(self):
         self.blocked([event() for _ in range(513)])
 
 if __name__=="__main__":
