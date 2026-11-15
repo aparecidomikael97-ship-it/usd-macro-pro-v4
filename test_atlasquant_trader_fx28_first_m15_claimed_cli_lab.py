@@ -70,6 +70,20 @@ class FirstM15ClaimedCliTests(TestCase):
                          "FIRST_M15_OUTSIDE_BOUNDED_WINDOW_OR_CLOCK_INVALID_NO_IO")
         self.assertFalse(fake.calls)
         self.assertFalse((self.root/CLAIM_NAME).exists())
+    def test_clock_is_rechecked_after_claim_before_any_mt5_call(self):
+        # Initial CLI gate and exclusive claim happen before a simulated
+        # process suspension that crosses the immutable 23:00Z deadline.
+        stamps=iter((CLOSED,CLOSED,datetime(2026,11,15,23,0,tzinfo=timezone.utc)))
+        fake=StrictMock([])
+        result=execute_cli_lab(
+            mode="capture-once",root=self.root,terminal_path=TERMINAL,
+            confirm_window=WINDOW,api=fake,clock=lambda:next(stamps))
+        self.assertEqual(result["reason"],
+                         "POST_CLAIM_CAPTURE_START_OUTSIDE_DEADLINE_NO_MT5_NO_RETRY")
+        self.assertTrue(result["claim_created"])
+        self.assertEqual(fake.calls,[])
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+
     def test_capture_requires_explicit_confirmation(self):
         fake = StrictMock([])
         r = self.execute(fake, confirm=None)
