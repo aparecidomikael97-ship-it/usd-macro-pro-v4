@@ -30,7 +30,7 @@ EXPECTED_SLOTS = tuple((currency, factor)
 _EXPECTED_PAIRS = tuple(OFFICIAL_PAIRS)
 _STATE = "LAB_FX28_32_FACTOR_DOCUMENTARY_GAP_RECONCILED_NO_GO"
 _HYP_STATE = "LAB_FX28_HYPOTHETICAL_MACRO_SCORE_COHERENT_NO_GO"
-_SHA256_HEX = re.compile(r"[0-9a-f]{64}\\Z")
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def _base(reason: str) -> dict[str, Any]:
