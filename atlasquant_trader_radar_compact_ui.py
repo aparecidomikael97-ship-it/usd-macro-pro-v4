@@ -241,6 +241,80 @@ def _hero(page: str) -> str:
             '<span>ÍNDICES + WIN / WDO</span><span>D1 · H4 · M15</span></div></section>')
 
 
+# A separate lab report is optional input. Its absence must never be
+# promoted to a cleared clock risk or to an authenticated FX28 hit rate.
+_TEMPORAL_SCHEMA = "ATLASQUANT_FX28_672_TEMPORAL_SCORING_INGRESS_FIREWALL_LAB_V1"
+_TEMPORAL_QUARANTINE = (
+    "LAB_FX28_672_FIRST56_AND_SERVER_CLOCK_P0_SCORING_QUARANTINE_NO_GO"
+)
+
+
+def _fx28_temporal_integrity_html(report: Any) -> str:
+    """Fail-closed presentational adapter, never a score or a broker receipt.
+
+    Even a structurally consistent supplied report remains a LAB claim.
+    Its data cannot authorize an entry, an accuracy figure or a time fix.
+    """
+    kind = "NAO_CONECTADO"
+    text = ("Auditoria de horários da campanha FX28 não conectada a esta tela. "
+            "Assertividade: N/D. Nenhuma operação autorizada.")
+    if report is not None:
+        valid = (
+            isinstance(report, Mapping)
+            and report.get("schema") == _TEMPORAL_SCHEMA
+            and report.get("state") == _TEMPORAL_QUARANTINE
+            and type(report.get("frozen_total_slots")) is int
+            and report["frozen_total_slots"] == 672
+            and type(report.get("first_nominal_window_slots_quarantined")) is int
+            and report["first_nominal_window_slots_quarantined"] == 56
+            and report.get("first_window_horizons") == {"D1": 28, "W1": 28}
+            and type(report.get("first_nominal_window_distinct_m15_prices_missing")) is int
+            and report["first_nominal_window_distinct_m15_prices_missing"] == 28
+            and type(report.get("remaining_original_slots_unevaluated")) is int
+            and report["remaining_original_slots_unevaluated"] == 616
+            and type(report.get("sunday_weekly_history_samples")) is int
+            and report["sunday_weekly_history_samples"] == 3
+            and type(report.get("matching_server_offset_weekly_minima")) is int
+            and report["matching_server_offset_weekly_minima"] == 3
+            and report.get("sunday_clock_p0_status") ==
+                "3_OF_3_SERVER_GMT_OFFSET_MATCH_HYPOTHESIS_ONLY"
+            and report.get("source_price_window_complete") is False
+            and report.get("scoring_ingress_allowed") is False
+            and report.get("documentary_perfect_score_claim_can_unlock_ingress") is False
+            and report.get("source_first_seen_broker_authenticated") is False
+            and report.get("market_server_utc_mapping_independently_attested") is False
+            and report.get("pre_event_forecasts_independently_authenticated") is False
+            and report.get("directional_accuracy_validated") is False
+            and report.get("validated_accuracy") is None
+            and report.get("calibrated_probability") is None
+            and type(report.get("documentary_score_count_released")) is int
+            and report["documentary_score_count_released"] == 0
+            and report.get("trade_authorized") is False
+            and report.get("publishable") is False
+            and report.get("frozen_campaign_slots_modified") is False
+            and report.get("operational_bias") == "AGUARDAR"
+        )
+        if valid:
+            kind = "QUARENTENA_LAB"
+            text = (
+                "FX28: 56 registros D1/W1 iniciais em quarentena; 28 candles "
+                "M15 nominais ausentes; 616 registros restantes ainda não "
+                "avaliados. Os três domingos históricos coincidem com o "
+                "deslocamento GMT+2/GMT+3, apenas como hipótese sem "
+                "autenticação da corretora. Assertividade: N/D; não operar."
+            )
+        else:
+            kind = "RELATORIO_REJEITADO"
+            text = ("Relatório temporal ausente, adulterado ou incompatível "
+                    "com as regras congeladas. Assertividade: N/D; não operar.")
+    return (
+        '<aside class="aqr-warning" role="status" data-fx28-temporal-state="' +
+        kind + '" data-scoring-allowed="false">'
+        '<strong>Integridade temporal FX28 · LAB / NÃO OPERAR</strong> ' +
+        escape(text) + '</aside>'
+    )
+
+
 def _disclaimer(calendar_connected: bool = False) -> str:
     source_note = ('O calendário, quando exibido, vem de fonte identificada e pode ter atraso. '
                    if calendar_connected else
@@ -736,7 +810,8 @@ def _master(calendar_data: Any = None, bias_evidence: Any = None) -> str:
 
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                       show_central: bool = True, daily_data: Any = None,
-                      calendar_data: Any = None, bias_evidence: Any = None) -> str:
+                      calendar_data: Any = None, bias_evidence: Any = None,
+                      temporal_scoring_report: Any = None) -> str:
     data = _daily(daily_data)
     page = selected if selected in {key for key, _ in PAGES} else "home"
     title = dict(PAGES)[page]
@@ -772,7 +847,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span><span class="aqr-chip">VISUALIZAÇÃO</span>' +
         '<span class="aqr-avatar" aria-label="Sessão do usuário"><span data-avatar-initial>' +
         escape((name.strip()[:1] or "U").upper()) + '</span><img data-profile-avatar alt="Foto do perfil" hidden></span></div></header>' +
-        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content +
+        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + _fx28_temporal_integrity_html(temporal_scoring_report) + content +
         '<footer class="aqr-foot">ATLASQUANT / TRADER RADAR · Poderoso por dentro. '
         'Simples por fora. · Sem ordens reais, sem dados fictícios.</footer></main></div></section>'
     )
@@ -786,4 +861,5 @@ def central_entry_html() -> str:
 
 
 __all__ = ["SCHEMA", "PAGES", "INDEX_GROUPS", "_daily",
-           "trader_radar_html", "central_entry_html"]
+           "trader_radar_html", "central_entry_html",
+           "_fx28_temporal_integrity_html"]
