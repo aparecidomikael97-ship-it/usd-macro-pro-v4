@@ -238,6 +238,20 @@ class GenericMacroSurpriseEventTests(unittest.TestCase):
         self.blocked(inspected_at_utc=None)
         self.blocked(inspected_at_utc=NOW.replace(tzinfo=None))
 
+    def test_26_identical_pre_and_post_original_digest_not_independent(self):
+        actual=replace(ACTUAL,
+                       original_sha256_claim=CONSENSUS.original_sha256_claim)
+        r=self.blocked(actual=actual)
+        self.assertEqual(r["reason"],
+            "PRE_EVENT_CONSENSUS_AND_POST_EVENT_ACTUAL_SAME_BYTES")
+
+    def test_27_explicit_default_https_port_443_remains_same_issuer(self):
+        actual=replace(ACTUAL,official_source_url=
+                       "https://www.bls.gov:443/news.release/ppi.toc.htm")
+        r=self.safety(self.run_event(actual=actual))
+        self.assertEqual(r["state"],
+            "LAB_FX28_SINGLE_EVENT_SURPRISE_DOCUMENTARY_ONLY_NO_GO")
+
     def test_25_all_8_currency_rosters_have_7_crosses_each(self):
         for c in CURRENCIES:
             self.assertEqual(
