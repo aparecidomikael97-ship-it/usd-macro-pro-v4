@@ -50,6 +50,18 @@ def _stamp(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
+def _github_utc(value: Any) -> datetime | None:
+    """Strict RFC3339 seconds emitted by GitHub REST JSON; not local datetimes."""
+    if (type(value) is not str
+            or re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", value) is None):
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt if _stamp(dt) == value else None
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
 def _base(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
@@ -173,8 +185,8 @@ def inspect_fx28_sunday_open_external_witness_lab(
     for data, body in ((github_prior_comment, before[1]),
                        (github_later_comment, after[1])):
         cid = data.get("id")
-        created = _utc(data.get("created_at"))
-        updated = _utc(data.get("updated_at"))
+        created = _github_utc(data.get("created_at"))
+        updated = _github_utc(data.get("updated_at"))
         observed = _utc(data.get("locally_observed_at_utc"))
         if (type(cid) is not int or not 1 <= cid <= 10**15 or cid in ids
                 or type(data.get("body")) is not str
