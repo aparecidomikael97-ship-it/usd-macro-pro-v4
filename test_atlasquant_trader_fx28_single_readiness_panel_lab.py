@@ -474,5 +474,75 @@ class Fx28ReadinessPanelTests(unittest.TestCase):
         self.assertEqual(r["factors_with_independently_accepted_signed_effect"],0)
 
 
+    def test_33_realistic_chf_and_nzd_seven_source_vintage_separation(self):
+        # Synthetic reports copy the VERIFIED real AM12 shape, not market data.
+        currencies=("AUD","CAD","CHF","EUR","GBP","NZD","USD")
+        p=mock_policy(currencies)
+        p["currency_archive_status"]={
+            c:{"selected_local_capture_utc_claim":(
+                "2026-11-15T05:39:05Z" if c=="CHF" else
+                "2026-11-15T05:23:03Z" if c=="NZD" else
+                "2026-11-13T23:56:00Z")} for c in currencies}
+        now=datetime(2026,11,15,5,45,tzinfo=UTC)
+        r=self.run_panel(now=now,policy=p,factors=mock_factors(7))
+        self.successful(r)
+        self.assertEqual(r["issuer_policy_document_count"],7)
+        self.assertEqual(r["issuer_policy_currencies_locally_checked"],
+                         list(currencies))
+        self.assertEqual(r["pairs_with_both_policy_documents"],21)
+        self.assertEqual(r["issuer_policy_missing_currencies"],["JPY"])
+        self.assertEqual(r["issuer_policy_rejected_currencies"],[])
+        self.assertEqual(r["factors_with_any_relevant_local_document"],7)
+        self.assertEqual(r["recent_24h_local_receipt_claim_currencies"],
+                         ["CHF","NZD"])
+        self.assertEqual(r["recent_24h_bilateral_policy_pair_count"],1)
+        self.assertEqual(r["stale_over_24h_local_receipt_claim_currencies"],
+                         ["AUD","CAD","EUR","GBP","USD"])
+        self.assertEqual(r["slots_future_no_supplied_witness"],672)
+        self.assertIsNone(r["validated_fx28_accuracy"])
+
+    def test_34_future_chf_receipt_cannot_be_backdated(self):
+        codes=("AUD","CAD","CHF","EUR","GBP","NZD","USD")
+        p=mock_policy(codes)
+        p["currency_archive_status"]={
+            "CHF":{"selected_local_capture_utc_claim":"2026-11-15T05:39:05Z"}}
+        r=self.run_panel(
+            now=datetime(2026,11,15,5,39,4,tzinfo=UTC),
+            policy=p,factors=mock_factors(7))
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+        self.assertEqual(r["reason"],"POLICY_LOCAL_CAPTURE_RECEIPT_CLOCK_INCONSISTENT")
+        self.assertEqual(r["slots_accounted"],0)
+
+    def test_35_jpy_not_a_current_source_despite_historical_release(self):
+        # The existing October policy PDF is a DIFFERENT source vintage,
+        # not a current BOJ homepage HTML source.
+        codes=("AUD","CAD","CHF","EUR","GBP","NZD","USD")
+        p=mock_policy(codes)
+        r=self.run_panel(
+            now=datetime(2026,11,15,5,45,tzinfo=UTC),
+            policy=p,factors=mock_factors(7))
+        self.successful(r)
+        self.assertEqual(r["issuer_policy_document_count"],7)
+        self.assertEqual(r["issuer_policy_missing_currencies"],["JPY"])
+        self.assertEqual(r["pairs_with_both_policy_documents"],21)
+        self.assertEqual(r["pairs_lacking_policy_document"],7)
+        self.assertEqual(r["factors_with_independently_accepted_signed_effect"],0)
+
+    def test_36_fake_eighth_current_bank_must_reconcile_factor_count(self):
+        # A caller claiming JPY current acceptance while source-factor
+        # reader accepts only 7 must FAIL CLOSED rather than silently
+        # claim all 28 FX pairs are market-ready.
+        p=mock_policy(tuple(CURRENCIES))
+        r=self.run_panel(
+            now=datetime(2026,11,15,5,45,tzinfo=UTC),
+            policy=p,factors=mock_factors(7))
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+        self.assertEqual(r["reason"],
+                         "FACTORS_DISAGREE_WITH_REAL_LOCAL_POLICY_SOURCE_COVERAGE")
+        self.assertEqual(r["slots_accounted"],0)
+
+
 if __name__ == "__main__":
     unittest.main()
