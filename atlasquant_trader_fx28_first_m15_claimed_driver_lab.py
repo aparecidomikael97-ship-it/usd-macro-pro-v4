@@ -77,8 +77,25 @@ def run_claimed_first_m15_lab(
             out["reason"]="SEMANTIC_READBACK_INCOMPLETE_NO_RETRY"
             return out
         out["semantically_verified_symbols"]=28
-        out["state"]="LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO"
-        out["reason"]="ONE_WRITE_ONCE_ARCHIVE_LOCAL_CLAIM_ONLY_NO_BROKER_PIT"
+        count=out["captured_m15_total"]
+        gaps=out["missing_m15_total"]
+        if (type(count) is not int or type(gaps) is not int
+                or not 0 <= count <= 28 or count + gaps != 28
+                or checked["m15_rows_semantically_checked"] != count
+                or checked["m15_gaps_from_base_verifier"] != gaps):
+            out["reason"]="CLAIMED_COHORT_COUNTS_INCONSISTENT_NO_RETRY"
+            return out
+        # Archive integrity can succeed even if ZERO broker bars exist.
+        # Distinguish a valid gap record from genuine observed prices.
+        if count == 0:
+            out["state"]="LAB_CLAIMED_FIRST_M15_ZERO_PRICE_OBSERVED_NO_GO"
+            out["reason"]="ZERO_OF_28_NOMINAL_BARS_NO_MARKET_PRICE_NO_RETRY"
+        elif count < 28:
+            out["state"]="LAB_CLAIMED_FIRST_M15_PARTIAL_PRICE_OBSERVED_NO_GO"
+            out["reason"]="INCOMPLETE_NOMINAL_M15_COHORT_NO_RETRY"
+        else:
+            out["state"]="LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO"
+            out["reason"]="ALL_28_NOMINAL_M15_ROWS_LOCAL_CLAIM_ONLY_NO_BROKER_PIT"
         return out
     except Exception as exc:
         # Do not delete the claimed marker or repeat IO. Keep diagnostic
