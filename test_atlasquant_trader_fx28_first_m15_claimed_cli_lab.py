@@ -16,6 +16,9 @@ from atlasquant_trader_fx28_first_m15_atomic_claim_lab import CLAIM_NAME, WINDOW
 from test_atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab import (
     StrictMock, TERMINAL, CLOSED,
 )
+from test_atlasquant_trader_fx28_first_m15_archive_census_readonly_lab import (
+    OneCandleMock,
+)
 
 
 class FirstM15ClaimedCliTests(TestCase):
@@ -56,7 +59,7 @@ class FirstM15ClaimedCliTests(TestCase):
     def test_one_capture_followed_by_blocked_repeat(self):
         first, second = StrictMock([]), StrictMock([])
         r = self.execute(first)
-        self.assertEqual(r["state"], "LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO")
+        self.assertEqual(r["state"], "LAB_CLAIMED_FIRST_M15_ZERO_PRICE_OBSERVED_NO_GO")
         self.assertEqual(first.calls.count("copy_rates_range"), 28)
         self.assertEqual(r["missing_m15_total"], 28)
         self.assertTrue((self.root / CLAIM_NAME).exists())
@@ -93,7 +96,7 @@ class FirstM15ClaimedCliTests(TestCase):
         a,b = StrictMock([]),StrictMock([])
         args = ["--mode", "capture-once", "--archive-root", str(self.root),
                 "--terminal-path", TERMINAL, "--confirm-window", WINDOW]
-        for fake, expected_code in ((a,0),(b,2)):
+        for fake, expected_code in ((a,2),(b,2)):
             stream=StringIO()
             with redirect_stdout(stream):
                 rc=cli_main(args,api_for_test=fake,clock=lambda:CLOSED,environ={})
@@ -102,6 +105,34 @@ class FirstM15ClaimedCliTests(TestCase):
         self.assertEqual(a.calls.count("copy_rates_range"),28)
         self.assertFalse(b.calls)
 
+    def test_full_28_nominal_bars_still_only_local_claim_and_no_trade(self):
+        fake=OneCandleMock()
+        args=["--mode","capture-once","--archive-root",str(self.root),
+              "--terminal-path",TERMINAL,"--confirm-window",WINDOW]
+        stream=StringIO()
+        with redirect_stdout(stream):
+            code=cli_main(args,api_for_test=fake,clock=lambda:CLOSED,environ={})
+        report=json.loads(stream.getvalue())
+        self.assertEqual(code,0)
+        self.assertEqual(report["captured_m15_total"],28)
+        self.assertEqual(report["missing_m15_total"],0)
+        self.assertEqual(report["state"],"LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO")
+        self.assertFalse(report["trade_authorized"])
+        self.assertFalse(report["independent_broker_price_source_attested"])
+    def test_partial_27_bars_exits_nonzero_but_keeps_archive(self):
+        fake=OneCandleMock(empty_symbol="EURUSD")
+        args=["--mode","capture-once","--archive-root",str(self.root),
+              "--terminal-path",TERMINAL,"--confirm-window",WINDOW]
+        stream=StringIO()
+        with redirect_stdout(stream):
+            code=cli_main(args,api_for_test=fake,clock=lambda:CLOSED,environ={})
+        report=json.loads(stream.getvalue())
+        self.assertEqual(code,2)
+        self.assertEqual(report["captured_m15_total"],27)
+        self.assertEqual(report["missing_m15_total"],1)
+        self.assertEqual(report["state"],"LAB_CLAIMED_FIRST_M15_PARTIAL_PRICE_OBSERVED_NO_GO")
+        self.assertTrue(Path(report["archive_dir"]).is_dir())
+        self.assertFalse(report["trade_authorized"])
     def test_no_env_fails_without_mt5(self):
         fake=StrictMock([])
         stream=StringIO()
