@@ -118,6 +118,41 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(api.calls,[])
         self.assertTrue((self.root/CLAIM_NAME).exists())
 
+    def test_clock_backward_after_claim_blocks_mt5_before_any_api(self):
+        initial=datetime(2026,11,15,22,55,tzinfo=timezone.utc)
+        earlier=datetime(2026,11,15,22,40,tzinfo=timezone.utc)
+        ticks=iter((initial,earlier))
+        mock=StrictMock([])
+        result=self.run_one(mock,clock=lambda:next(ticks))
+        self.assertTrue(result["claim_created"])
+        self.assertEqual(result["reason"],
+                         "POST_CLAIM_CLOCK_MOVED_BACKWARDS_NO_MT5_NO_RETRY")
+        self.assertEqual(mock.calls,[])
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+
+    def test_backward_clock_inside_collector_blocks_before_mt5_initialize(self):
+        ticks=iter((CLOSED,CLOSED,CLOSED-timedelta(seconds=1)))
+        mock=StrictMock([])
+        result=self.run_one(mock,clock=lambda:next(ticks))
+        self.assertTrue(result["claim_created"])
+        self.assertEqual(result["reason"],
+                         "COLLECTOR_CLOCK_REGRESSED_OR_INVALID_NO_MT5_NO_RETRY")
+        self.assertEqual(mock.calls,[])
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+
+    def test_backward_clock_after_collector_rejects_prospective_status(self):
+        newer=CLOSED+timedelta(seconds=20)
+        older=CLOSED+timedelta(seconds=10)
+        ticks=iter((CLOSED,CLOSED,newer,older))
+        mock=OneCandleMock()
+        result=self.run_one(mock,clock=lambda:next(ticks))
+        self.assertEqual(result["reason"],
+                         "POST_COLLECT_CLOCK_MOVED_BACKWARDS_NO_RETRY")
+        self.assertEqual(result["captured_m15_total"],28)
+        self.assertTrue(Path(result["archive_dir"]).exists())
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+        self.assertFalse(result["trade_authorized"])
+
     def test_existing_incomplete_directory_blocks_preclaim(self):
         (self.root/(WINDOW+"_partial")).mkdir()
         fake=StrictMock([])
