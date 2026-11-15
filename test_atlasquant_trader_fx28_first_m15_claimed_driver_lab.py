@@ -84,6 +84,40 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(r["claim_created"])
         self.assertFalse(fake.calls)
         self.assertFalse((self.root/CLAIM_NAME).exists())
+    def test_process_pause_after_claim_blocks_any_late_mt5_api(self):
+        times=iter((CLOSED,datetime(2026,11,15,23,0,tzinfo=timezone.utc)))
+        api=StrictMock([])
+        r=self.run_one(api,clock=lambda:next(times))
+        self.assertTrue(r["claim_created"])
+        self.assertEqual(r["reason"],
+                         "POST_CLAIM_CAPTURE_START_OUTSIDE_DEADLINE_NO_MT5_NO_RETRY")
+        self.assertEqual(api.calls,[])
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+        self.assertFalse(self.run_one(StrictMock([]))["claim_created"])
+
+    def test_capture_finishes_after_deadline_archive_not_prospective(self):
+        end=datetime(2026,11,15,23,0,tzinfo=timezone.utc)
+        times=iter((CLOSED,CLOSED,CLOSED,end))
+        api=OneCandleMock()
+        r=self.run_one(api,clock=lambda:next(times))
+        self.assertTrue(r["claim_created"])
+        self.assertEqual(r["state"],"LAB_CLAIMED_FIRST_M15_NO_GO")
+        self.assertEqual(r["reason"],
+                         "POST_COLLECT_OUTSIDE_DEADLINE_PROSPECTIVE_REJECTED_NO_RETRY")
+        self.assertEqual(r["captured_m15_total"],28)
+        self.assertTrue(Path(r["archive_dir"]).exists())
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+        self.assertFalse(r["trade_authorized"])
+
+    def test_invalid_second_clock_does_not_touch_mt5(self):
+        times=iter((CLOSED,None))
+        api=StrictMock([])
+        r=self.run_one(api,clock=lambda:next(times))
+        self.assertTrue(r["claim_created"])
+        self.assertEqual(r["reason"],"POST_CLAIM_CLOCK_INVALID_NO_MT5_NO_RETRY")
+        self.assertEqual(api.calls,[])
+        self.assertTrue((self.root/CLAIM_NAME).exists())
+
     def test_existing_incomplete_directory_blocks_preclaim(self):
         (self.root/(WINDOW+"_partial")).mkdir()
         fake=StrictMock([])
