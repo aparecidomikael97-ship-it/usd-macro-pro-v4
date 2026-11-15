@@ -113,6 +113,7 @@ def claim_once_lab(*,archive_root:Any,clock:Callable[[],datetime]) -> dict[str,A
             "prior_archive_or_claim_found":0,
             "claim_filename":CLAIM_NAME,
             "claim_sha256":sha256(raw).hexdigest(),
+            "claimed_at_utc_local_clock_unattested":now.isoformat(),
             "archive_capture_allowed_by_this_module":False,
             "file_writes":1,
         })
