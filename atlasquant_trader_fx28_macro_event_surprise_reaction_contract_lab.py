@@ -117,7 +117,8 @@ def _https_host(value: Any) -> str | None:
         if (u.scheme != "https" or not u.hostname or u.username is not None
                 or u.password is not None or u.fragment or not u.path
                 or (u.port is not None and u.port != 443)
-                or not u.netloc.endswith(u.hostname)
+                or u.netloc.lower() not in
+                (u.hostname.lower(), u.hostname.lower() + ":443")
                 or u.query):
             return None
         return u.hostname.lower()
@@ -194,6 +195,9 @@ def inspect_macro_event_surprise_reaction_lab(
     if any(type(h) is not str or _SHA.fullmatch(h) is None for h in (
             consensus.original_sha256_claim, actual.original_sha256_claim)):
         result["reason"] = "MISSING_SOURCE_ORIGINAL_SHA_CLAIMS"
+        return result
+    if consensus.original_sha256_claim == actual.original_sha256_claim:
+        result["reason"] = "PRE_EVENT_CONSENSUS_AND_POST_EVENT_ACTUAL_SAME_BYTES"
         return result
     cpub = _utc(consensus.published_at_utc)
     ccap = _utc(consensus.locally_captured_at_utc)
