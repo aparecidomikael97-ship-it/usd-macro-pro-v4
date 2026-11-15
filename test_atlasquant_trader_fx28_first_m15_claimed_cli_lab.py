@@ -111,6 +111,15 @@ class FirstM15ClaimedCliTests(TestCase):
         self.assertFalse(r["claim_created"])
         self.assertFalse(second.calls)
 
+    def test_other_mt5_terminal_path_cannot_capture_first_window(self):
+        fake=StrictMock([])
+        wrong=r"C:\Program Files\Other Broker MetaTrader 5\terminal64.exe"
+        result=self.execute(fake,path=wrong)
+        self.assertEqual(result["reason"],"INVALID_CALL_PARAMETERS_NO_CLAIM")
+        self.assertFalse(result["claim_created"])
+        self.assertEqual(fake.calls,[])
+        self.assertFalse((self.root/CLAIM_NAME).exists())
+
     def test_missing_mt5_api_does_not_create_claim(self):
         r = self.execute(None)
         self.assertEqual(r["reason"], "MT5_API_UNAVAILABLE_NO_CLAIM")
