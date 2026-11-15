@@ -177,7 +177,8 @@ def audit_historical_macro_event_cohorts_lab(
                 or (e.pre_event_forecast_direction in ("UP","DOWN")
                     and (forecast_time is None
                          or not rel-_PRECOMMIT_LOOKBACK<=forecast_time<rel
-                         or forecast_time>now))):
+                         or forecast_time>now
+                         or forecast_time<cons))):
             out["reason"]="MISSING_LATE_OR_REWRITTEN_PRE_EVENT_FORECAST"
             return out
         by_root[e.root_id]=len(cohorts)
@@ -204,7 +205,8 @@ def audit_historical_macro_event_cohorts_lab(
                 union(i,j)
             # Same calendar/consensus snapshot across two root IDs is
             # shared context, never two entirely independent information sets.
-            elif e.consensus_original_sha256_claim==cohorts[j].consensus_original_sha256_claim:
+            elif (e.consensus_original_sha256_claim==cohorts[j].consensus_original_sha256_claim
+                  or e.price_archive_sha256_claim==cohorts[j].price_archive_sha256_claim):
                 union(i,j)
         for other in e.competing_release_roots:
             if other in by_root:
