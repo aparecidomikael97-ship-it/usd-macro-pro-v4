@@ -178,6 +178,19 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(out["claim_created"])
         self.assertFalse(self.root.exists())
         self.assertFalse(fake.calls)
+    def test_other_valid_mt5_terminal_rejected_before_claim_or_mt5(self):
+        wrong = r"C:\Program Files\Other Broker MetaTrader 5\terminal64.exe"
+        fake = StrictMock([])
+        result = run_claimed_first_m15_lab(
+            fake, terminal_path=wrong, output_root=self.root,
+            clock=lambda: CLOSED)
+        self.assertEqual(result["reason"],"INVALID_CALL_PARAMETERS_NO_CLAIM")
+        self.assertFalse(result["claim_created"])
+        self.assertEqual(fake.calls,[])
+        self.assertFalse((self.root/CLAIM_NAME).exists())
+        # An invalid request does not consume the real frozen attempt.
+        self.assertTrue(self.run_one(StrictMock([]))["claim_created"])
+
     def test_bad_terminal_path_rejected_before_burning_claim(self):
         fake=StrictMock([])
         out=run_claimed_first_m15_lab(fake,terminal_path="BAD",output_root=self.root,clock=lambda:CLOSED)
