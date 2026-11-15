@@ -42,6 +42,8 @@ class TestFX28AtomicClaim(unittest.TestCase):
         record=json.loads((self.root/CLAIM_NAME).read_text(encoding="utf-8"))
         self.assertEqual(record["schema"],SCHEMA)
         self.assertEqual(record["window"],WINDOW)
+        self.assertEqual(a["claimed_at_utc_local_clock_unattested"],
+                         record["claimed_at_utc_local_clock_unattested"])
         self.assertEqual(record["window_open_utc"],"2026-11-15T22:00:00+00:00")
         self.assertFalse(record["trading_authorized"])
         self.assertFalse(a["archive_capture_allowed_by_this_module"])
