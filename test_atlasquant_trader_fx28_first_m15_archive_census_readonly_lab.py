@@ -123,7 +123,7 @@ class FX28M15ArchiveCensusTests(unittest.TestCase):
         self.assertEqual(r["symbol_hashes_verified"],0)
     def test_10_single_partial_directory_does_not_claim_no_bars(self):
         self.root.mkdir()
-        (self.root/(WINDOW+"_20261115T222001000000Z")).mkdir()
+        (self.root/(WINDOW+"_20261115T221959000000Z")).mkdir()
         r=self.inspect()
         self.assertEqual(r["candidate_window_artifact_count"],1)
         self.assertEqual(r["reason"],"ARCHIVE_INSPECTION_EXCEPTION_FAIL_CLOSED")
