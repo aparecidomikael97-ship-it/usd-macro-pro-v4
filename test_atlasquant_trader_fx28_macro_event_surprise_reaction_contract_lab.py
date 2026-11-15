@@ -129,6 +129,44 @@ class GenericMacroSurpriseEventTests(unittest.TestCase):
         consensus=replace(CONSENSUS,published_at_utc=RELEASE-timedelta(minutes=30))
         self.blocked(consensus=consensus)
 
+    def test_07a_year_old_consensus_cannot_masquerade_as_current(self):
+        old=replace(CONSENSUS,
+            published_at_utc=RELEASE-timedelta(days=365),
+            locally_captured_at_utc=RELEASE-timedelta(hours=1))
+        r=self.blocked(consensus=old)
+        self.assertEqual(r["reason"],
+            "STALE_PRE_EVENT_CONSENSUS_PUBLISHED_OVER_60_DAYS_EARLY")
+        self.assertFalse(
+            r["consensus_publication_within_60_day_pre_event_window_claim"])
+
+    def test_07b_60_day_consensus_boundary_is_documentary_only(self):
+        on_boundary=replace(CONSENSUS,
+            published_at_utc=RELEASE-timedelta(days=60),
+            locally_captured_at_utc=RELEASE-timedelta(hours=1))
+        r=self.safety(self.run_event(consensus=on_boundary))
+        self.assertEqual(r["state"],
+            "LAB_FX28_SINGLE_EVENT_SURPRISE_DOCUMENTARY_ONLY_NO_GO")
+        self.assertTrue(
+            r["consensus_publication_within_60_day_pre_event_window_claim"])
+        self.assertFalse(r["pre_event_consensus_independently_authenticated"])
+
+    def test_07c_one_second_outside_consensus_lookback_is_blocked(self):
+        old=replace(CONSENSUS,
+            published_at_utc=RELEASE-timedelta(days=60,seconds=1),
+            locally_captured_at_utc=RELEASE-timedelta(hours=1))
+        r=self.blocked(consensus=old)
+        self.assertEqual(r["reason"],
+            "STALE_PRE_EVENT_CONSENSUS_PUBLISHED_OVER_60_DAYS_EARLY")
+
+    def test_07d_old_published_forecast_not_refreshed_by_recent_capture(self):
+        old=replace(CONSENSUS,
+            published_at_utc=RELEASE-timedelta(days=180),
+            locally_captured_at_utc=RELEASE-timedelta(seconds=1))
+        r=self.blocked(consensus=old)
+        self.assertEqual(r["reason"],
+            "STALE_PRE_EVENT_CONSENSUS_PUBLISHED_OVER_60_DAYS_EARLY")
+        self.assertEqual(r["single_independent_economic_event_count"],0)
+
     def test_08_original_actual_published_future_rejected(self):
         actual=replace(ACTUAL,published_at_utc=NOW+timedelta(seconds=1))
         self.blocked(actual=actual)
