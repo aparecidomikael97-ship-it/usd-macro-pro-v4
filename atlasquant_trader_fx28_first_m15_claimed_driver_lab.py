@@ -60,6 +60,15 @@ def run_claimed_first_m15_lab(
         out["reason"]=claim["reason"]
         return out
     try:
+        # An intra-process backwards clock jump is no proof of an earlier
+        # observation. Track each live-clock phase, including the timestamp
+        # read INSIDE the collector before MT5.initialize.
+        claimed_at=datetime.fromisoformat(
+            claim["claimed_at_utc_local_clock_unattested"])
+        if claimed_at.utcoffset() is None:
+            out["reason"]="CLAIM_CLOCK_INVALID_NO_MT5_NO_RETRY"
+            return out
+        claimed_at=claimed_at.astimezone(timezone.utc)
         # The atomic claim's timestamp is only the time at marker creation.
         # Re-read the clock BEFORE any MT5 call. A paused process could
         # resume after 23:00 UTC while retaining an earlier claimed time.
@@ -73,10 +82,32 @@ def run_claimed_first_m15_lab(
         if not CLAIM_EARLIEST_UTC<=pre_collect<CLAIM_DEADLINE_UTC:
             out["reason"]="POST_CLAIM_CAPTURE_START_OUTSIDE_DEADLINE_NO_MT5_NO_RETRY"
             return out
+        if pre_collect < claimed_at:
+            out["reason"]="POST_CLAIM_CLOCK_MOVED_BACKWARDS_NO_MT5_NO_RETRY"
+            return out
+
+        collector_clock_value=None
+        collector_clock_rejected=False
+        def protected_collector_clock():
+            nonlocal collector_clock_value, collector_clock_rejected
+            observed=clock()
+            if (not isinstance(observed,datetime)
+                    or observed.tzinfo is None or observed.utcoffset() is None):
+                collector_clock_rejected=True
+                raise ValueError("COLLECTOR_CLOCK_INVALID")
+            observed=observed.astimezone(timezone.utc)
+            if not pre_collect<=observed<CLAIM_DEADLINE_UTC:
+                collector_clock_rejected=True
+                raise ValueError("COLLECTOR_CLOCK_REGRESSED_OR_LATE")
+            collector_clock_value=observed
+            return observed
 
         captured=collect_window_lab(
             api,window=WINDOW,terminal_path=terminal_path,
-            output_root=output_root,clock=clock)
+            output_root=output_root,clock=protected_collector_clock)
+        if collector_clock_rejected or collector_clock_value is None:
+            out["reason"]="COLLECTOR_CLOCK_REGRESSED_OR_INVALID_NO_MT5_NO_RETRY"
+            return out
         out["collector_state"]=captured["state"]
         out["collector_reason"]=captured["reason"]
         out["captured_m15_total"]=captured.get("captured_m15_total")
@@ -96,6 +127,9 @@ def run_claimed_first_m15_lab(
         post_collect=post_collect.astimezone(timezone.utc)
         if not CLAIM_EARLIEST_UTC<=post_collect<CLAIM_DEADLINE_UTC:
             out["reason"]="POST_COLLECT_OUTSIDE_DEADLINE_PROSPECTIVE_REJECTED_NO_RETRY"
+            return out
+        if post_collect < collector_clock_value:
+            out["reason"]="POST_COLLECT_CLOCK_MOVED_BACKWARDS_NO_RETRY"
             return out
         if not archive:
             out["reason"]="COLLECTOR_BLOCKED_CLAIM_PERMANENT_NO_RETRY"
