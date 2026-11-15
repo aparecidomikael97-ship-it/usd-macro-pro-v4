@@ -184,7 +184,12 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
-    # Independent TD table re-read: protected source hash + country sections.\n    # Does not alter the frozen event protocol or auxiliary calendar claims.\n    td_same_minute = inspect_ppi_td_same_minute_fx28_lab(\n        td_original_html=packet.td_html)\n\n    actual = inspect_ppi_oct2026_first_print_lab(
+    # Independent TD table re-read: protected source hash + country sections.
+    # Does not alter the frozen event protocol or auxiliary calendar claims.
+    td_same_minute = inspect_ppi_td_same_minute_fx28_lab(
+        td_original_html=packet.td_html)
+
+    actual = inspect_ppi_oct2026_first_print_lab(
         raw_html=packet.bls_html, receipt=packet.bls_capture, as_of_utc=now)
     stages["BLS_FIRST_PRINT"] = actual.get("state")
     if actual.get("state") != ACTUAL_OK:
@@ -249,7 +254,18 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
-    # The three auxiliary official schedule pages are PARTIAL. Their empty\n    # M15 candidate list must not hide a CAD release present in the TD original.\n    # If the exact TD bytes are absent in synthetic tests, report UNKNOWN,\n    # never assert that there was no competing M15 release.\n    td_cad_confirmed = td_same_minute["state"] == TD_SAME_MINUTE_CAD_DOCUMENTARY\n    other_m15 = (competing.get("candidate_competing_roots_by_reaction_window")\n                 or {}).get("M15")\n    combined_m15 = (sorted(set(other_m15 or [])\n                           | {"CAD_MANUFACTURING_SALES_SEP2026"})\n                    if td_cad_confirmed else None)\n\n    out = _blocked("ONE_UNATTESTED_EVENT_NOT_A_PREDICTIVE_SAMPLE",
+    # The three auxiliary official schedule pages are PARTIAL. Their empty
+    # M15 candidate list must not hide a CAD release present in the TD original.
+    # If the exact TD bytes are absent in synthetic tests, report UNKNOWN,
+    # never assert that there was no competing M15 release.
+    td_cad_confirmed = td_same_minute["state"] == TD_SAME_MINUTE_CAD_DOCUMENTARY
+    other_m15 = (competing.get("candidate_competing_roots_by_reaction_window")
+                 or {}).get("M15")
+    combined_m15 = (sorted(set(other_m15 or [])
+                           | {"CAD_MANUFACTURING_SALES_SEP2026"})
+                    if td_cad_confirmed else None)
+
+    out = _blocked("ONE_UNATTESTED_EVENT_NOT_A_PREDICTIVE_SAMPLE",
                    "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
     out["source_stage_states"] = stages
     out["one_event_study"] = {
@@ -277,7 +293,16 @@ def inspect_ppi_one_event_study_lab(
             "candidate_other_root_count": competing["candidate_competing_root_count_documentary"],
             "candidate_other_roots_in_baseline": competing["candidate_baseline_contamination_roots_documentary"],
             "candidate_other_roots_by_window": competing["candidate_competing_roots_by_reaction_window"],
-            "td_same_minute_cad_source_gate_state": td_same_minute["state"],\n            "td_additional_cad_root_from_pinned_original": (\n                "CAD_MANUFACTURING_SALES_SEP2026" if td_cad_confirmed else None),\n            "td_seven_cad_currency_pairs_exposed_documentary": (\n                td_same_minute["cad_pairs_exposed_to_cad_release"]\n                if td_cad_confirmed else None),\n            "cross_source_candidate_other_roots_in_m15": combined_m15,\n            "cross_source_m15_empty_calendar_proven": False,\n            "ppi_exclusive_usdcad_causality_proven": False,\n            "source_and_event_times_independently_verified": False,
+            "td_same_minute_cad_source_gate_state": td_same_minute["state"],
+            "td_additional_cad_root_from_pinned_original": (
+                "CAD_MANUFACTURING_SALES_SEP2026" if td_cad_confirmed else None),
+            "td_seven_cad_currency_pairs_exposed_documentary": (
+                td_same_minute["cad_pairs_exposed_to_cad_release"]
+                if td_cad_confirmed else None),
+            "cross_source_candidate_other_roots_in_m15": combined_m15,
+            "cross_source_m15_empty_calendar_proven": False,
+            "ppi_exclusive_usdcad_causality_proven": False,
+            "source_and_event_times_independently_verified": False,
             "ppi_causal_isolation_verified": False,
             "no_competing_events_proven": False,
             "requires_human_calendar_review": True,
