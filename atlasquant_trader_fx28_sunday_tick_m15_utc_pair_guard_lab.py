@@ -30,7 +30,7 @@ SCHEMA = "ATLASQUANT_FX28_SUNDAY_TICK_M15_UTC_PAIR_GUARD_LAB_V1"
 UTC = timezone.utc
 NY = ZoneInfo("America/New_York")
 M15_SECONDS = 900
-MAX_TICKS_PER_PAIR = 16
+MAX_TICKS_PER_PAIR = 24
 MINUTES_5H = MAX_HOURS * 3600
 SERVER_OFFSET_HOURS = (2, 3)
 PRESENT = "BARS_PRESENT"
@@ -163,6 +163,8 @@ def inspect_fx28_sunday_tick_m15_utc_pair_lab(
             or (op - first) % M15_SECONDS != 0):
             out["reason"] = "BAD_M15_OPEN_UTC_EPOCH_GRID"
             return out
+        # Consecutive FX ticks may legitimately share an identical time_msc.
+        # Preserve non-decreasing (not strictly increasing) milliseconds.
         ticks: list[int] = []
         for tick in record.tick_samples:
             if not isinstance(tick, LocalTickTimeClaim):
@@ -173,7 +175,7 @@ def inspect_fx28_sunday_tick_m15_utc_pair_lab(
                     or not first <= tsec < last_open_exclusive + M15_SECONDS
                     or tms // 1000 != tsec
                     or not first * 1000 <= tms < last_tick_exclusive_ms
-                    or (ticks and tms <= ticks[-1])):
+                    or (ticks and tms < ticks[-1])):
                 out["reason"] = "TICK_TIME_SECONDS_MILLISECONDS_OR_ORDER_CONFLICT"
                 return out
             ticks.append(tms)
