@@ -50,6 +50,26 @@ class FirstM15ClaimedCliTests(TestCase):
         self.assertFalse(fake.calls)
         self.assertFalse((self.root / CLAIM_NAME).exists())
 
+    def test_too_late_does_not_claim_or_query_the_terminal(self):
+        late=datetime(2026,11,16,9,0,tzinfo=timezone.utc)
+        fake=StrictMock([])
+        result=self.execute(fake,at=late)
+        self.assertEqual(result["reason"],"TOO_LATE_FOR_PROSPECTIVE_FIRST_M15_NO_BACKFILL_NO_IO")
+        self.assertFalse(fake.calls)
+        self.assertFalse((self.root/CLAIM_NAME).exists())
+    def test_main_late_refuses_without_import_or_claim(self):
+        late=datetime(2026,11,16,9,0,tzinfo=timezone.utc)
+        fake=StrictMock([])
+        args=["--mode","capture-once","--archive-root",str(self.root),
+              "--terminal-path",TERMINAL,"--confirm-window",WINDOW]
+        stream=StringIO()
+        with redirect_stdout(stream):
+            code=cli_main(args,api_for_test=fake,clock=lambda:late,environ={})
+        self.assertEqual(code,2)
+        self.assertEqual(json.loads(stream.getvalue())["reason"],
+                         "FIRST_M15_OUTSIDE_BOUNDED_WINDOW_OR_CLOCK_INVALID_NO_IO")
+        self.assertFalse(fake.calls)
+        self.assertFalse((self.root/CLAIM_NAME).exists())
     def test_capture_requires_explicit_confirmation(self):
         fake = StrictMock([])
         r = self.execute(fake, confirm=None)
