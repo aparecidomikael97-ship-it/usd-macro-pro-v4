@@ -24,6 +24,9 @@ def poll(first: bool, *, start=NOMINAL, mode=EMPTY, bar=None):
         finished_at_utc=when,
         api_result_kind=mode,
         first_closed_bar_open_utc=bar,
+        requested_history_start_at_utc=start,
+        requested_history_end_at_utc=start+timedelta(hours=5),
+        timeframe_claim="M15",
     ) for pair in OFFICIAL_PAIRS]
 
 
@@ -253,6 +256,26 @@ class SundayFirstAvailabilityBracketTests(unittest.TestCase):
     def test_27_future_inspection_clock_cannot_precede_poll_receipt(self):
         r=self.check(now=NOMINAL+timedelta(minutes=40))
         self.assertEqual(r["reason"],
+                         "INVALID_28_PAIR_POLL_COHORT_OR_MT5_RETURNED_NONE")
+
+    def test_28_different_history_start_between_polls_rejected(self):
+        after=poll(False,mode=BAR,bar=NOMINAL+timedelta(minutes=15))
+        after[0]=replace(after[0],requested_history_start_at_utc=
+                         NOMINAL+timedelta(minutes=15))
+        self.assertEqual(self.check(after=after)["reason"],
+                         "INVALID_28_PAIR_POLL_COHORT_OR_MT5_RETURNED_NONE")
+
+    def test_29_shortened_history_end_between_polls_rejected(self):
+        before=poll(True)
+        before[0]=replace(before[0],requested_history_end_at_utc=
+                          NOMINAL+timedelta(hours=4))
+        self.assertEqual(self.check(before=before)["reason"],
+                         "INVALID_28_PAIR_POLL_COHORT_OR_MT5_RETURNED_NONE")
+
+    def test_30_wrong_timeframe_even_when_nominal_matches_rejected(self):
+        after=poll(False,mode=BAR,bar=NOMINAL+timedelta(minutes=15))
+        after[0]=replace(after[0],timeframe_claim="H1")
+        self.assertEqual(self.check(after=after)["reason"],
                          "INVALID_28_PAIR_POLL_COHORT_OR_MT5_RETURNED_NONE")
 
 
