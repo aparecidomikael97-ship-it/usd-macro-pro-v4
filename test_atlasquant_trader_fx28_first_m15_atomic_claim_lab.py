@@ -7,13 +7,20 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import json,unittest
+import json,unittest,multiprocessing as mp
 
 from atlasquant_trader_fx28_first_m15_atomic_claim_lab import (
     SCHEMA,WINDOW,CLAIM_NAME,claim_once_lab,inspect_claim_lab,
 )
 CLOSED=datetime(2026,11,15,22,20,tzinfo=timezone.utc)
 EARLY=datetime(2026,11,15,22,14,59,tzinfo=timezone.utc)
+
+def _separate_process_claim(path,barrier,result_queue):
+    """Spawned worker, not a thread. One shared filesystem claim path."""
+    barrier.wait(timeout=20)
+    result=claim_once_lab(archive_root=Path(path),clock=lambda:CLOSED)
+    result_queue.put(result["exclusive_claim_created"])
+
 class TestFX28AtomicClaim(unittest.TestCase):
     def setUp(self):
         self.temp=TemporaryDirectory(prefix="ATLASQUANT_ATOMIC_CLAIM_MOCK_ONLY_")
@@ -95,6 +102,28 @@ class TestFX28AtomicClaim(unittest.TestCase):
         self.assertEqual(sum(v["exclusive_claim_created"] for v in results),1)
         self.assertEqual(len(list(self.root.iterdir())),1)
         self.assertTrue(all(not v["trading_authorized"] for v in results))
+    def test_eight_independent_spawned_processes_allow_one(self):
+        """True multiprocess contention, not just GIL-controlled threads."""
+        ctx=mp.get_context("spawn")
+        barrier=ctx.Barrier(8)
+        results=ctx.Queue()
+        workers=[ctx.Process(target=_separate_process_claim,
+            args=(str(self.root),barrier,results)) for _ in range(8)]
+        for p in workers:
+            p.start()
+        for p in workers:
+            p.join(timeout=25)
+        try:
+            self.assertFalse(any(p.is_alive() for p in workers))
+            self.assertTrue(all(p.exitcode==0 for p in workers))
+            self.assertEqual(sum(results.get(timeout=2) for _ in workers),1)
+            self.assertEqual(len(list(self.root.iterdir())),1)
+        finally:
+            for p in workers:
+                if p.is_alive():
+                    p.terminate()
+                    p.join(timeout=3)
+            results.close()
     def test_different_timezone_clock_normalized_to_utc(self):
         tz=timezone(timedelta(hours=-4))
         dt=datetime(2026,11,15,18,20,tzinfo=tz)
