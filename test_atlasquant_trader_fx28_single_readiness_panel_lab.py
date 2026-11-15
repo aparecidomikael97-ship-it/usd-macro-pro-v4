@@ -410,5 +410,69 @@ class Fx28ReadinessPanelTests(unittest.TestCase):
             self.assertIsNone(factor_reader.call_args.kwargs["hypothetical_factors"])
 
 
+    def test_29_nzd_october_article_variant_six_sources_one_recent_no_fx_signal(self):
+        # Simulated source statuses; the ACTUAL RBNZ HTML is on AM12,
+        # NOT bundled here. The stage on AM12 also ran real bytes.
+        currencies=("AUD","CAD","EUR","GBP","NZD","USD")
+        p=mock_policy(currencies)
+        p["currency_archive_status"]={
+            code:{"selected_local_capture_utc_claim":(
+                "2026-11-15T05:23:03Z" if code=="NZD"
+                else "2026-11-13T23:56:00Z"
+            )} for code in currencies
+        }
+        now=datetime(2026,11,15,5,29,0,tzinfo=UTC)
+        r=self.run_panel(now=now,policy=p,factors=mock_factors(6))
+        self.successful(r)
+        self.assertEqual(r["issuer_policy_document_count"],6)
+        self.assertEqual(r["issuer_policy_currencies_locally_checked"],
+                         list(currencies))
+        self.assertEqual(r["pairs_with_both_policy_documents"],15)
+        self.assertEqual(r["issuer_policy_missing_currencies"],["CHF","JPY"])
+        self.assertEqual(r["issuer_policy_rejected_currencies"],[])
+        self.assertEqual(r["factors_with_any_relevant_local_document"],6)
+        self.assertEqual(r["recent_24h_local_receipt_claim_currencies"],["NZD"])
+        self.assertEqual(r["stale_over_24h_local_receipt_claim_currencies"],
+                         ["AUD","CAD","EUR","GBP","USD"])
+        self.assertEqual(r["recent_24h_bilateral_policy_pair_count"],0)
+        self.assertEqual(r["slots_future_no_supplied_witness"],672)
+        self.assertFalse(r["issuer_identity_and_first_seen_independently_authenticated"])
+        self.assertIsNone(r["validated_fx28_accuracy"])
+
+    def test_30_new_nzd_receipt_cannot_be_backdated_before_capture(self):
+        currencies=("AUD","CAD","EUR","GBP","NZD","USD")
+        p=mock_policy(currencies)
+        p["currency_archive_status"]={
+            "NZD":{"selected_local_capture_utc_claim":"2026-11-15T05:23:03Z"}
+        }
+        before=datetime(2026,11,15,5,23,2,tzinfo=UTC)
+        r=self.run_panel(now=before,policy=p,factors=mock_factors(6))
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+        self.assertEqual(r["slots_accounted"],0)
+        self.assertEqual(r["reason"],"POLICY_LOCAL_CAPTURE_RECEIPT_CLOCK_INCONSISTENT")
+
+    def test_31_six_bank_sources_and_five_factors_disagree_fail_closed(self):
+        currencies=("AUD","CAD","EUR","GBP","NZD","USD")
+        r=self.run_panel(
+            now=datetime(2026,11,15,5,29,tzinfo=UTC),
+            policy=mock_policy(currencies),factors=mock_factors(5))
+        self.safe(r)
+        self.assertEqual(r["state"],"LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+        self.assertEqual(r["reason"],
+                         "FACTORS_DISAGREE_WITH_REAL_LOCAL_POLICY_SOURCE_COVERAGE")
+
+    def test_32_legacy_rejected_nzd_not_silently_counted_as_6th_bank(self):
+        legacy=mock_policy(("AUD","CAD","EUR","GBP","USD"),rejected=("NZD",))
+        r=self.run_panel(
+            now=datetime(2026,11,15,5,29,tzinfo=UTC),
+            policy=legacy,factors=mock_factors(5))
+        self.successful(r)
+        self.assertEqual(r["issuer_policy_document_count"],5)
+        self.assertEqual(r["issuer_policy_rejected_currencies"],["NZD"])
+        self.assertEqual(r["pairs_with_both_policy_documents"],10)
+        self.assertEqual(r["factors_with_independently_accepted_signed_effect"],0)
+
+
 if __name__ == "__main__":
     unittest.main()
