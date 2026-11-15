@@ -5,12 +5,12 @@ Only an explicitly supplied API object is used, solely by the unchanged
 collector; no trading API is invoked here. All failures preserve the marker.
 """
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from atlasquant_trader_fx28_first_m15_atomic_claim_lab import (
-    WINDOW,claim_once_lab,
+    WINDOW, CLAIM_EARLIEST_UTC, CLAIM_DEADLINE_UTC, claim_once_lab,
 )
 from atlasquant_trader_fx28_ny17_m15_writeonce_capture_lab import collect_window_lab
 from atlasquant_mt5_xauusd_closedbar_capture_lab import _terminal_path_ok
@@ -60,6 +60,20 @@ def run_claimed_first_m15_lab(
         out["reason"]=claim["reason"]
         return out
     try:
+        # The atomic claim's timestamp is only the time at marker creation.
+        # Re-read the clock BEFORE any MT5 call. A paused process could
+        # resume after 23:00 UTC while retaining an earlier claimed time.
+        pre_collect=clock()
+        if (not isinstance(pre_collect,datetime)
+                or pre_collect.tzinfo is None
+                or pre_collect.utcoffset() is None):
+            out["reason"]="POST_CLAIM_CLOCK_INVALID_NO_MT5_NO_RETRY"
+            return out
+        pre_collect=pre_collect.astimezone(timezone.utc)
+        if not CLAIM_EARLIEST_UTC<=pre_collect<CLAIM_DEADLINE_UTC:
+            out["reason"]="POST_CLAIM_CAPTURE_START_OUTSIDE_DEADLINE_NO_MT5_NO_RETRY"
+            return out
+
         captured=collect_window_lab(
             api,window=WINDOW,terminal_path=terminal_path,
             output_root=output_root,clock=clock)
@@ -68,10 +82,24 @@ def run_claimed_first_m15_lab(
         out["captured_m15_total"]=captured.get("captured_m15_total")
         out["missing_m15_total"]=captured.get("missing_m15_total")
         archive=captured.get("archive_dir")
+        if archive:
+            out["archive_dir"]=archive
+        # After broker API returns, a late archive is retained for forensic
+        # review but is NEVER promoted to prospective first-M15 evidence.
+        # No retry; permanent claim remains reserved.
+        post_collect=clock()
+        if (not isinstance(post_collect,datetime)
+                or post_collect.tzinfo is None
+                or post_collect.utcoffset() is None):
+            out["reason"]="POST_COLLECT_CLOCK_INVALID_NO_RETRY"
+            return out
+        post_collect=post_collect.astimezone(timezone.utc)
+        if not CLAIM_EARLIEST_UTC<=post_collect<CLAIM_DEADLINE_UTC:
+            out["reason"]="POST_COLLECT_OUTSIDE_DEADLINE_PROSPECTIVE_REJECTED_NO_RETRY"
+            return out
         if not archive:
             out["reason"]="COLLECTOR_BLOCKED_CLAIM_PERMANENT_NO_RETRY"
             return out
-        out["archive_dir"]=archive
         checked=assert_semantics(Path(archive))
         if checked["symbols_structurally_verified"]!=28:
             out["reason"]="SEMANTIC_READBACK_INCOMPLETE_NO_RETRY"
