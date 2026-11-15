@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any
 import json
 import re
+from hashlib import sha256
+from atlasquant_trader_fx28_first_m15_atomic_claim_lab import (
+    CLAIM_NAME, SCHEMA as CLAIM_SCHEMA,
+)
 
 from atlasquant_trader_fx28_ny17_m15_writeonce_capture_lab import (
     PAIRS, SCHEMA as ARCHIVE_SCHEMA, verify_archive_lab,
@@ -42,6 +46,9 @@ def _base(reason: str) -> dict[str, Any]:
         "expected_candles_in_frozen_window": 28,
         "candidate_window_artifact_count": None,
         "candidate_artifact_names": [],
+        "attempt_claim_marker_present": False,
+        "attempt_claim_marker_sha256": None,
+        "attempt_claim_marker_is_not_broker_attestation": True,
         "archive_manifest_sha256": None,
         "symbol_hashes_verified": 0,
         "m15_rows_semantically_verified": 0,
@@ -112,18 +119,58 @@ def inspect_first_m15_archive_census_lab(*, archive_root: Any,
              or item.name.casefold().startswith(prefix)),
             key=lambda item: item.name.casefold(),
         )
-        result["candidate_window_artifact_count"] = len(candidates)
-        result["candidate_artifact_names"] = [p.name for p in candidates[:16]]
-        if not candidates:
+        # The atomic attempt marker is not an archive.  When the claimed
+        # driver is used, a normal single capture produces BOTH one marker
+        # and one timestamped archive.  Counting them as two captures is a
+        # false duplicate; ignoring a malformed marker is also unsafe.
+        markers = [p for p in candidates if p.name.casefold() == CLAIM_NAME.casefold()]
+        archives = [p for p in candidates if p.name.casefold() != CLAIM_NAME.casefold()]
+        result["candidate_window_artifact_count"] = len(archives)
+        result["candidate_artifact_names"] = [p.name for p in archives[:16]]
+        result["attempt_claim_marker_present"] = bool(markers)
+        if len(markers) > 1:
+            result["reason"] = "MULTIPLE_CASE_VARIANT_CLAIM_MARKERS_FAIL_CLOSED"
+            return result
+        claimed_at = None
+        if markers:
+            marker = markers[0]
+            if marker.name != CLAIM_NAME or marker.is_symlink() or not marker.is_file():
+                result["reason"] = "CLAIM_MARKER_NAME_OR_TYPE_UNSAFE"
+                return result
+            raw = marker.read_bytes()
+            if not raw or len(raw) > 2048:
+                result["reason"] = "CLAIM_MARKER_EMPTY_OR_TOO_LARGE_FAIL_CLOSED"
+                return result
+            claim = json.loads(raw.decode("utf-8", "strict"))
+            value = claim.get("claimed_at_utc_local_clock_unattested")
+            if type(value) is not str:
+                result["reason"] = "CLAIM_MARKER_TIMESTAMP_INVALID"
+                return result
+            claimed_at = _aware_utc(datetime.fromisoformat(value))
+            if (claim.get("schema") != CLAIM_SCHEMA or claim.get("window") != WINDOW
+                    or claim.get("window_open_utc") != START.isoformat()
+                    or claim.get("window_end_utc") != END.isoformat()
+                    or claim.get("one_attempt_only") is not True
+                    or claim.get("never_retry_without_human_review") is not True
+                    or claim.get("source_first_seen_attested") is not False
+                    or claim.get("broker_identity_authenticated") is not False
+                    or claim.get("trading_authorized") is not False
+                    or claimed_at is None or not END <= claimed_at <= now):
+                result["reason"] = "CLAIM_MARKER_CONTENT_OR_CLOCK_INVALID"
+                return result
+            result["attempt_claim_marker_sha256"] = sha256(raw).hexdigest()
+        if not archives:
             result.update({
                 "state": "LAB_FX28_FIRST_M15_ARCHIVE_NOT_OBSERVED_NO_GO",
-                "reason": "NO_WINDOW_ARTIFACT_VISIBLE_MAY_HAVE_FAILED_BEFORE_WRITE",
+                "reason": ("ATTEMPT_CLAIM_EXISTS_WITHOUT_ARCHIVE_NO_RETRY"
+                           if markers else
+                           "NO_WINDOW_ARTIFACT_VISIBLE_MAY_HAVE_FAILED_BEFORE_WRITE"),
             })
             return result
-        if len(candidates) > 1:
+        if len(archives) > 1:
             result["reason"] = "MULTIPLE_WINDOW_ARTIFACTS_NO_GO_NO_SECOND_CAPTURE"
             return result
-        one = candidates[0]
+        one = archives[0]
         if one.is_symlink() or not one.is_dir():
             result["reason"] = "WINDOW_ARTIFACT_SYMLINK_OR_NOT_DIRECTORY"
             return result
@@ -135,6 +182,9 @@ def inspect_first_m15_archive_census_lab(*, archive_root: Any,
             match.group(1), "%Y%m%dT%H%M%S%fZ").replace(tzinfo=timezone.utc)
         if name_timestamp < END or name_timestamp > now:
             result["reason"] = "ARCHIVE_NAMED_TIME_OUTSIDE_COMPLETED_WINDOW"
+            return result
+        if claimed_at is not None and name_timestamp < claimed_at:
+            result["reason"] = "ARCHIVE_CLOCK_PREDATES_ATTEMPT_CLAIM"
             return result
 
         # Independently verify ALL 28 raw CSVs and the frozen bar grid.
