@@ -64,7 +64,7 @@ class SundayResearchProtocolTests(TestCase):
                   "absence_of_nominal_bar_proves_market_closed"):
             self.assertFalse(r[k],k)
         self.assertEqual((r["mt5_calls"],r["http_requests"],
-                          r["file_writes"],r["new_cost_brl"]),(0,0,0))
+                          r["file_writes"],r["new_cost_brl"]),(0,0,0,0))
         self.assertTrue(r["historical_data_are_caller_claims_not_broker_attestation"])
         self.assertEqual(r["operational_bias"],"AGUARDAR")
 
