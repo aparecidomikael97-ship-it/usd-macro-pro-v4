@@ -171,6 +171,24 @@ class Fx28SourceBiasFirewallTests(unittest.TestCase):
         self.assertEqual(r["reason"],
             "SLOT_SOURCE_DOCUMENT_OR_SIGNED_EFFECT_CONTRADICTION")
 
+    def test_06a_documentary_sha_must_be_real_lowercase_sha256_hex(self):
+        for fake in ("z"*64, "G"*64, "0"*64, "a"*63, True, []):
+            with self.subTest(fake=str(fake)[:40]):
+                report=deepcopy(self.source)
+                report["factor_slots"][0]["documentary_source_sha256_local_claim"]=fake
+                result=self.blocked(audit(admission_report=report))
+                self.assertEqual(result["reason"],
+                                 "SLOT_SOURCE_DOCUMENT_OR_SIGNED_EFFECT_CONTRADICTION")
+
+    def test_06b_source_kind_cannot_be_arbitrary_nonstring_or_control_text(self):
+        for kind in ([], {"k":"v"}, 3, "", "FAKE SOURCE", "X\\nDANGER", "z"*129):
+            with self.subTest(kind=str(kind)[:35]):
+                report=deepcopy(self.source)
+                report["factor_slots"][0]["documentary_source_kind"]=kind
+                result=self.blocked(audit(admission_report=report))
+                self.assertEqual(result["reason"],
+                                 "SLOT_SOURCE_DOCUMENT_OR_SIGNED_EFFECT_CONTRADICTION")
+
     def test_07_document_count_7_cannot_be_8_with_only_7_documents(self):
         report=deepcopy(self.source)
         report["factor_slots_with_any_relevant_local_document"]=8
