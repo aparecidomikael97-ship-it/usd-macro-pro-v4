@@ -1,0 +1,118 @@
+"""Offline tests for the explicit, unscheduled first-M15 one-shot CLI."""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import TestCase, main
+from contextlib import redirect_stdout
+from io import StringIO
+import json
+
+from atlasquant_trader_fx28_first_m15_claimed_cli_lab import (
+    execute_cli_lab, main as cli_main,
+)
+from atlasquant_trader_fx28_first_m15_atomic_claim_lab import CLAIM_NAME, WINDOW
+from test_atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab import (
+    StrictMock, TERMINAL, CLOSED,
+)
+
+
+class FirstM15ClaimedCliTests(TestCase):
+    def setUp(self):
+        self.t = TemporaryDirectory(prefix="aq_fx28_cli_lab_")
+        self.addCleanup(self.t.cleanup)
+        self.root = Path(self.t.name) / "FX28_NY17_M15"
+        self.root.mkdir()
+
+    def execute(self, fake, *, mode="capture-once", at=CLOSED,
+                confirm=WINDOW, path=TERMINAL):
+        return execute_cli_lab(
+            mode=mode, root=self.root, terminal_path=path,
+            confirm_window=confirm, api=fake, clock=lambda: at,
+        )
+
+    def test_preflight_never_contacts_mt5_or_claims(self):
+        fake = StrictMock([])
+        out = self.execute(fake, mode="preflight")
+        self.assertEqual(out["state"], "LAB_FX28_CLI_PREFLIGHT_ONLY_NO_GO")
+        self.assertTrue(out["precheck"]["single_attempt_start_precheck_clear"])
+        self.assertFalse(fake.calls)
+        self.assertFalse((self.root / CLAIM_NAME).exists())
+
+    def test_capture_before_close_never_claims_or_contacts_mt5(self):
+        fake = StrictMock([])
+        r = self.execute(fake, at=CLOSED - timedelta(minutes=6))
+        self.assertEqual(r["reason"], "FIRST_M15_NOT_CLOSED_NO_IO_OR_CLAIM")
+        self.assertFalse(fake.calls)
+        self.assertFalse((self.root / CLAIM_NAME).exists())
+
+    def test_capture_requires_explicit_confirmation(self):
+        fake = StrictMock([])
+        r = self.execute(fake, confirm=None)
+        self.assertEqual(r["reason"], "EXPLICIT_WINDOW_AND_TERMINAL_REQUIRED")
+        self.assertFalse(fake.calls)
+
+    def test_one_capture_followed_by_blocked_repeat(self):
+        first, second = StrictMock([]), StrictMock([])
+        r = self.execute(first)
+        self.assertEqual(r["state"], "LAB_CLAIMED_FIRST_M15_ARCHIVE_CHECKED_NO_GO")
+        self.assertEqual(first.calls.count("copy_rates_range"), 28)
+        self.assertEqual(r["missing_m15_total"], 28)
+        self.assertTrue((self.root / CLAIM_NAME).exists())
+        blocked = self.execute(second, at=CLOSED + timedelta(minutes=1))
+        self.assertFalse(blocked["claim_created"])
+        self.assertFalse(second.calls)
+        self.assertEqual(len(list(self.root.glob(WINDOW+"_*/manifest.json"))), 1)
+
+    def test_none_query_burns_attempt_and_no_repeat(self):
+        failed = self.execute(StrictMock(None))
+        self.assertTrue(failed["claim_created"])
+        self.assertEqual(failed["collector_reason"], "MT5_HISTORY_QUERY_FAILED_NONE_EURUSD")
+        second = StrictMock([])
+        r = self.execute(second)
+        self.assertFalse(r["claim_created"])
+        self.assertFalse(second.calls)
+
+    def test_missing_mt5_api_does_not_create_claim(self):
+        r = self.execute(None)
+        self.assertEqual(r["reason"], "MT5_API_UNAVAILABLE_NO_CLAIM")
+        self.assertFalse((self.root / CLAIM_NAME).exists())
+
+    def test_default_main_is_preflight_with_no_mt5(self):
+        stream = StringIO()
+        with redirect_stdout(stream):
+            rc = cli_main(["--archive-root", str(self.root)],
+                          clock=lambda:CLOSED, environ={})
+        report = json.loads(stream.getvalue())
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["state"], "LAB_FX28_CLI_PREFLIGHT_ONLY_NO_GO")
+        self.assertFalse((self.root / CLAIM_NAME).exists())
+
+    def test_main_explicit_mock_capture_and_replay_block(self):
+        a,b = StrictMock([]),StrictMock([])
+        args = ["--mode", "capture-once", "--archive-root", str(self.root),
+                "--terminal-path", TERMINAL, "--confirm-window", WINDOW]
+        for fake, expected_code in ((a,0),(b,2)):
+            stream=StringIO()
+            with redirect_stdout(stream):
+                rc=cli_main(args,api_for_test=fake,clock=lambda:CLOSED,environ={})
+            self.assertEqual(rc,expected_code)
+            self.assertFalse(json.loads(stream.getvalue())["trade_authorized"])
+        self.assertEqual(a.calls.count("copy_rates_range"),28)
+        self.assertFalse(b.calls)
+
+    def test_no_env_fails_without_mt5(self):
+        fake=StrictMock([])
+        stream=StringIO()
+        with redirect_stdout(stream):
+            rc=cli_main(["--mode","capture-once","--terminal-path",TERMINAL,
+                         "--confirm-window",WINDOW],
+                        api_for_test=fake,clock=lambda:CLOSED,environ={})
+        self.assertEqual(rc,2)
+        self.assertFalse(fake.calls)
+        self.assertEqual(json.loads(stream.getvalue())["reason"],"LOCALAPPDATA_MISSING_FAIL_CLOSED")
+
+
+if __name__ == "__main__":
+    main(verbosity=2)
