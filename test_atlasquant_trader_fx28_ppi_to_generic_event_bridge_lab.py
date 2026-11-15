@@ -26,6 +26,8 @@ from test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
 )
 
 
+_MISSING=object()
+
 class PpiGenericBridgeTests(unittest.TestCase):
     def setUp(self):
         self.fixture=OneEventStudyJoinTests(
@@ -34,7 +36,7 @@ class PpiGenericBridgeTests(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.packet=self.fixture.packet
 
-    def run_bridge(self,*,packet=None,at=NOW,patch_td_te=True,
+    def run_bridge(self,*,packet=_MISSING,at=NOW,patch_td_te=True,
                    td_override=None,te_override=None):
         with ExitStack() as patches:
             if patch_td_te:
@@ -43,7 +45,8 @@ class PpiGenericBridgeTests(unittest.TestCase):
                 # Mock only test's pinned original TD and TE identity
                 # validation. Real BLS parsing and every local FX byte
                 # are NOT mocked and must still pass all source joins.
-                td["publisher_last_modified_http_claim"]="2026-11-06T14:00:00+00:00"
+                td.setdefault("publisher_last_modified_http_claim",
+                              "2026-11-06T14:00:00+00:00")
                 for module in (
                     "atlasquant_trader_ppi_one_event_study_join_lab",
                     "atlasquant_trader_fx28_ppi_to_generic_event_bridge_lab",
@@ -52,7 +55,7 @@ class PpiGenericBridgeTests(unittest.TestCase):
                         ".inspect_ppi_pre_event_snapshot_lab",return_value=td))
                     patches.enter_context(patch(module+
                         ".inspect_te_ppi_snapshot_lab",return_value=te))
-            r=bridge(packet=self.packet if packet is None else packet,
+            r=bridge(packet=self.packet if packet is _MISSING else packet,
                      as_of_utc=at)
         self.assertEqual(r["schema"],SCHEMA)
         self.assertEqual(r["operational_bias"],"AGUARDAR")
