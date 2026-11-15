@@ -44,6 +44,9 @@ class LocalM15PollClaim:
     finished_at_utc: datetime
     api_result_kind: str
     first_closed_bar_open_utc: datetime | None
+    requested_history_start_at_utc: datetime
+    requested_history_end_at_utc: datetime
+    timeframe_claim: str
     mt5_terminal_path_claim: str = EXPECTED_TERMINAL
     source_kind_claim: str = SOURCE
     terminal_connected_claim: bool = True
@@ -117,7 +120,12 @@ def _valid_cohort(
         end = _utc(item.finished_at_utc)
         opening = (_utc(item.first_closed_bar_open_utc)
                    if item.first_closed_bar_open_utc is not None else None)
+        requested_start = _utc(item.requested_history_start_at_utc)
+        requested_end = _utc(item.requested_history_end_at_utc)
         if (begin is None or end is None
+                or item.timeframe_claim != "M15"
+                or requested_start != nominal
+                or requested_end != nominal + timedelta(hours=MAX_HOURS)
                 or begin < nominal + BAR_TIME
                 or not begin <= end <= inspected
                 or end > nominal + timedelta(hours=MAX_HOURS) + BAR_TIME
@@ -150,7 +158,8 @@ def inspect_fx28_sunday_open_two_poll_bracket_lab(
 ) -> dict[str, Any]:
     """Strict 28+28 caller-claims, no ability to prove true broker availability.
 
-    Both cohorts use the SAME frozen 5h nominal-origin query. The preceding
+    Both cohorts MUST claim the SAME frozen 5h nominal-origin M15 query
+    bounds. No local hash authenticates the actual API arguments. The preceding
     EMPTY call is meaningful only if its completed timestamp is after the
     first later-observed candle had already closed. Otherwise this is
     normal candle maturation rather than evidence of source latency.
