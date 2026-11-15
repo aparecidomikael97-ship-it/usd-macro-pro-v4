@@ -178,16 +178,14 @@ class TickVsM15UtcGuardTests(unittest.TestCase):
         self.assertEqual(self.check(p)["reason"],
                          "TICK_TIME_SECONDS_MILLISECONDS_OR_ORDER_CONFLICT")
 
-    def test_15_unsorted_or_equal_tick_milliseconds_blocked(self):
-        for ticks in ((tick(OPEN+12),tick(OPEN+11)),
-                      (tick(OPEN+12),tick(OPEN+12))):
-            with self.subTest(ticks=ticks):
-                self.assertEqual(
-                    self.check(cohort(ticks=ticks))["reason"],
-                    "TICK_TIME_SECONDS_MILLISECONDS_OR_ORDER_CONFLICT")
+    def test_15_unsorted_tick_milliseconds_blocked(self):
+        samples=(tick(OPEN+12),tick(OPEN+11))
+        self.assertEqual(
+            self.check(cohort(ticks=samples))["reason"],
+            "TICK_TIME_SECONDS_MILLISECONDS_OR_ORDER_CONFLICT")
 
-    def test_16_over_16_tick_samples_rejected(self):
-        samples=tuple(tick(OPEN+i) for i in range(17))
+    def test_16_over_24_tick_samples_rejected(self):
+        samples=tuple(tick(OPEN+i) for i in range(25))
         self.assertEqual(self.check(cohort(ticks=samples))["reason"],
                          "INVALID_PAIR_SOURCE_OR_NONE_MISCLASSIFIED_AS_EMPTY")
 
@@ -273,6 +271,22 @@ class TickVsM15UtcGuardTests(unittest.TestCase):
         self.assertFalse(r["pepperstone_broker_source_authenticated"])
         self.assertFalse(r["clock_rewrite_allowed"])
         self.assertFalse(r["first_tick_at_actual_market_open_authenticated"])
+
+    def test_30_identical_tick_time_msc_legitimate_two_market_events(self):
+        # MetaQuotes' documented example contains consecutive tick rows
+        # with equal time_msc. These MUST NOT be classified as an API error.
+        same=tick(OPEN+12,128)
+        r=self.check(cohort(ticks=(same,same)))
+        self.safe(r)
+        self.assertEqual(r["pairs_with_same_m15_bucket_tick"],28)
+        self.assertEqual(r["comparison_rows"][0]["sampled_tick_count"],2)
+
+    def test_31_21_distinct_quarterhour_buckets_not_over_limit(self):
+        # 5 hours + optional closure bucket = 21 buckets, <= 24.
+        samples=tuple(tick(BASE+900*i) for i in range(21))
+        r=self.check(cohort(ticks=samples))
+        self.safe(r)
+        self.assertEqual(r["comparison_rows"][0]["sampled_tick_count"],21)
 
 
 if __name__ == "__main__":
