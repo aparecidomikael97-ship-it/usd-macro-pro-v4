@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from atlasquant_trader_fx28_first_m15_atomic_claim_lab import (
-    WINDOW, inspect_claim_lab,
+    WINDOW, CLAIM_DEADLINE_UTC, inspect_claim_lab,
 )
 from atlasquant_trader_fx28_first_m15_claimed_driver_lab import (
     run_claimed_first_m15_lab,
@@ -70,6 +70,8 @@ def execute_cli_lab(
         return _blocked("INVALID_CAPTURE_CLOCK")
     if now < END_UTC:
         return _blocked("FIRST_M15_NOT_CLOSED_NO_IO_OR_CLAIM")
+    if now >= CLAIM_DEADLINE_UTC:
+        return _blocked("TOO_LATE_FOR_PROSPECTIVE_FIRST_M15_NO_BACKFILL_NO_IO")
     if api is None:
         return _blocked("MT5_API_UNAVAILABLE_NO_CLAIM")
     # The driver atomically claims before it invokes the read-only collector.
@@ -108,7 +110,7 @@ def main(argv: Sequence[str] | None = None, *,
             now = now_fn()
             ready = isinstance(now, datetime) and now.tzinfo is not None and (
                 now.utcoffset() is not None and
-                now.astimezone(timezone.utc) >= END_UTC
+                END_UTC <= now.astimezone(timezone.utc) < CLAIM_DEADLINE_UTC
             )
         except (TypeError, ValueError, RuntimeError, OverflowError):
             ready = False
@@ -118,7 +120,7 @@ def main(argv: Sequence[str] | None = None, *,
             except (ImportError, OSError):
                 mt5 = None
         if not ready:
-            result = _blocked("FIRST_M15_NOT_CLOSED_OR_CLOCK_INVALID_NO_IO")
+            result = _blocked("FIRST_M15_OUTSIDE_BOUNDED_WINDOW_OR_CLOCK_INVALID_NO_IO")
             print(json.dumps(result, sort_keys=True))
             return 2
 
