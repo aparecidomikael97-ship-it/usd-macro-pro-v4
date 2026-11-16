@@ -15,6 +15,10 @@ from typing import Any
 from zipfile import ZipFile, BadZipFile
 import json
 
+from atlasquant_trader_us_bls_four_original_documentary_census_lab import (
+    OriginalBlsReleaseClaim, inspect_four_bls_original_documentary_events_lab,
+)
+
 SCHEMA = "ATLASQUANT_BLS_FOUR_REAL_ORIGINALS_PIT_VISIBILITY_LAB_V1"
 MANIFEST_SCHEMA = "ATLASQUANT_BLS_4_DOCUMENT_ORIGINALS_PRESERVATION_COPY_V1"
 # Independent literals: trusting hashes copied from the same untrusted manifest
@@ -65,7 +69,9 @@ def _blocked(reason: str) -> dict[str, Any]:
     return {"schema": SCHEMA, "state": "LAB_BLS_REAL_ORIGINALS_BLOCKED_HARD_NO_GO",
             "reason": reason, "event_denominator": 4,
             "visible_postrelease_originals": 0, "not_yet_visible_originals": 4,
-            "events": [], "forecast_count_verified": 0,
+            "events": [], "source_body_semantics_reconciled_count": 0,
+            "headline_sa_mom_values_not_forecasts": True,
+            "forecast_count_verified": 0,
             "independent_out_of_sample_prediction_trials": 0,
             "consensus_pre_event_authenticated": False,
             "publisher_first_seen_independently_attested": False,
@@ -141,6 +147,7 @@ def inspect_four_real_bls_originals_lab(*, package_path: Any,
                     return _blocked("MANIFEST_ARCHIVE_HASH_CHANGED")
             visible = []
             hidden = []
+            validated_source_claims = []
             for event_id, pin in PINS.items():
                 archive_id, body_name, receipt_name, body_sha, receipt_sha, when, release, url, period = pin
                 capture = datetime.fromisoformat(when)
@@ -178,9 +185,16 @@ def inspect_four_real_bls_originals_lab(*, package_path: Any,
                 received_bytes = item.get("raw_bytes",item.get("body_bytes"))
                 received_url = item.get("url",item.get("source_url"))
                 received_finished = item.get("finished_utc",item.get("finished_at_utc"))
+                received_started = item.get("started_utc",item.get("started_at_utc"))
+                received_type = item.get("content_type")
                 received_status = item.get("http_status",item.get("status_code"))
                 if (received_sha != body_sha or received_bytes != len(body)
-                        or received_url != url or received_status != 200
+                        or received_url != url or type(received_status) is not int
+                        or received_status != 200
+                        or type(received_type) is not str
+                        or received_type.split(";")[0].strip().lower() != "text/html"
+                        or type(received_started) is not str
+                        or _utc(datetime.fromisoformat(received_started.replace("Z","+00:00"))) is None
                         or _utc(datetime.fromisoformat(received_finished.replace("Z","+00:00"))) != capture):
                     return _blocked("RECEIPT_SOURCE_IDENTITY_OR_CAPTURE_INVALID")
                 # Cross-check manifest by the documented reference-period key,
@@ -195,6 +209,18 @@ def inspect_four_real_bls_originals_lab(*, package_path: Any,
                         or meta.get("source_url") != url
                         or meta.get("captured_after_release") is not True):
                     return _blocked("MANIFEST_DOCUMENT_IDENTITY_CHANGED")
+                # Reuse the already verified original bytes IN THIS READ;
+                # never re-open the archive after deciding provenance.
+                validated_source_claims.append(OriginalBlsReleaseClaim(
+                    reference_period=period,
+                    indicator="CPI" if "_CPI_" in event_id else "PPI",
+                    source_url=url, html_original_bytes=body,
+                    http_status=received_status, content_type=received_type,
+                    capture_started_at_utc=datetime.fromisoformat(
+                        received_started.replace("Z","+00:00")),
+                    capture_finished_at_utc=capture,
+                    original_sha256_claim=body_sha,
+                ))
                 visible.append({"event_root": event_id, "reference_period": period,
                                 "scheduled_release_utc_calendar_claim": release,
                                 "state": "POST_RELEASE_ARCHIVED_ORIGINAL_REPLAYED_NO_FORECAST",
@@ -203,6 +229,31 @@ def inspect_four_real_bls_originals_lab(*, package_path: Any,
                                 "source_first_seen_independently_attested": False,
                                 "numeric_consensus_verified_pre_event": False,
                                 "trade_authorized": False})
+            # An old receipt's SOURCE SHA and HTTP time are insufficient to
+            # establish which *indicator* or numeric headline is in that
+            # document. Reuse the strict BLS issuer-specific parsers already
+            # tested in the four-release documentary census. Parsing occurs
+            # only AFTER capture cutoff, on bytes hashed in this same read.
+            semantic = inspect_four_bls_original_documentary_events_lab(
+                source_claims=tuple(validated_source_claims), research_cutoff_utc=now)
+            if (semantic.get("state") != "LAB_BLS_FOUR_EVENT_DOCUMENTARY_CENSUS_NO_GO"
+                    or semantic.get("documentary_originals_reconciled_at_cutoff") != len(visible)
+                    or semantic.get("frozen_documentary_release_denominator") != 4):
+                return _blocked("BLS_SOURCE_BODY_SEMANTICS_NOT_RECONCILED")
+            semantic_rows = {row["root_id"]: row for row in semantic["events"]}
+            if set(semantic_rows) != set(PINS):
+                return _blocked("BLS_SOURCE_BODY_SEMANTICS_ROOTS_MISMATCH")
+            for row in visible:
+                exact = semantic_rows[row["event_root"]]
+                if (exact["doc_status"] != "ORIGINAL_HTML_LOCALLY_SHA_AND_METRIC_RECONCILED"
+                        or exact["original_sha256"] != row["original_sha256"]
+                        or exact["local_capture_utc_claim"] != row["capture_at_utc"]
+                        or exact["actual_headline_sa_mom_pct_documentary"] is None):
+                    return _blocked("BLS_SOURCE_BODY_OR_CUTOFF_SEMANTICS_MISMATCH")
+                row["actual_headline_sa_mom_pct_documentary"] = exact[
+                    "actual_headline_sa_mom_pct_documentary"]
+                row["actual_metric"] = "HEADLINE_MOM_SA_PERCENT"
+                row["metric_authenticated_first_print"] = False
             # Caller-visible event order is invariant, never selected by outcome.
             indexed = {e["event_root"]: e for e in visible+hidden}
             result.update({"state": "LAB_BLS_FOUR_REAL_POSTRELEASE_ORIGINALS_PIT_DOCUMENTARY_NO_GO",
@@ -210,6 +261,7 @@ def inspect_four_real_bls_originals_lab(*, package_path: Any,
                            "event_denominator": 4,
                            "visible_postrelease_originals": len(visible),
                            "not_yet_visible_originals": len(hidden),
+                           "source_body_semantics_reconciled_count": len(visible),
                            "events": [indexed[k] for k in PINS]})
             return result
     except (OSError, ValueError, TypeError, KeyError, UnicodeError,
