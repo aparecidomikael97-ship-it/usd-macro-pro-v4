@@ -20,9 +20,7 @@ from test_atlasquant_trader_us_cpi_ppi_official_body_join_lab import cases
 from test_atlasquant_trader_us_cpi_ppi_consensus_body_gate_lab import (
     pair, synthetic_digest_fixture_lock,
 )
-from test_atlasquant_trader_ppi_one_event_study_join_lab import (
-    OneEventStudyJoinTests,
-)
+import test_atlasquant_trader_ppi_one_event_study_join_lab as ppi_fixture
 
 UTC=timezone.utc
 POST=LAST_REQUIRED_CLOSE_UTC+timedelta(hours=1)
@@ -221,7 +219,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_17_wrong_ppi_html_in_price_packet_blocks_without_trading(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         bad_packet=replace(t.packet,bls_html=t.packet.bls_html+b" ")
         with synthetic_digest_fixture_lock(sources):
@@ -232,7 +230,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_18_price_data_not_eligible_before_m15_h4_close(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         with synthetic_digest_fixture_lock(sources):
             r=run(claims,receipts,sources,now=PPI_RELEASE+timedelta(minutes=5),
@@ -244,7 +242,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_19_end_to_end_price_study_must_revalidate_seven_source_csv(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         with synthetic_digest_fixture_lock(sources):
             with t.isolated_synthetic_pre_event_receipts():
@@ -260,7 +258,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_20_tamper_one_price_csv_blocks_full_attached_study(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         file=t.root/"EURUSD_PPI_20261113_M15.csv"
         file.write_bytes(file.read_bytes()+b"TAMPER")
@@ -274,7 +272,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_21_price_report_cannot_fill_cpi_missing_consensus(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         with synthetic_digest_fixture_lock(sources):
             with t.isolated_synthetic_pre_event_receipts():
@@ -286,7 +284,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_22_cad_calendar_unknown_still_confounded_event(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         with synthetic_digest_fixture_lock(sources):
             with t.isolated_synthetic_pre_event_receipts():
@@ -297,7 +295,7 @@ class TwoEventCoverageLabTests(unittest.TestCase):
 
     def test_23_ppi_reaction_seven_pairs_are_not_seven_forecast_trials(self):
         claims,receipts,sources=scenario()
-        t=OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
+        t=ppi_fixture.OneEventStudyJoinTests(methodName="test_integrated_synthetic_study_is_one_event_not_seven_trials")
         t.setUp();self.addCleanup(t.doCleanups)
         with synthetic_digest_fixture_lock(sources):
             with t.isolated_synthetic_pre_event_receipts():
