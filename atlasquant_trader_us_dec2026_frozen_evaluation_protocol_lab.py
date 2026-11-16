@@ -15,7 +15,7 @@ Pure Python (no network, disk, broker, API, worker, orders, subscriptions).
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 from typing import Any
@@ -157,8 +157,7 @@ def inspect_frozen_dec2026_evaluation_protocol_lab(
     expected_roots = [root for root, _, _, _ in EVENTS]
     expected_release = [dt.isoformat() for _, _, _, dt in EVENTS]
     expected_freeze = [
-        (dt.replace(microsecond=0) -
-         __import__("datetime").timedelta(hours=1)).isoformat()
+        (dt - timedelta(hours=1)).isoformat()
         for _, _, _, dt in EVENTS
     ]
     if (FROZEN_PLAN["event_roots"] != [
