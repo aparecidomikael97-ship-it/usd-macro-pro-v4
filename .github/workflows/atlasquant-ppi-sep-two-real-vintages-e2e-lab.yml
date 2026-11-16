@@ -101,6 +101,19 @@ jobs:
               if not complete:
                   assert out["later_revision_minus_first_release_headline_pp"] is None
               else:
+                  if out["state"] != "LAB_PPI_SEP2026_TWO_REAL_VINTAGES_RECONCILED_NO_GO":
+                      from atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab import _ppi_table1_sep_2026_values
+                      from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import _BlsTables
+                      for key, edition in [("sep", "sep"), ("oct", "oct")]:
+                          data = sources[key]
+                          parsed = _ppi_table1_sep_2026_values(data, edition=edition)
+                          table = _BlsTables()
+                          table.feed(data.decode("utf-8", "surrogateescape"))
+                          table.close()
+                          selection = [(context[-180:],len(rows),len(table.table_layouts[index]))
+                                       for index,(context,rows) in enumerate(table.tables)
+                                       if "Table 1." in context]
+                          print("DIAG_REAL_BLS_TABLE1",edition,"parsed",parsed,"selection",selection[:6])
                   assert out["state"] == "LAB_PPI_SEP2026_TWO_REAL_VINTAGES_RECONCILED_NO_GO", out
                   assert (
                       out["sep_reported_sep2026_sa_mom_headline_pct"],
