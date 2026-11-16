@@ -320,6 +320,46 @@ class CpiPpiConsensusBodyGateTests(unittest.TestCase):
         self.safety(r)
         self.assertFalse(r["ppi_consensus_admitted_from_two_pinned_pre_event_html"])
 
+
+    def test_26_real_am12_fractional_second_claim_not_visible_early(self):
+        p=pair()
+        p=replace(p,
+            td_http_capture=replace(p.td_http_capture,
+                started_at_utc=p.td_http_capture.started_at_utc+
+                               timedelta(microseconds=766504),
+                finished_at_utc=p.td_http_capture.finished_at_utc+
+                                 timedelta(microseconds=21457)),
+            te_http_capture=replace(p.te_http_capture,
+                started_utc=p.te_http_capture.started_utc+
+                             timedelta(microseconds=80508),
+                finished_utc=p.te_http_capture.finished_utc+
+                             timedelta(microseconds=35108)))
+        with synthetic_digest_fixture_lock(p):
+            prior=audit(p,at=TE_END)
+            following=audit(p,at=TE_END+timedelta(seconds=1))
+        self.safety(prior)
+        self.safety(following)
+        self.assertFalse(prior["ppi_consensus_admitted_from_two_pinned_pre_event_html"])
+        self.assertTrue(following["ppi_consensus_admitted_from_two_pinned_pre_event_html"])
+        self.assertEqual(prior["research_events_with_pre_release_consensus_visible"],0)
+        self.assertEqual(following["feature_rows"][1]["consensus_percent_local_claim_visible"],"0.4")
+        self.assertEqual(following["ppi_pre_event_original_pair"]["te_capture_utc_local_claim"],
+                         "2026-11-11T01:15:54.035108+00:00")
+
+    def test_27_precise_td_capture_must_round_up_in_downstream_pit(self):
+        p=pair()
+        p=replace(p,td_http_capture=replace(
+            p.td_http_capture,
+            finished_at_utc=p.td_http_capture.finished_at_utc+
+                            timedelta(microseconds=21457)))
+        with synthetic_digest_fixture_lock(p):
+            r=audit(p,at=TE_END+timedelta(seconds=1))
+        self.safety(r)
+        self.assertTrue(r["ppi_consensus_admitted_from_two_pinned_pre_event_html"])
+        self.assertEqual(r["feature_rows"][1]["consensus_percent_local_claim_visible"],"0.4")
+        self.assertEqual(r["ppi_pre_event_original_pair"]["td_capture_utc_local_claim"],
+                         "2026-11-11T00:58:12.021457+00:00")
+
     def test_25_td_server_http_clock_bad_never_admits(self):
         p=pair()
         p=replace(p,td_http_capture=replace(p.td_http_capture,
