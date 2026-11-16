@@ -17,6 +17,10 @@ import unittest
 from atlasquant_trader_us_macro_mt5_bidask_manual_export_lab import (
     export_manual_mt5_7fx_bidask_anchors_lab as export,
     load_manual_mt5_bidask_receipt_lab as load,
+    PRICE_OBSERVATION_KIND,
+)
+from atlasquant_trader_us_dec2026_frozen_evaluation_protocol_lab import (
+    FROZEN_PLAN,
 )
 from atlasquant_trader_us_macro_mt5_bidask_anchor_archive_lab import (
     EVENTS,PAIR_ORDER,
@@ -354,6 +358,65 @@ class ManualSevenPairBidAskExportTests(unittest.TestCase):
         self.assertEqual(api.terminal_calls,1)
         self.assertEqual(len(api.info_calls),14)
         self.assertEqual(len(api.calls),28)
+
+
+    def test_34_tick_before_anchor_is_not_frozen_m15_candle_open_or_close(self):
+        report,_=self.allowed()
+        self.assertEqual(
+            report["price_observation_kind"],
+            "LAST_BIDASK_TICK_AT_OR_BEFORE_ANCHOR_NOT_M15_OHLC",
+        )
+        self.assertFalse(report["can_substitute_tick_anchors_for_frozen_m15_ohlc"])
+        self.assertFalse(report["matches_frozen_m15_baseline_and_endpoint_definition"])
+        self.assertFalse(report["fx_price_change_or_pnl_from_tick_anchors_allowed"])
+        self.assertNotEqual(
+            PRICE_OBSERVATION_KIND,FROZEN_PLAN["price_baseline_rule"])
+        self.assertNotEqual(
+            PRICE_OBSERVATION_KIND,FROZEN_PLAN["price_endpoint_rule"])
+
+    def test_35_private_manifest_contains_explicit_non_ohlc_semantics(self):
+        self.allowed()
+        manifest=json.loads((self.root/PPI/"receipt.json").read_text("utf-8"))
+        self.assertEqual(manifest["price_observation_kind"],PRICE_OBSERVATION_KIND)
+        self.assertIs(manifest["can_substitute_tick_anchors_for_frozen_m15_ohlc"],
+                      False)
+        self.assertEqual(
+            len(load(archive_root=self.root,event_root=PPI,
+                     inspected_at_utc=NOW).sha256_by_pair),7)
+
+    def test_36_replay_rejects_manifest_falsely_relabelled_as_candle_open(self):
+        self.allowed()
+        path=self.root/PPI/"receipt.json"
+        manifest=json.loads(path.read_text("utf-8"))
+        manifest["price_observation_kind"]="M15_CANDLE_OPEN_AT_RELEASE_MINUS_15_MINUTES"
+        path.write_text(json.dumps(manifest),encoding="utf-8")
+        with self.assertRaises(ValueError):
+            load(archive_root=self.root,event_root=PPI,inspected_at_utc=NOW)
+
+    def test_37_replay_rejects_tick_to_ohlc_authorization_flip(self):
+        self.allowed()
+        path=self.root/PPI/"receipt.json"
+        manifest=json.loads(path.read_text("utf-8"))
+        manifest["can_substitute_tick_anchors_for_frozen_m15_ohlc"]=True
+        path.write_text(json.dumps(manifest),encoding="utf-8")
+        with self.assertRaises(ValueError):
+            load(archive_root=self.root,event_root=PPI,inspected_at_utc=NOW)
+
+    def test_38_replay_rejects_missing_observation_semantics(self):
+        self.allowed()
+        path=self.root/PPI/"receipt.json"
+        manifest=json.loads(path.read_text("utf-8"))
+        manifest.pop("price_observation_kind")
+        path.write_text(json.dumps(manifest),encoding="utf-8")
+        with self.assertRaises(ValueError):
+            load(archive_root=self.root,event_root=PPI,inspected_at_utc=NOW)
+
+    def test_39_blocked_tick_export_never_claims_to_replace_ohlc(self):
+        report,_=self.denied(FakeReadOnlyMT5(mode="future"))
+        self.assertEqual(report["price_observation_kind"],PRICE_OBSERVATION_KIND)
+        self.assertFalse(report["can_substitute_tick_anchors_for_frozen_m15_ohlc"])
+        self.assertFalse(report["matches_frozen_m15_baseline_and_endpoint_definition"])
+        self.assertFalse(report["fx_price_change_or_pnl_from_tick_anchors_allowed"])
 
 
 if __name__=="__main__":
