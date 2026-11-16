@@ -36,6 +36,11 @@ from atlasquant_trader_fx28_policy_ppi_unified_readiness_lab import (
 from atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab import (
     replay_bls_cpi_u_nsa_original_lab,
 )
+from atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab import (
+    SEP_HASH as PPI_SEP_FIRST_RELEASE_SHA,
+    OCT_HASH as PPI_OCT_WITH_SEP_REVISION_SHA,
+    inspect_real_ppi_sep2026_release_vintages_lab,
+)
 
 SCHEMA = "ATLASQUANT_FX28_SOURCE_BACKED_32_FACTOR_ADMISSION_LAB_V1"
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -85,6 +90,13 @@ def _blocked(reason: str) -> dict[str, Any]:
         "cpi_u_nsa_is_not_pre_event_surprise": True,
         "cpi_u_nsa_oct2026_yoy_unavailable_missing_oct2025": True,
         "cpi_u_nsa_is_not_authenticated_first_print_vintage": True,
+        "ppi_sep2026_vintage_context_requested": False,
+        "ppi_sep2026_verified_original_count_at_local_cutoff": 0,
+        "ppi_sep2026_first_release_and_revision_reconciled_local_only": False,
+        "ppi_sep2026_vintage_context_in_usd_inflation_slot_only": True,
+        "ppi_sep2026_vintage_context_is_not_new_signed_impact": True,
+        "ppi_sep2026_vintage_research_context": None,
+        "ppi_sep2026_revision_never_backfilled_to_october_decision": True,
         "distinct_original_document_sha_claim_count": 0,
         "factor_slots_with_any_relevant_local_document": 0,
         "factor_slots_with_signed_impact_independently_admissible": 0,
@@ -201,6 +213,7 @@ def inspect_fx28_32_factor_source_admission_lab(
     ppi_archive_basename: Any = None,
     cpi_archive_basename: Any = None,
     hypothetical_factors: Any = None,
+    ppi_sep2026_two_vintage_originals: Any = None,
 ) -> dict[str, Any]:
     """Pure caller-side inspection except real read-only LOCAL archive replay."""
     out = _blocked("INVALID_DECISION_TIME_OR_32_FACTOR_CONTRACT")
@@ -211,6 +224,12 @@ def inspect_fx28_32_factor_source_admission_lab(
             or ppi_archive_basename == ""
             or type(cpi_archive_basename) not in (str, type(None))
             or cpi_archive_basename == ""
+            or (ppi_sep2026_two_vintage_originals is not None
+                and (type(ppi_sep2026_two_vintage_originals) is not tuple
+                     or len(ppi_sep2026_two_vintage_originals) != 2
+                     or any(type(doc) is not bytes
+                            or not 100_000 <= len(doc) <= 4_194_304
+                            for doc in ppi_sep2026_two_vintage_originals)))
             or tuple(WEIGHTS) != _CATEGORIES
             or len(CURRENCIES) != 8 or len(OFFICIAL_PAIRS) != 28):
         return out
@@ -238,6 +257,85 @@ def inspect_fx28_32_factor_source_admission_lab(
     if not _trusted_unified(source):
         out["reason"] = "SOURCE_AUDIT_REPORT_MALFORMED_OR_GO_FORGED"
         return out
+    # Join an already SHA-pinned two-release PPI history to the REAL
+    # source-backed 32-factor admission, not the hypothetical scoring model.
+    # One vintage corresponds to the September first print; the later
+    # October release revises September. Neither is a new FX forecast.
+    vintage_context = None
+    vintage_count = 0
+    requested_vintages = ppi_sep2026_two_vintage_originals is not None
+    if requested_vintages:
+        try:
+            first, later = ppi_sep2026_two_vintage_originals
+            v = inspect_real_ppi_sep2026_release_vintages_lab(
+                sep_original_html=first, oct_original_html=later,
+                research_cutoff_utc=now)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError,
+                OverflowError, RecursionError):
+            return _blocked("PPI_REVISION_SOURCE_REPLAY_EXCEPTION_NO_FALLBACK")
+        if (type(v) is not dict
+                or v.get("trade_authorized") is not False
+                or v.get("publishable") is not False
+                or v.get("accuracy") is not None
+                or v.get("bias_usd") is not None
+                or v.get("fx28_672_slots_changed") is not False
+                or v.get("independent_directional_fx_predictions") != 0
+                or v.get("economic_consensus_pre_event_authenticated") is not False
+                or v.get("original_first_print_time_independently_authenticated")
+                   is not False
+                or v.get("documentary_source_denominator") != 2):
+            return _blocked("PPI_REVISION_REPORT_AUTHORITY_OR_SHAPE_INVALID")
+        vintage_count = v.get("originals_visible_at_local_cutoff")
+        if type(vintage_count) is not int or vintage_count not in (0, 1, 2):
+            return _blocked("PPI_REVISION_SOURCE_COUNT_NOT_VERIFIED")
+        if v.get("state") == "LAB_PPI_SEP2026_TWO_REAL_VINTAGES_RECONCILED_NO_GO":
+            if (vintage_count != 2
+                    or v.get("original_sep_release_html_sha256")
+                        != PPI_SEP_FIRST_RELEASE_SHA
+                    or v.get("oct_release_html_sha256")
+                        != PPI_OCT_WITH_SEP_REVISION_SHA
+                    or tuple(v.get(k) for k in (
+                        "sep_reported_sep2026_sa_mom_headline_pct",
+                        "sep_reported_sep2026_sa_mom_core_ex_food_energy_pct",
+                        "oct_reported_revised_sep2026_sa_mom_headline_pct",
+                        "oct_reported_revised_sep2026_sa_mom_core_ex_food_energy_pct",
+                        "later_revision_minus_first_release_headline_pp",
+                        "later_revision_minus_first_release_core_pp",
+                    )) != ("1.3", "0.7", "1.4", "0.8", "0.1", "0.1")):
+                return _blocked("PPI_REVISION_REAL_VINTAGES_OR_UNIT_CONFLICT")
+            # Period, series and both edition dates are separate. Local
+            # capture controls visibility, not a presumed publisher first-seen.
+            vintage_context = {
+                "source_kind": "BLS_PPI_SEPTEMBER2026_TWO_RELEASES_POSTRELEASE_ONLY",
+                "currency": "USD",
+                "reference_period": "2026-09",
+                "measure": "MOM_SA_PERCENT_CHANGE",
+                "headline_series_code": "FD/4",
+                "core_ex_food_energy_series_code": "FD/49104",
+                "initial_release": {
+                    "release_date": "2026-10-15",
+                    "headline_pct": "1.3",
+                    "core_ex_food_energy_pct": "0.7",
+                    "original_html_sha256": PPI_SEP_FIRST_RELEASE_SHA,
+                },
+                "later_release_revision": {
+                    "release_date": "2026-11-13",
+                    "headline_pct": "1.4",
+                    "core_ex_food_energy_pct": "0.8",
+                    "original_html_sha256": PPI_OCT_WITH_SEP_REVISION_SHA,
+                },
+                "headline_revision_percentage_points": "0.1",
+                "core_revision_percentage_points": "0.1",
+                "both_documents_first_seen_by_local_lab_after_their_release": True,
+                "backtest_as_if_2026_10_15_known": False,
+                "can_derive_signed_inflation_impact": False,
+            }
+        elif (v.get("reason")
+              != "ONE_OR_BOTH_ORIGINALS_NOT_YET_CAPTURED_AT_LOCAL_CUTOFF"
+              or vintage_count == 2
+              or v.get("sep_reported_sep2026_sa_mom_headline_pct") is not None
+              or v.get("oct_reported_revised_sep2026_sa_mom_headline_pct") is not None):
+            return _blocked("PPI_REVISION_INVALID_OR_PREMATURE_CLAIM_NO_FALLBACK")
     ledger = source["policy_source_byte_sha_lineage_by_currency"]
     ppi = source["ppi_source_raw_sha256"]
     # The CPI-U official v1 index levels are a distinct US source from PPI.
@@ -340,6 +438,10 @@ def inspect_fx28_32_factor_source_admission_lab(
                 "signed_impact_points_admitted": None,
                 "missing_model_input_reason": reason,
                 "source_sha_is_not_issuer_or_pit_attestation": True,
+                "ppi_sep2026_historical_two_release_revision_context": (
+                    vintage_context
+                    if currency == "USD" and category == "inflation_impact"
+                    else None),
             })
     rows = []
     for original in source["per_pair"]:
@@ -368,6 +470,11 @@ def inspect_fx28_32_factor_source_admission_lab(
         "locally_replayed_policy_issuer_count": len(ledger),
         "locally_replayed_ppi_document_count": int(ppi is not None),
         "locally_replayed_cpi_u_nsa_document_count": int(cpi_sha is not None),
+        "ppi_sep2026_vintage_context_requested": requested_vintages,
+        "ppi_sep2026_verified_original_count_at_local_cutoff": vintage_count,
+        "ppi_sep2026_first_release_and_revision_reconciled_local_only":
+            vintage_context is not None,
+        "ppi_sep2026_vintage_research_context": vintage_context,
         "cpi_local_replay_original_but_archived_index_levels_disagree": (
             cpi_original_replayed
             and cpi_report.get("local_api_index_levels_match_bls_archived_first_print")
