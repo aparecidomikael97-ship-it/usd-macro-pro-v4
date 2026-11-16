@@ -231,5 +231,23 @@ class DecemberBlsScheduleTests(unittest.TestCase):
         self.assertNotIn("numerical_consensus", out)
 
 
+    def test_18_real_bls_nested_layout_table_accepts_only_inner_rows(self):
+        # The live BLS calendar is an actual table nested within an outer
+        # layout table. This valid structure caused the first LAB run to
+        # fail safely; the inner release rows must remain physical rows.
+        raw = html().replace(b"<table>", b"<table><tr><td><table>", 1).replace(
+            b"</table>", b"</table></td></tr></table>", 1)
+        out = m.inspect_dec2026_schedule_original_lab(raw_html=raw)
+        self.check_nogo(out)
+        self.assertEqual(out["schedule_release_rows_reconciled"], 3)
+        self.assertEqual(len(out["scheduled_rows"]), 3)
+
+    def test_19_unmatched_table_row_blocks_instead_of_silent_recovery(self):
+        bad = html().replace(b"</table>", b"</tr></table>")
+        self.assertEqual(m.inspect_dec2026_schedule_original_lab(
+            raw_html=bad)["schedule_release_rows_reconciled"], 0)
+
+
+
 if __name__ == "__main__":
     unittest.main()
