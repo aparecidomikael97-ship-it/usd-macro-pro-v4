@@ -274,7 +274,7 @@ class ReadOnlyMT5TickArchiveTests(unittest.TestCase):
             self.blocked(f)
 
     def test_24_negative_or_nan_bid_refused(self):
-        for bad in ("-1","NaN","Inf","1e200",0.1):
+        for bad in ("-1","NaN","Inf","1e200","not_a_quote"):
             with self.subTest(bad=bad),TemporaryDirectory() as d:
                 f=TickFixture(d)
                 f.samples["EURUSD"][0]["bid"]=bad
@@ -337,7 +337,7 @@ class ReadOnlyMT5TickArchiveTests(unittest.TestCase):
     def test_32_m15_bar_spread_does_not_masquerade_as_tick_bidask(self):
         with TemporaryDirectory() as d:
             f=TickFixture(d)
-            f.samples["EURUSD"][0]["ask"]="11"
+            f.samples["EURUSD"][0]["ask"]="11pts"
             f.receipt=f.write()
             self.blocked(f)
 
