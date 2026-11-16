@@ -28,7 +28,7 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - name: Offline syntax + 16 adversarial synthetic guards
+      - name: Offline syntax + 18 adversarial synthetic guards
         shell: bash
         run: |
           python -m py_compile atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab.py test_atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab.py
