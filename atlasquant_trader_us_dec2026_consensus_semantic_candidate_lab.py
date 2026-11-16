@@ -133,11 +133,15 @@ class _TERowReader(HTMLParser):
         self.routes = set(target_routes)
         self.headers: list[str] = []
         self.header_table_ids: list[int | None] = []
+        self.header_row_ids: list[int | None] = []
         self.row_table_ids: list[int | None] = []
+        self.open_tr_ids: list[int] = []
+        self.next_tr_id = 0
         self.table_stack: list[int] = []
         self.table_id = 0
         self.current_row_table: int | None = None
         self.current_header_table: int | None = None
+        self.current_header_row: int | None = None
         self.th: list[str] | None = None
         self.active = False
         self.depth = 0
@@ -159,12 +163,17 @@ class _TERowReader(HTMLParser):
         if tag=="table":
             self.table_id+=1
             self.table_stack.append(self.table_id)
+        if tag=="tr":
+            self.next_tr_id+=1
+            self.open_tr_ids.append(self.next_tr_id)
         if tag=="th" and not self.active:
             if self.th is not None:
                 raise ValueError("NESTED_TABLE_HEADER")
             self.th=[]
             self.current_header_table=(self.table_stack[-1]
                                        if self.table_stack else None)
+            self.current_header_row=(self.open_tr_ids[-1]
+                                     if self.open_tr_ids else None)
         if tag=="tr" and not self.active and a.get("data-url") in self.routes:
             self.active=True
             self.depth=1
@@ -203,12 +212,18 @@ class _TERowReader(HTMLParser):
         if tag=="th" and self.th is not None:
             self.headers.append(" ".join(" ".join(self.th).split()))
             self.header_table_ids.append(self.current_header_table)
+            self.header_row_ids.append(self.current_header_row)
             self.current_header_table=None
+            self.current_header_row=None
             self.th=None
         if tag=="table":
             if not self.table_stack:
                 raise ValueError("UNMATCHED_TE_TABLE_END")
             self.table_stack.pop()
+        if tag=="tr":
+            if not self.open_tr_ids:
+                raise ValueError("UNMATCHED_TE_ROW_END")
+            self.open_tr_ids.pop()
         if not self.active:
             return
         if tag=="td" and self.depth==1 and self.cell is not None:
@@ -273,8 +288,10 @@ def _te_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str, str]] | No
         doc.feed(raw.decode("utf-8","strict"))
         doc.close()
         if (doc.active or doc.cell is not None or doc.th is not None
-                or doc.table_stack or len(doc.row_table_ids)!=len(doc.rows)
-                or len(doc.header_table_ids)!=len(doc.headers)):
+                or doc.table_stack or doc.open_tr_ids
+                or len(doc.row_table_ids)!=len(doc.rows)
+                or len(doc.header_table_ids)!=len(doc.headers)
+                or len(doc.header_row_ids)!=len(doc.headers)):
             return None
     except (UnicodeError, ValueError, TypeError, OverflowError, RecursionError):
         return None
@@ -284,11 +301,17 @@ def _te_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str, str]] | No
     if (table_id is None
             or any(i!=table_id for i in doc.row_table_ids)):
         return None
-    # The four labels must be in this very table, not elsewhere on page.
-    own_headers=[h for h,i in zip(doc.headers,doc.header_table_ids)
-                 if i==table_id]
-    if sum(tuple(own_headers[i:i+4])==_TE_HEADER
-           for i in range(max(0,len(own_headers)-3))) != 1:
+    # Four labels must be one physical <tr> header, within the target
+    # <table>. Flattening headers across rows permits a second form of
+    # consensus-header laundering, even when table IDs agree.
+    own_headers=[(h, row_id)
+                 for h, owner, row_id in zip(
+                     doc.headers,doc.header_table_ids,doc.header_row_ids)
+                 if owner==table_id]
+    if (len(own_headers)!=len(_TE_HEADER)
+            or tuple(h for h,_ in own_headers)!=_TE_HEADER
+            or any(row_id is None or row_id!=own_headers[0][1]
+                   for _,row_id in own_headers)):
         return None
     parsed: dict[str,tuple[str,str,str]]={}
     for kind, route, label in zip(
