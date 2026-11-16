@@ -202,7 +202,7 @@ def inspect_real_ppi_sep2026_release_vintages_lab(
     if oct_eligible:
         if (type(oct_original_html) is not bytes
                 or sha256(oct_original_html).hexdigest() != OCT_HASH):
-            return _blocked("LOCALLY_ELIGIBLE_OCT_ORIGINAL_MISSING_OR_SHA_INVALID")
+            return _blocked("LOCALLY_ELIGIBLE_OCT_ORIGINAL_MISSING_OR_SHA256_INVALID")
         actual = inspect_ppi_oct2026_first_print_lab(
             raw_html=oct_original_html,
             receipt=ClaimedPostReleaseHTTP(
@@ -220,7 +220,7 @@ def inspect_real_ppi_sep2026_release_vintages_lab(
     if sep_eligible:
         if (type(sep_original_html) is not bytes
                 or sha256(sep_original_html).hexdigest() != SEP_HASH):
-            return _blocked("LOCALLY_ELIGIBLE_SEP_ORIGINAL_MISSING_OR_SHA_INVALID")
+            return _blocked("LOCALLY_ELIGIBLE_SEP_ORIGINAL_MISSING_OR_SHA256_INVALID")
         sep_checked = inspect_sep2026_bls_release_body_lab(
             kind="PPI", raw_html=sep_original_html)
         if (sep_checked is None
