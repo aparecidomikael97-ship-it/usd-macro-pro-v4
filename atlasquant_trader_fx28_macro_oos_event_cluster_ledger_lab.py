@@ -69,6 +69,9 @@ def _base(reason:str)->dict[str,Any]:
         "untrusted_metric_rows_checked":0,
         "untrusted_fx_pair_observations_checked":0,
         "untrusted_candidate_cluster_count":0,
+        "untrusted_total_cluster_count":0,
+        "unresolved_competing_release_root_count":0,
+        "quarantined_unresolved_confounder_cluster_count":0,
         "candidate_train_cluster_count":0,
         "candidate_holdout_cluster_count":0,
         "candidate_purged_boundary_cluster_count":0,
@@ -217,18 +220,46 @@ def audit_historical_macro_event_cohorts_lab(
         for other in e.competing_release_roots:
             if other in by_root:union(i,by_root[other])
 
+    # CRITICAL: a competing release outside this input roster is NOT proof
+    # that no other release existed. Two events sharing an unresolved
+    # external root are also dependent on that same unknown news episode.
+    # Union their cohorts BEFORE choosing a chronological holdout. The
+    # missing root can never be treated as an independent trial or silently
+    # omitted from the group and model evaluation.
+    unresolved_by_root:dict[str,int]={}
+    for i,e in enumerate(cohorts):
+        for other in e.competing_release_roots:
+            if other in by_root:
+                continue
+            previous=unresolved_by_root.get(other)
+            if previous is None:
+                unresolved_by_root[other]=i
+            else:
+                union(i,previous)
+
     groups:dict[int,list[int]]={}
     for i in range(len(cohorts)):
         groups.setdefault(find(i),[]).append(i)
     rendered=[]
-    train=holdout=purged=0
+    train=holdout=purged=quarantined=0
     for members in sorted(groups.values(),key=lambda a:(
         min(intervals[i][0] for i in a),
         tuple(cohorts[i].root_id for i in a),
     )):
         earliest=min(intervals[i][0] for i in members)
         latest=max(intervals[i][1] for i in members)
-        if latest < split-_SPLIT_EMBARGO:
+        missing_conf=sorted({
+            ref for i in members
+            for ref in cohorts[i].competing_release_roots
+            if ref not in by_root
+        })
+        # The only defensible statistical classification for missing
+        # competing-news provenance is QUARANTINE, not a purported
+        # training/holdout sample. Retain it visibly in the denominator.
+        if missing_conf:
+            partition="QUARANTINED_UNRESOLVED_COMPETING_RELEASE_NO_GO"
+            quarantined+=1
+        elif latest < split-_SPLIT_EMBARGO:
             partition="CANDIDATE_TRAIN_UNATTESTED"
             train+=1
         elif earliest > split+_SPLIT_EMBARGO:
@@ -237,11 +268,6 @@ def audit_historical_macro_event_cohorts_lab(
         else:
             partition="PURGED_AROUND_HOLDOUT_BOUNDARY"
             purged+=1
-        missing_conf=sorted({
-            ref for i in members
-            for ref in cohorts[i].competing_release_roots
-            if ref not in by_root
-        })
         rendered.append({
             "root_ids":[cohorts[i].root_id for i in members],
             "event_roots_count":len(members),
@@ -260,7 +286,10 @@ def audit_historical_macro_event_cohorts_lab(
         "untrusted_event_roots_checked":len(cohorts),
         "untrusted_metric_rows_checked":sum(len(e.metric_ids) for e in cohorts),
         "untrusted_fx_pair_observations_checked":7*len(cohorts),
-        "untrusted_candidate_cluster_count":len(rendered),
+        "untrusted_candidate_cluster_count":train+holdout+purged,
+        "untrusted_total_cluster_count":len(rendered),
+        "unresolved_competing_release_root_count":len(unresolved_by_root),
+        "quarantined_unresolved_confounder_cluster_count":quarantined,
         "candidate_train_cluster_count":train,
         "candidate_holdout_cluster_count":holdout,
         "candidate_purged_boundary_cluster_count":purged,
