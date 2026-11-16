@@ -149,7 +149,10 @@ class CpiPpiConsensusBodyGateTests(unittest.TestCase):
         p=pair()
         rows=list(macro_cases())
         rows[0]=replace(rows[0], actual=None,actual_source_bytes=None)
-        rows[1]=replace(rows[1], actual=None,actual_source_bytes=None)
+        # Preserve CPI's forged early consensus claim, but do not supply a
+        # conflicting PPI fake claim: the source-bound gate must construct it.
+        rows[1]=replace(rows[1], consensus=None, consensus_source_bytes=None,
+                        actual=None,actual_source_bytes=None)
         with synthetic_digest_fixture_lock(p):
             r=audit(p,rows=tuple(rows),at=TE_END+timedelta(seconds=1))
         self.safety(r)
@@ -272,6 +275,7 @@ class CpiPpiConsensusBodyGateTests(unittest.TestCase):
     def test_20_consensus_and_actual_same_ppi_event_documentary_not_usd_signal(self):
         p=pair()
         rows,rec=original_body_cases()
+        rows=tuple(replace(x,consensus=None,consensus_source_bytes=None) for x in rows)
         with synthetic_digest_fixture_lock(p):
             r=audit(p,rows=rows,receipts=rec,at=EVENT_RELEASE_UTC+timedelta(minutes=4))
         self.safety(r)
@@ -284,6 +288,7 @@ class CpiPpiConsensusBodyGateTests(unittest.TestCase):
     def test_21_future_results_blocked_even_when_pre_event_consensus_passes(self):
         p=pair()
         rows,rec=original_body_cases()
+        rows=tuple(replace(x,consensus=None,consensus_source_bytes=None) for x in rows)
         with synthetic_digest_fixture_lock(p):
             r=audit(p,rows=rows,receipts=rec,at=TE_END+timedelta(seconds=1))
         self.safety(r)
