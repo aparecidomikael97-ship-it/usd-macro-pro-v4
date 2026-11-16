@@ -95,7 +95,7 @@ class FakeReadOnlyMT5:
             secs[-1]=anchor
         if active and self.mode=="duplicate_ms":
             secs[-1]=secs[0]
-        base=149.231 if pair.endswith("JPY") else 1.12534
+        base=149.231 if pair.endswith("JPY") else 1.12534+PAIR_ORDER.index(pair)*0.00137
         spread=0.002 if pair.endswith("JPY") else 0.00020
         result=[]
         for ms in secs:
