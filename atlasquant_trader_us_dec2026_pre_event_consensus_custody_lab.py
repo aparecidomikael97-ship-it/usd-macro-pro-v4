@@ -144,20 +144,17 @@ def inspect_us_dec2026_pre_event_consensus_custody_lab(
     checked = 0
     for item in snapshots:
         if type(item) is not OriginalPreEventSourceClaim:
-            out["reason"] = "SOURCE_SNAPSHOT_TYPE_UNRECOGNIZED"
-            return out
+            return _base("SOURCE_SNAPSHOT_TYPE_UNRECOGNIZED")
         key = (item.event_root, item.provider)
         if (item.event_root not in event_map
                 or item.provider not in SOURCE_NAMES
                 or key in seen):
-            out["reason"] = "UNEXPECTED_DUPLICATE_OR_FOREIGN_SOURCE_EVENT"
-            return out
+            return _base("UNEXPECTED_DUPLICATE_OR_FOREIGN_SOURCE_EVENT")
         seen.add(key)
         event_idx,release = event_map[item.event_root]
         start,end = _utc(item.started_at_utc),_utc(item.finished_at_utc)
         if start is None or end is None or start > end:
-            out["reason"] = "UNTRUSTED_IMPOSSIBLE_LOCAL_CAPTURE_CLOCK"
-            return out
+            return _base("UNTRUSTED_IMPOSSIBLE_LOCAL_CAPTURE_CLOCK")
         # CRITICAL: only inspect the body/hash of an observation that was
         # already captured by the research cutoff. No future HTML parsing.
         if end > now:
@@ -166,8 +163,7 @@ def inspect_us_dec2026_pre_event_consensus_custody_lab(
         latest = release-_FREEZE_BEFORE
         if (start < earliest or end > latest
                 or (end-start).total_seconds() > _MAX_HTTP_SECONDS):
-            out["reason"] = "SOURCE_NOT_CAPTURED_WITHIN_PRE_RELEASE_FREEZE_WINDOW"
-            return out
+            return _base("SOURCE_NOT_CAPTURED_WITHIN_PRE_RELEASE_FREEZE_WINDOW")
         allowed = (
             (_TD_URL.fullmatch(item.source_url) is not None
              if item.provider == "TD_ECONOMICS"
@@ -185,8 +181,7 @@ def inspect_us_dec2026_pre_event_consensus_custody_lab(
                 or _SHA.fullmatch(item.original_sha256_claim) is None
                 or sha256(item.html_original_bytes).hexdigest() != item.original_sha256_claim
                 or item.original_sha256_claim in body_digests):
-            out["reason"] = "HTML_PROVIDER_HTTP_DATE_SHA_OR_SOURCE_DUPLICATION_INVALID"
-            return out
+            return _base("HTML_PROVIDER_HTTP_DATE_SHA_OR_SOURCE_DUPLICATION_INVALID")
         body_digests.add(item.original_sha256_claim)
         row=out["events"][event_idx]
         row["source_provider_names"].append(item.provider)
