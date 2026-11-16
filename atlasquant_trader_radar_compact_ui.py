@@ -247,6 +247,8 @@ _TEMPORAL_SCHEMA = "ATLASQUANT_FX28_672_TEMPORAL_SCORING_INGRESS_FIREWALL_LAB_V1
 _TEMPORAL_QUARANTINE = (
     "LAB_FX28_672_FIRST56_AND_SERVER_CLOCK_P0_SCORING_QUARANTINE_NO_GO"
 )
+_LOCAL_TEMPORAL_SCHEMA = "ATLASQUANT_FX28_RADAR_LOCAL_TEMPORAL_ARCHIVE_BINDING_LAB_V1"
+_LOCAL_TEMPORAL_STATE = "LAB_FX28_LOCAL_FIRST56_QUARANTINED_SOURCE_UNATTESTED_NO_GO"
 
 
 def _fx28_temporal_integrity_html(report: Any) -> str:
@@ -302,6 +304,42 @@ def _fx28_temporal_integrity_html(report: Any) -> str:
                 "avaliados. Os três domingos históricos coincidem com o "
                 "deslocamento GMT+2/GMT+3, apenas como hipótese sem "
                 "autenticação da corretora. Assertividade: N/D; não operar."
+            )
+        elif (
+            isinstance(report, Mapping)
+            and report.get("schema") == _LOCAL_TEMPORAL_SCHEMA
+            and report.get("state") == _LOCAL_TEMPORAL_STATE
+            and type(report.get("frozen_total_slots")) is int
+            and report["frozen_total_slots"] == 672
+            and type(report.get("first_nominal_window_slots_quarantined")) is int
+            and report["first_nominal_window_slots_quarantined"] == 56
+            and type(report.get("first_nominal_window_distinct_m15_prices_missing")) is int
+            and report["first_nominal_window_distinct_m15_prices_missing"] == 28
+            and type(report.get("remaining_original_slots_unevaluated")) is int
+            and report["remaining_original_slots_unevaluated"] == 616
+            and report.get("first_window_horizons") == {"D1":28,"W1":28}
+            and report.get("clock_p0_documentary_historical_claims_checked") is False
+            and report.get("broker_source_independently_authenticated") is False
+            and report.get("github_pre_event_witness_independently_authenticated") is False
+            and report.get("verified_directional_accuracy") is None
+            and report.get("calibrated_probability") is None
+            and report.get("score_allowed") is False
+            and report.get("trade_authorized") is False
+            and report.get("publishable") is False
+            and report.get("has_local_price_data_exposed") is False
+            and report.get("file_writes") == 0
+            and report.get("mt5_calls") == 0
+            and report.get("http_requests") == 0
+            and report.get("operational_bias") == "AGUARDAR"
+        ):
+            kind = "QUARENTENA_LOCAL_LAB"
+            text = (
+                "FX28: arquivo local selado inspecionado; 56 registros D1/W1 "
+                "iniciais em quarentena devido a 28 candles M15 nominais "
+                "ausentes. Outros 616 registros não avaliados. "
+                "A hipótese GMT+2/GMT+3 não foi examinada neste recibo; "
+                "origem e horário da corretora NÃO autenticados. "
+                "Assertividade: N/D; não operar."
             )
         else:
             kind = "RELATORIO_REJEITADO"
