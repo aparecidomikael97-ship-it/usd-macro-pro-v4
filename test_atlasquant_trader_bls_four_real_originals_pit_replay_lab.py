@@ -70,6 +70,8 @@ class FakeNestedArchive:
             else:
                 receipts[group]={"body_sha256":h(body),"body_bytes":len(body),
                                  "status_code":200,"source_url":url,
+                                 "content_type":"text/html",
+                                 "started_at_utc":capture,
                                  "finished_at_utc":capture}
             self.pins[root]=[group,name,receipt_name,h(body),"",capture,release,url,period]
             self.manifest["economic_originals"][period+"_"+kind]={
