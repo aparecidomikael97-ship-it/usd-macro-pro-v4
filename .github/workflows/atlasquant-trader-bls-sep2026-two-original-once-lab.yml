@@ -1,15 +1,8 @@
 name: AtlasQuant BLS September 2026 Two Original Releases LAB
 
+# Original source pair already retained in GitHub Actions run 43791551985.
+# NO automatic recapture on PR updates or branch pushes.
 on:
-  pull_request:
-    types: [opened, synchronize]
-    paths:
-      - ".github/workflows/atlasquant-trader-bls-sep2026-two-original-once-lab.yml"
-  push:
-    branches:
-      - lab/trader-bls-sep2026-cpi-ppi-original-pair-20261115
-    paths:
-      - ".github/workflows/atlasquant-trader-bls-sep2026-two-original-once-lab.yml"
   workflow_dispatch:
 
 permissions:
