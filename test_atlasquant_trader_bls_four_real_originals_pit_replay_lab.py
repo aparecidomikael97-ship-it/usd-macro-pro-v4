@@ -73,6 +73,7 @@ class FakeNestedArchive:
             if group=="sep":
                 receipts.setdefault(group,{"sources":{}})["sources"][kind]={
                     "raw_sha256":h(body),"raw_bytes":len(body),"http_status":200,
+                    "content_type":"text/html","started_utc":capture,
                     "url":url,"finished_utc":capture}
             else:
                 receipts[group]={"body_sha256":h(body),"body_bytes":len(body),
