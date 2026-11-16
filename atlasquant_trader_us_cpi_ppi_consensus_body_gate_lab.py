@@ -18,7 +18,7 @@ independent proof of a first-seen time or pre-registered model prediction.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from email.utils import parsedate_to_datetime
 from hashlib import sha256
@@ -62,12 +62,31 @@ class PpiPreEventOriginalPair:
 
 
 def _utc(t: Any) -> datetime | None:
+    # Decision cutoffs are integer UTC seconds in the downstream PIT engine.
     if type(t) is not datetime or t.tzinfo is None or t.microsecond:
         return None
     try:
         return t.astimezone(timezone.utc) if t.utcoffset() is not None else None
     except (TypeError, ValueError, OverflowError):
         return None
+
+
+def _source_utc_precise(t: Any) -> datetime | None:
+    # REAL AM12 TD/TE receipts include microsecond capture times. Keep their
+    # exact precision when parsing and validating the original HTTP receipt.
+    if type(t) is not datetime or t.tzinfo is None:
+        return None
+    try:
+        return t.astimezone(timezone.utc) if t.utcoffset() is not None else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _not_before_second(t: datetime) -> datetime:
+    # Fail-closed when coercing a microsecond receipt into the older integer
+    # second PIT contract: 01:15:54.035 -> first eligible 01:15:55, NOT 54.
+    whole = t.replace(microsecond=0)
+    return whole if t.microsecond == 0 else whole + timedelta(seconds=1)
 
 
 def _num(t: Any) -> Decimal | None:
@@ -112,8 +131,8 @@ def _inspect_original_pair(
             or type(sources.te_http_capture) is not TeCapture):
         return out
     d = _utc(cutoff)
-    td_end = _utc(sources.td_http_capture.finished_at_utc)
-    te_end = _utc(sources.te_http_capture.finished_utc)
+    td_end = _source_utc_precise(sources.td_http_capture.finished_at_utc)
+    te_end = _source_utc_precise(sources.te_http_capture.finished_utc)
     if d is None or td_end is None or te_end is None:
         out["reason"] = "INVALID_CUTOFF_OR_PRE_EVENT_CAPTURE_CLOCK"
         return out
@@ -217,12 +236,13 @@ def inspect_us_cpi_ppi_source_bound_consensus_lab(
         if eligible:
             receipt = ppi_original_pair.td_http_capture
             published = _utc(parsedate_to_datetime(receipt.last_modified_http))
-            end = _utc(receipt.finished_at_utc)
+            end = _source_utc_precise(receipt.finished_at_utc)
             generated = PreEventConsensus(
                 metric=_PPI_METRIC,
                 numeric_value=probe["headline_consensus_from_two_original_bodies_pct"],
                 source_url=TD_URL, original_sha256_claim=TD_PRE_EVENT_HTML_SHA256,
-                published_at_utc=published, locally_captured_at_utc=end,
+                published_at_utc=published,
+                locally_captured_at_utc=_not_before_second(end),
             )
             supplied = by_kind["PPI"].consensus
             if supplied is not None and supplied != generated:
