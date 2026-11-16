@@ -152,7 +152,7 @@ def inspect_four_bls_original_documentary_events_lab(
             parsed = inspect_bls_oct2026_release_text_lab(
                 raw_html=src.html_original_bytes,receipt=receipt,as_of_utc=now)
             value = (parsed.get("headline_oct2026_sa_mom_pct_body_claim")
-                     if parsed.get("state") == "LAB_BLS_OCT2026_CPI_RELEASE_HTML_LOCAL_CLAIM_NO_TRADE"
+                     if parsed.get("state") == "LAB_BLS_HTML_MONTHLY_CONTEXT_UNATTESTED"
                      else None)
         else:
             receipt = ClaimedPostReleaseHTTP(
