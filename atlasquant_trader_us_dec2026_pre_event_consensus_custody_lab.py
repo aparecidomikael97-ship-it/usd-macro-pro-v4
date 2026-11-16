@@ -19,7 +19,7 @@ alerts, trading, broker session or FX28 campaign mutation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from hashlib import sha256
 import re
@@ -37,6 +37,8 @@ SOURCE_NAMES = ("TD_ECONOMICS", "TRADING_ECONOMICS")
 _LOOKBACK = timedelta(days=7)
 _FREEZE_BEFORE = timedelta(hours=1)
 _MAX_HTTP_SECONDS = 180
+_MAX_HTTP_DATE_STALE = timedelta(seconds=30)
+_MAX_HTTP_DATE_FUTURE = timedelta(seconds=2)
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _TD_URL = re.compile(
     r"https://economics\.td\.com/domains/economics\.td\.com/documents/"
@@ -77,6 +79,28 @@ def _http_date(raw: Any) -> datetime | None:
         return _utc(parsedate_to_datetime(raw))
     except (TypeError, IndexError, ValueError, OverflowError):
         return None
+
+
+def _td_edition_in_capture_window(
+    url: Any, *, release: datetime, captured_start: datetime,
+) -> bool:
+    """Reject stale/future TD weekly vintage even if URL and HTML look valid.
+
+    The date in an archive URL is ONLY a publisher-edition claim; its
+    presence is not an independently verified publication timestamp.
+    """
+    if type(url) is not str or _TD_URL.fullmatch(url) is None:
+        return False
+    match = re.search(r"/tables/(20\d{2}-\d{2}-\d{2})/upcoming\.htm\Z", url)
+    if match is None:
+        return False
+    try:
+        issue = date.fromisoformat(match.group(1))
+    except ValueError:
+        return False
+    return ((release-_LOOKBACK).date() <= issue
+            and issue <= captured_start.date()
+            and issue <= release.date())
 
 
 def _base(reason: str) -> dict[str, Any]:
@@ -165,7 +189,8 @@ def inspect_us_dec2026_pre_event_consensus_custody_lab(
                 or (end-start).total_seconds() > _MAX_HTTP_SECONDS):
             return _base("SOURCE_NOT_CAPTURED_WITHIN_PRE_RELEASE_FREEZE_WINDOW")
         allowed = (
-            (_TD_URL.fullmatch(item.source_url) is not None
+            (_td_edition_in_capture_window(
+                item.source_url, release=release, captured_start=start)
              if item.provider == "TD_ECONOMICS"
              else item.source_url == _TE_URL))
         date = _http_date(item.http_date_claim)
@@ -174,7 +199,10 @@ def inspect_us_dec2026_pre_event_consensus_custody_lab(
                 or item.http_status != 200
                 or type(item.http_content_type) is not str
                 or item.http_content_type.split(";")[0].strip().lower() != "text/html"
-                or date is None or not start-timedelta(hours=2) <= date <= end+timedelta(minutes=1)
+                or date is None
+                or not (start-_MAX_HTTP_DATE_STALE <= date
+                        <= end+_MAX_HTTP_DATE_FUTURE)
+                or date > latest
                 or type(item.html_original_bytes) is not bytes
                 or not 100 <= len(item.html_original_bytes) <= _MAX_BYTES[item.provider]
                 or type(item.original_sha256_claim) is not str
