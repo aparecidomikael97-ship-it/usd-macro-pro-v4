@@ -34,22 +34,22 @@ jobs:
       - name: Download exactly the 3 existing GH Actions archives, without BLS requests
         shell: bash
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           for entry in sep:14192770992 oct_cpi:14189754220 oct_ppi:14120274042; do
-            key="\${entry%%:*}"; artifact="\${entry##*:}"
+            key="${entry%%:*}"; artifact="${entry##*:}"
             curl --fail --silent --show-error --location --retry 0 --max-time 50 \
-              --header "Authorization: Bearer \${GH_TOKEN}" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
               --header 'Accept: application/vnd.github+json' \
-              --output "\${RUNNER_TEMP}/bls_\${key}.zip" \
-              "https://api.github.com/repos/\${GITHUB_REPOSITORY}/actions/artifacts/\${artifact}/zip"
-            test -s "\${RUNNER_TEMP}/bls_\${key}.zip"
+              --output "${RUNNER_TEMP}/bls_${key}.zip" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact}/zip"
+            test -s "${RUNNER_TEMP}/bls_${key}.zip"
           done
       - name: Verify archive pins, reconstruct only ephemeral outer wrapper and replay true bytes
         shell: bash
         env:
-          BLS_LAB_TMP: \${{ runner.temp }}
+          BLS_LAB_TMP: ${{ runner.temp }}
         run: |
           python - <<'PY'
           from datetime import datetime, timezone
