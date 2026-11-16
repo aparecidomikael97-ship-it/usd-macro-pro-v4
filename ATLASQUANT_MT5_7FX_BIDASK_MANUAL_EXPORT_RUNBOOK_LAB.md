@@ -66,6 +66,14 @@ finally:
     mt5.shutdown()  # Disconnect API session; no trade action
 ```
 
+## Fundamental price-definition mismatch: DO NOT JOIN TO FROZEN OHLC
+
+The exported tick snapshot is the **last observed historical Bid/Ask tick at or BEFORE** each fixed UTC anchor (up to 5 seconds old). It is **not the opening price of the new M15 candle**, which is the first reported tick at or after that candle's opening time. Nor does it prove the exact, source-specific **closing value of an M15 OHLC bar**.
+
+The frozen December protocol in `atlasquant_trader_us_dec2026_frozen_evaluation_protocol_lab.py` explicitly specifies `M15_CANDLE_OPEN_AT_RELEASE_MINUS_15_MINUTES` for the baseline and `CLOSED_M15_CANDLE_AT_RELEASE_PLUS_WINDOW_MINUTES` for M15/H1/H4 endpoints. Those must remain a **separate series**; the tick quote files describe spreads and tick conditions, not a substitute for OHLC prices or a direct forward-return series.
+
+The receipt and return contract now explicitly fix `price_observation_kind=LAST_BIDASK_TICK_AT_OR_BEFORE_ANCHOR_NOT_M15_OHLC` and `can_substitute_tick_anchors_for_frozen_m15_ohlc=False`. Any altered/missing price-definition field in the local receipt causes the reader to reject the archive. **No FX direction, P&L, fill, entry price or model win-rate should be derived by silently joining these incompatible types.**
+
 ## Interpretation and strict limits
 
 - **No interpolation or backfill:** when the terminal lacks a tick in the fixed five-second window, the entire seven-pair event is **NO-GO**. This may be common in sparse markets. Do not move anchors or extend stale quotes to force a result.
