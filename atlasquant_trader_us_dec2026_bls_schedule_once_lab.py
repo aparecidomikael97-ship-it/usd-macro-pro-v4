@@ -45,24 +45,29 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 class _Rows(HTMLParser):
+    """BLS wraps its schedule table inside an outer layout table.
+
+    Preserve every physical <tr> separately. Text from an inner release row
+    must NOT be copied into its layout parent, nor validated using headers
+    from another row/table. Reject malformed nesting and runaway structures.
+    """
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.rows = []
-        self.active = False
-        self.text = []
+        self.row_stack = []
         self.hidden = 0
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
         if tag in ("script", "style", "noscript", "svg"):
             self.hidden += 1
+            return
         if self.hidden:
             return
         if tag == "tr":
-            if self.active:
-                raise ValueError("NESTED_TABLE_ROW_NOT_ALLOWED")
-            self.active = True
-            self.text = []
+            if len(self.row_stack) >= 12:
+                raise ValueError("BLS_TABLE_ROW_NESTING_TOO_DEEP")
+            self.row_stack.append([])
 
     def handle_endtag(self, tag):
         tag = tag.lower()
@@ -71,14 +76,14 @@ class _Rows(HTMLParser):
             return
         if self.hidden:
             return
-        if tag == "tr" and self.active:
-            self.rows.append(" ".join(" ".join(self.text).split()))
-            self.active = False
-            self.text = []
+        if tag == "tr":
+            if not self.row_stack or len(self.rows) >= 2000:
+                raise ValueError("BLS_TABLE_ROW_END_OR_COUNT_INVALID")
+            self.rows.append(" ".join(" ".join(self.row_stack.pop()).split()))
 
     def handle_data(self, data):
-        if self.active and not self.hidden:
-            self.text.append(data)
+        if self.row_stack and not self.hidden:
+            self.row_stack[-1].append(data)
 
 
 def _utc(value: Any) -> datetime | None:
@@ -125,7 +130,7 @@ def inspect_dec2026_schedule_original_lab(*, raw_html: Any) -> dict[str, Any]:
         # release words, so invalid UTF-8 is rejected rather than repaired.
         parser.feed(raw_html.decode("utf-8", "strict"))
         parser.close()
-        if parser.active or not parser.rows:
+        if parser.row_stack or not parser.rows:
             return out
         matched = []
         for root, date_phrase, indicator, day in TARGETS:
