@@ -60,8 +60,15 @@ def _te_header(raw: bytes) -> tuple[int,int,bytes]:
 
 def _te_shift_header(raw: bytes, *, before: bytes | None = None) -> bytes:
     head=_te_header(raw)
-    return _reorder(raw,segment=head,
-                    before=before if before is not None else b"</table>")
+    start,end,part=head
+    stripped=raw[:start]+raw[end:]
+    if before is None:
+        # The outer calendar </table>, NOT the nested country-icon table.
+        position=stripped.rfind(b"</table>")
+    else:
+        position=stripped.index(before)
+    assert position>=0
+    return stripped[:position]+part+stripped[position:]
 
 
 def _claim(root: str, provider: str, raw: bytes):
