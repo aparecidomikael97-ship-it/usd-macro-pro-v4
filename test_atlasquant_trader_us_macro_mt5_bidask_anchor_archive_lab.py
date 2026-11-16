@@ -95,7 +95,7 @@ class ReadOnlyMT5TickArchiveTests(unittest.TestCase):
         self.assertIsNone(result["calibrated_probability"])
         self.assertEqual(result["operational_bias"],"AGUARDAR")
         self.assertEqual((result["mt5_calls"],result["http_requests"],
-                          result["file_writes"],result["new_cost_brl"]),(0,0,0))
+                          result["file_writes"],result["new_cost_brl"]),(0,0,0,0))
 
     def allowed(self,fixture,at=NOW,receipt=None):
         r=inspect(archive_root=fixture.root,receipt=receipt or fixture.receipt,
