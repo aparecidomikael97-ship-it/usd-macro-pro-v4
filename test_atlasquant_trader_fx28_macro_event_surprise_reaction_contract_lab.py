@@ -351,18 +351,14 @@ class GenericMacroSurpriseEventTests(unittest.TestCase):
         self.assertEqual(r["reason"],
             "FX_PRICE_CLAIM_NUMERIC_TIME_OR_SOURCE_HASH_INVALID")
 
-    def test_22d_one_synchronized_endpoint_within_alignment_tolerance(self):
+    def test_22d_synchronized_but_posthoc_shifted_endpoint_must_now_block(self):
+        # Regression: seven synchronized endpoints can still ALL be cherry-
+        # picked one minute after the frozen M15 endpoint.
         pp=[replace(row,endpoint_at_utc=RELEASE+timedelta(minutes=16))
             for row in prices()]
-        r=self.safety(self.run_event(price_claims=pp))
-        self.assertTrue(
-            r["all_seven_pairs_share_identical_baseline_and_endpoint_clocks"])
-        self.assertEqual(r["shared_price_baseline_utc_claim"],
-                         (RELEASE-timedelta(minutes=15)).isoformat())
-        self.assertEqual(r["shared_price_endpoint_utc_claim"],
-                         (RELEASE+timedelta(minutes=16)).isoformat())
-        self.assertEqual(r["fx_pair_outcome_claim_count"],7)
-        self.assertFalse(r["broker_price_and_bid_ask_independently_authenticated"])
+        r=self.blocked(price_claims=pp)
+        self.assertEqual(r["reason"],
+                         "PRICE_BASELINE_ENDPOINT_NOT_FROZEN_EVENT_RELATIVE")
 
     def test_22_timezone_equivalence_is_reproducible(self):
         mt=timezone(timedelta(hours=-4))
