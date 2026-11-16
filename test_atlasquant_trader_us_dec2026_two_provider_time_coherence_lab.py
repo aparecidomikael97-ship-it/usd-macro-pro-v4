@@ -148,8 +148,10 @@ class TwoProviderCaptureCoherenceTests(unittest.TestCase):
         docs=pair(te_shift=timedelta(days=1))
         self.rejected(docs)
 
-    def test_11_same_numbers_but_two_days_apart_ppi_blocks(self):
-        docs=pair(PPI,te_shift=timedelta(days=2))
+    def test_11_same_numbers_but_thirty_six_hours_apart_ppi_blocks(self):
+        # Keep both documents strictly PRE-release; otherwise this would
+        # test the existing release gate instead of the new pair-gap gate.
+        docs=pair(PPI,te_shift=timedelta(hours=36))
         prior=inspect_custody(snapshots=docs,research_cutoff_utc=POST)
         self.assertEqual(prior["locally_sha_reconciled_pre_event_source_documents"],2)
         self.rejected(docs)
