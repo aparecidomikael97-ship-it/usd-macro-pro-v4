@@ -59,6 +59,44 @@ _TE_HEADER = ("Actual", "Previous", "Consensus", "Forecast")
 _NUMBER = re.compile(r"[+-]?(?:0|[1-9][0-9]?)(?:\.[0-9]{1,3})?\Z")
 
 
+class _ScopedTDTables(_TDTables):
+    """Keep TD header/title/metric rows on the SAME concrete table.
+
+    _TDTables historically joins rows from every <table> into one flat list.
+    That permits a consensus header from an unrelated table to label numbers
+    from another table. Table IDs preserve source structure without reading
+    arbitrary page text as a survey.
+    """
+    def __init__(self) -> None:
+        super().__init__()
+        self.table_stack: list[int] = []
+        self.table_id = 0
+        self.row_table_ids: list[int | None] = []
+        self.pending_row_table: int | None = None
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag == "table" and not self.hidden:
+            self.table_id += 1
+            self.table_stack.append(self.table_id)
+        elif tag == "tr" and not self.hidden:
+            self.pending_row_table = (self.table_stack[-1]
+                                      if self.table_stack else None)
+        super().handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        before = len(self.rows)
+        super().handle_endtag(tag)
+        if tag == "tr" and len(self.rows) != before:
+            self.row_table_ids.append(self.pending_row_table)
+            self.pending_row_table = None
+        elif tag == "table" and not self.hidden:
+            if not self.table_stack:
+                raise ValueError("UNMATCHED_TD_TABLE_END")
+            self.table_stack.pop()
+
+
 def _utc(dt: Any) -> datetime | None:
     if type(dt) is not datetime or dt.tzinfo is None:
         return None
@@ -94,6 +132,12 @@ class _TERowReader(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.routes = set(target_routes)
         self.headers: list[str] = []
+        self.header_table_ids: list[int | None] = []
+        self.row_table_ids: list[int | None] = []
+        self.table_stack: list[int] = []
+        self.table_id = 0
+        self.current_row_table: int | None = None
+        self.current_header_table: int | None = None
         self.th: list[str] | None = None
         self.active = False
         self.depth = 0
@@ -112,16 +156,23 @@ class _TERowReader(HTMLParser):
             return
         if self.hidden:
             return
+        if tag=="table":
+            self.table_id+=1
+            self.table_stack.append(self.table_id)
         if tag=="th" and not self.active:
             if self.th is not None:
                 raise ValueError("NESTED_TABLE_HEADER")
             self.th=[]
+            self.current_header_table=(self.table_stack[-1]
+                                       if self.table_stack else None)
         if tag=="tr" and not self.active and a.get("data-url") in self.routes:
             self.active=True
             self.depth=1
             self.key=a["data-url"]
             self.cells=[]
             self.date_class=""
+            self.current_row_table=(self.table_stack[-1]
+                                     if self.table_stack else None)
             return
         if not self.active:
             return
@@ -151,7 +202,13 @@ class _TERowReader(HTMLParser):
             return
         if tag=="th" and self.th is not None:
             self.headers.append(" ".join(" ".join(self.th).split()))
+            self.header_table_ids.append(self.current_header_table)
+            self.current_header_table=None
             self.th=None
+        if tag=="table":
+            if not self.table_stack:
+                raise ValueError("UNMATCHED_TE_TABLE_END")
+            self.table_stack.pop()
         if not self.active:
             return
         if tag=="td" and self.depth==1 and self.cell is not None:
@@ -163,29 +220,42 @@ class _TERowReader(HTMLParser):
                 if self.cell is not None:
                     raise ValueError("UNCLOSED_OUTER_CELL")
                 self.rows.append((self.key,self.date_class,tuple(self.cells)))
+                self.row_table_ids.append(self.current_row_table)
+                self.current_row_table=None
                 self.active=False
 
 
 def _td_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str]] | None:
     spec = _EVENT[root]
     try:
-        doc=_TDTables()
+        doc=_ScopedTDTables()
         doc.feed(raw.decode("cp1252","strict"))
         doc.close()
-        if doc.cell is not None or doc.row is not None:
+        if (doc.cell is not None or doc.row is not None
+                or doc.table_stack
+                or len(doc.row_table_ids)!=len(doc.rows)):
             return None
     except (UnicodeError, ValueError, TypeError, OverflowError, RecursionError):
         return None
-    if doc.rows.count(_TD_HEADER)!=1:
+    header_positions=[i for i, row in enumerate(doc.rows) if row==_TD_HEADER]
+    if len(header_positions)!=1:
         return None
-    if not any(spec["week_title"] in cell for row in doc.rows for cell in row):
+    table_id=doc.row_table_ids[header_positions[0]]
+    if table_id is None:
+        return None
+    if not any(
+        doc.row_table_ids[i]==table_id
+        and any(spec["week_title"] in cell for cell in row)
+        for i, row in enumerate(doc.rows)
+    ):
         return None
     parsed: dict[str, tuple[str,str]]={}
     for kind, name in zip(("headline","core"),spec["td_names"]):
-        matched=[r for r in doc.rows if len(r)==8 and r[3]==name]
-        if len(matched)!=1:
+        matches=[i for i,r in enumerate(doc.rows)
+                 if len(r)==8 and r[3]==name]
+        if len(matches)!=1 or doc.row_table_ids[matches[0]]!=table_id:
             return None
-        r=matched[0]
+        r=doc.rows[matches[0]]
         if (r[0]!=spec["date_short"] or r[1]!="8:30" or r[2]!=""
                 or r[4]!="Nov" or r[5]!="M/M % Chg."):
             return None
@@ -202,14 +272,23 @@ def _te_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str, str]] | No
         doc=_TERowReader(spec["te_routes"])
         doc.feed(raw.decode("utf-8","strict"))
         doc.close()
-        if doc.active or doc.cell is not None or doc.th is not None:
+        if (doc.active or doc.cell is not None or doc.th is not None
+                or doc.table_stack or len(doc.row_table_ids)!=len(doc.rows)
+                or len(doc.header_table_ids)!=len(doc.headers)):
             return None
     except (UnicodeError, ValueError, TypeError, OverflowError, RecursionError):
         return None
-    if sum(tuple(doc.headers[i:i+4])==_TE_HEADER
-           for i in range(max(0,len(doc.headers)-3))) != 1:
+    if len(doc.rows)!=2 or not doc.row_table_ids:
         return None
-    if len(doc.rows)!=2:
+    table_id=doc.row_table_ids[0]
+    if (table_id is None
+            or any(i!=table_id for i in doc.row_table_ids)):
+        return None
+    # The four labels must be in this very table, not elsewhere on page.
+    own_headers=[h for h,i in zip(doc.headers,doc.header_table_ids)
+                 if i==table_id]
+    if sum(tuple(own_headers[i:i+4])==_TE_HEADER
+           for i in range(max(0,len(own_headers)-3))) != 1:
         return None
     parsed: dict[str,tuple[str,str,str]]={}
     for kind, route, label in zip(
