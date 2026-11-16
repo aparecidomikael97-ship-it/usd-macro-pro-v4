@@ -1,0 +1,56 @@
+name: AtlasQuant BLS December 2026 Original Calendar One-Shot LAB
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlasquant-trader-bls-dec26-schedule-once-lab.yml"
+      - "atlasquant_trader_us_dec2026_bls_schedule_once_lab.py"
+      - "test_atlasquant_trader_us_dec2026_bls_schedule_once_lab.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preserve-original-bls-schedule:
+    name: One BLS calendar GET after offline checks (no FX signal)
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout LAB code without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Use Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Compile module and test syntax
+        shell: bash
+        run: |
+          python -m py_compile atlasquant_trader_us_dec2026_bls_schedule_once_lab.py test_atlasquant_trader_us_dec2026_bls_schedule_once_lab.py
+      - name: Offline 17 adversarial tests with synthetic calendar pages
+        shell: bash
+        run: |
+          python -m unittest -v test_atlasquant_trader_us_dec2026_bls_schedule_once_lab
+      - name: Fetch ONE genuine BLS schedule original and verify actual release rows
+        shell: bash
+        env:
+          BLS_TEMP_ROOT: ${{ runner.temp }}
+        run: |
+          python -m atlasquant_trader_us_dec2026_bls_schedule_once_lab --capture-official --output-root "$BLS_TEMP_ROOT"
+      - name: Preserve only BLS.gov public original and local provenance receipt, 30 days
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: atlasquant-bls-dec2026-schedule-postfetch-original-lab
+          path: ${{ runner.temp }}/US_BLS_DEC26_SCHEDULE_*/
+          if-no-files-found: error
+          retention-days: 30
+
+# One explicit LAB run. Neither a calendar document nor a CI result is a
+# pre-event CPI/PPI analyst consensus, publisher first-seen certificate,
+# historical Pepperstone quote, predictive model score or trading approval.
+# No scheduler, deploy, MT5, broker, FX28 campaign mutation or subscription.
