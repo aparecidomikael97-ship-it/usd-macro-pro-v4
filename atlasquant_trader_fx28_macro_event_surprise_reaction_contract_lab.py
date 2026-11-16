@@ -288,9 +288,12 @@ def inspect_macro_event_surprise_reaction_lab(
     horizon = price_claims[0].horizon
     if horizon not in _HORIZONS or any(p.horizon != horizon for p in price_claims):
         return _blocked("MIXED_OR_UNKNOWN_FX_REACTION_HORIZON")
-    # A seven-cross 'M15' reaction must represent ONE synchronized price
-    # experiment, not seven separately chosen baselines/endpoints. Keep a
-    # bounded end-point tolerance for bar alignment, never hours/days late.
+    # A seven-cross reaction must represent ONE synchronized experiment.
+    # Sharing the SAME shifted timestamp is NOT enough: all seven could
+    # otherwise cherry-pick a different baseline/endpoint after seeing
+    # market prices, while still passing the synchronization test.
+    # Enforce the pre-registered event-relative endpoints after checking
+    # the 7-row cohort's internal clock agreement.
     paired_baseline_utc = None
     paired_endpoint_utc = None
     output = []
@@ -320,6 +323,15 @@ def inspect_macro_event_surprise_reaction_lab(
             "change_is_not_fx_currency_strength_causal_estimate": True,
             "broker_price_source_independently_verified": False,
         })
+    # Temporal anti-cherry-pick: exactly one canonical window per horizon.
+    # The baseline is the M15 candle OPEN 15 minutes BEFORE the release;
+    # the endpoint is the CLOSED M15 candle at the specified M15/H1/H4
+    # horizon, never an offset chosen using post-event price movement.
+    # Timestamps are still caller claims and do not prove broker first-seen.
+    if (paired_baseline_utc != rel - timedelta(minutes=15)
+            or paired_endpoint_utc != rel + timedelta(minutes=_HORIZONS[horizon])):
+        return _blocked("PRICE_BASELINE_ENDPOINT_NOT_FROZEN_EVENT_RELATIVE")
+
     result.update({
         "state": "LAB_FX28_SINGLE_EVENT_AND_7FX_REACTIONS_DOCUMENTARY_ONLY_NO_GO",
         "reason": "ONE_EVENT_SEVEN_CORRELATED_PRICE_MOVEMENT_CLAIMS_NOT_FX_FORECAST",
@@ -328,6 +340,7 @@ def inspect_macro_event_surprise_reaction_lab(
         "all_seven_pairs_share_identical_baseline_and_endpoint_clocks": True,
         "shared_price_baseline_utc_claim": paired_baseline_utc.isoformat(),
         "shared_price_endpoint_utc_claim": paired_endpoint_utc.isoformat(),
+        "price_window_matches_frozen_event_relative_clocks_claim_only": True,
         "fx_reaction_claims": output,
     })
     return result
