@@ -28,6 +28,10 @@ from atlasquant_trader_fx28_32_factor_source_admission_lab import (
     SCHEMA as FACTOR_SCHEMA,
     inspect_fx28_32_factor_source_admission_lab,
 )
+from atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab import (
+    SEP_HASH as PPI_SEP_ORIGINAL_SHA,
+    OCT_HASH as PPI_OCT_ORIGINAL_SHA,
+)
 from atlasquant_trader_fx28_ny17_672_slot_issuance_ledger_lab import (
     SCHEMA as LEDGER_SCHEMA,
     inspect_fx28_ny17_672_slot_issuance_ledger_lab,
@@ -138,6 +142,11 @@ def _base(reason: str) -> dict[str, Any]:
         "ppi_original_local_replayed_for_context": False,
         "cpi_original_local_replayed_for_context": False,
         "ppi_cpi_documents_are_not_signed_usd_impacts": True,
+        "ppi_sep2026_vintage_input_requested": False,
+        "ppi_sep2026_locally_verified_original_count": 0,
+        "ppi_sep2026_revision_documentary_summary": None,
+        "ppi_sep2026_revision_available_to_oct15_model": False,
+        "ppi_sep2026_revision_is_not_signed_fx_impact": True,
         "factors_with_independently_accepted_signed_effect": 0,
         "factors_with_independent_pre_event_consensus": 0,
         "factors_with_calibrated_directional_effect": 0,
@@ -175,6 +184,7 @@ def _base(reason: str) -> dict[str, Any]:
 def inspect_fx28_single_readiness_panel_lab(
     *, local_appdata: Any, inspected_at_utc: Any,
     ppi_archive_basename: Any = None, cpi_archive_basename: Any = None,
+    ppi_sep2026_two_vintage_originals: Any = None,
 ) -> dict[str, Any]:
     """Read only local originals, then reconcile coverage and future slots.
 
@@ -190,6 +200,12 @@ def inspect_fx28_single_readiness_panel_lab(
             or ppi_archive_basename == ""
             or type(cpi_archive_basename) not in (str, type(None))
             or cpi_archive_basename == ""
+            or (ppi_sep2026_two_vintage_originals is not None
+                and (type(ppi_sep2026_two_vintage_originals) is not tuple
+                     or len(ppi_sep2026_two_vintage_originals) != 2
+                     or any(type(blob) is not bytes
+                            or not 100_000 <= len(blob) <= 4_194_304
+                            for blob in ppi_sep2026_two_vintage_originals)))
             or len(OFFICIAL_PAIRS) != 28
             or len(CURRENCIES) != 8
             or EXPECTED_PAIR_HORIZON_SLOTS != 672):
@@ -201,7 +217,8 @@ def inspect_fx28_single_readiness_panel_lab(
             local_appdata=local_appdata, decision_at_utc=now,
             ppi_archive_basename=ppi_archive_basename,
             cpi_archive_basename=cpi_archive_basename,
-            hypothetical_factors=None)
+            hypothetical_factors=None,
+            ppi_sep2026_two_vintage_originals=ppi_sep2026_two_vintage_originals)
         ledger = inspect_fx28_ny17_672_slot_issuance_ledger_lab(
             window_claims=(), inspected_at_utc=now)
     except (OSError, TypeError, ValueError, KeyError, RuntimeError,
@@ -281,6 +298,111 @@ def inspect_fx28_single_readiness_panel_lab(
             or factors.get("operational_bias") != "AGUARDAR"):
         out["reason"] = "FACTORS_DISAGREE_WITH_REAL_LOCAL_POLICY_SOURCE_COVERAGE"
         return out
+    # Source-backed revision proof MUST be reconciled in the same reader
+    # as the 32-factor admission. Displaying a caller-written "PASS" would
+    # silently make revised values appear historically available.
+    revision_requested = ppi_sep2026_two_vintage_originals is not None
+    verified_revision_count = factors.get(
+        "ppi_sep2026_verified_original_count_at_local_cutoff")
+    revision_present = factors.get(
+        "ppi_sep2026_first_release_and_revision_reconciled_local_only")
+    vintage = factors.get("ppi_sep2026_vintage_research_context")
+    if (factors.get("ppi_sep2026_vintage_context_requested")
+            is not revision_requested
+            or type(verified_revision_count) is not int
+            or verified_revision_count not in (0, 1, 2)
+            or type(revision_present) is not bool
+            or factors.get("ppi_sep2026_vintage_context_in_usd_inflation_slot_only")
+               is not True
+            or factors.get("ppi_sep2026_vintage_context_is_not_new_signed_impact")
+               is not True
+            or factors.get("ppi_sep2026_revision_never_backfilled_to_october_decision")
+               is not True
+            or (not revision_requested
+                and (verified_revision_count != 0
+                     or revision_present or vintage is not None))
+            or (revision_requested and
+                ((revision_present and verified_revision_count != 2)
+                 or (not revision_present and
+                     (verified_revision_count == 2 or vintage is not None))))):
+        out["reason"] = "PPI_VINTAGE_FACTOR_STATUS_OR_PIT_CONTEXT_INCOHERENT"
+        return out
+    summary = None
+    if revision_present:
+        if (type(vintage) is not dict
+                or vintage.get("currency") != "USD"
+                or vintage.get("reference_period") != "2026-09"
+                or vintage.get("measure") != "MOM_SA_PERCENT_CHANGE"
+                or vintage.get("headline_series_code") != "FD/4"
+                or vintage.get("core_ex_food_energy_series_code") != "FD/49104"
+                or vintage.get("both_documents_first_seen_by_local_lab_after_their_release")
+                   is not True
+                or vintage.get("backtest_as_if_2026_10_15_known") is not False
+                or vintage.get("can_derive_signed_inflation_impact") is not False
+                or vintage.get("headline_revision_percentage_points") != "0.1"
+                or vintage.get("core_revision_percentage_points") != "0.1"):
+            out["reason"] = "PPI_VINTAGE_DOCUMENTARY_CONTEXT_MALFORMED"
+            return out
+        initial, revised = vintage.get("initial_release"), vintage.get("later_release_revision")
+        if (type(initial) is not dict or type(revised) is not dict
+                or initial.get("release_date") != "2026-10-15"
+                or revised.get("release_date") != "2026-11-13"
+                or tuple(initial.get(k) for k in ("headline_pct", "core_ex_food_energy_pct",
+                                                 "original_html_sha256"))
+                   != ("1.3", "0.7", PPI_SEP_ORIGINAL_SHA)
+                or tuple(revised.get(k) for k in ("headline_pct", "core_ex_food_energy_pct",
+                                                 "original_html_sha256"))
+                   != ("1.4", "0.8", PPI_OCT_ORIGINAL_SHA)):
+            out["reason"] = "PPI_VINTAGE_REPORT_EDITION_OR_SHA_CHANGED"
+            return out
+        factor_slots = factors.get("factor_slots")
+        if (type(factor_slots) is not list or len(factor_slots) != 32
+                or any(type(slot) is not dict for slot in factor_slots)):
+            out["reason"] = "PPI_VINTAGE_FACTOR_SLOT_ROSTER_INVALID"
+            return out
+        attached = [slot for slot in factor_slots
+                    if slot.get("ppi_sep2026_historical_two_release_revision_context")
+                       is not None]
+        if (len(attached) != 1
+                or attached[0].get("currency") != "USD"
+                or attached[0].get("category") != "inflation_impact"
+                or attached[0].get("ppi_sep2026_historical_two_release_revision_context")
+                   != vintage
+                or attached[0].get("signed_impact_points_admitted") is not None):
+            out["reason"] = "PPI_VINTAGE_ATTACHED_TO_WRONG_FACTOR_OR_DUPLICATED"
+            return out
+        # A compact factual diagnostic with separate dates; no source HTML,
+        # issuer-access claim, ticker signal, confidence or live advice.
+        summary = {
+            "reference_period": "2026-09",
+            "currency": "USD",
+            "unit": "PERCENT_CHANGE_MOM_SA",
+            "initial_release_date": "2026-10-15",
+            "initial_headline_pct": "1.3",
+            "initial_core_ex_food_energy_pct": "0.7",
+            "revised_release_date": "2026-11-13",
+            "revised_headline_pct": "1.4",
+            "revised_core_ex_food_energy_pct": "0.8",
+            "headline_revision_percentage_points": "0.1",
+            "core_revision_percentage_points": "0.1",
+            "original_source_sha256_pair": [
+                PPI_SEP_ORIGINAL_SHA, PPI_OCT_ORIGINAL_SHA,
+            ],
+            "first_seen_by_model_on_original_release_date_authenticated": False,
+            "research_only_postrelease_local_capture": True,
+            "contributes_calibrated_signed_macro_impact": False,
+        }
+    elif revision_requested:
+        # With a partial window (0/1 evidence) the panel intentionally
+        # reports NO revised numerical value, rather than showing 1.4 too
+        # early or claiming that mere elapsed time validates an original.
+        factor_slots = factors.get("factor_slots")
+        if (type(factor_slots) is not list or len(factor_slots) != 32
+                or any(type(slot) is not dict or
+                       slot.get("ppi_sep2026_historical_two_release_revision_context")
+                       is not None for slot in factor_slots)):
+            out["reason"] = "PPI_VINTAGE_PREMATURE_FACTOR_SLOT_EXPOSURE"
+            return out
     if (type(ledger) is not dict or ledger.get("schema") != LEDGER_SCHEMA
             or ledger.get("state")
                 != "LAB_FX28_672_SLOTS_ACCOUNTED_UNATTESTED_NO_GO"
@@ -333,6 +455,9 @@ def inspect_fx28_single_readiness_panel_lab(
             ppi_archive_basename is not None,
         "cpi_original_local_replayed_for_context":
             cpi_archive_basename is not None,
+        "ppi_sep2026_vintage_input_requested": revision_requested,
+        "ppi_sep2026_locally_verified_original_count": verified_revision_count,
+        "ppi_sep2026_revision_documentary_summary": summary,
         "slots_accounted": 672,
         "slots_future_no_supplied_witness": future,
         "slots_past_no_supplied_witness": past,
