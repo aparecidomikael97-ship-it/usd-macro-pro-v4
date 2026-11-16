@@ -23,7 +23,7 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
-      ORIGINAL_ROOT: ${{ runner.temp }}/bls_sep2026_cpi_ppi_originals
+      # runner.temp is only valid in a STEP env context.
     steps:
       - name: Checkout research branch without persisting credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -38,11 +38,15 @@ jobs:
         run: |
           python -m unittest -q test_atlasquant_trader_us_bls_sep2026_original_pair_once_lab
       - name: Attempt exactly one HTTPS GET per OFFICIAL September release, after release
+        env:
+          ORIGINAL_ROOT: ${{ runner.temp }}/bls_sep2026_cpi_ppi_originals
         shell: bash
         run: |
           mkdir -p "$ORIGINAL_ROOT"
           python -m atlasquant_trader_us_bls_sep2026_original_pair_once_lab --capture-official --output-root "$ORIGINAL_ROOT"
       - name: Replay exact saved original bytes and print documentary-only provenance
+        env:
+          ORIGINAL_ROOT: ${{ runner.temp }}/bls_sep2026_cpi_ppi_originals
         shell: bash
         run: |
           python - <<'PY'
