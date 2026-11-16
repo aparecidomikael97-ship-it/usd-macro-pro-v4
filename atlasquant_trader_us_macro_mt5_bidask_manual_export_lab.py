@@ -36,6 +36,10 @@ from atlasquant_trader_us_macro_mt5_bidask_anchor_archive_lab import (
 )
 
 SCHEMA="ATLASQUANT_MT5_7FX_MANUAL_BIDASK_TICK_EXPORT_LAB_V1"
+# A last-known tick at/before a time is NOT a M15 candle OPEN (first
+# traded tick inside the bar) or a validated CLOSED M15 candle. The
+# frozen December study #1984 explicitly requests OHLC price semantics.
+PRICE_OBSERVATION_KIND="LAST_BIDASK_TICK_AT_OR_BEFORE_ANCHOR_NOT_M15_OHLC"
 _MANUAL_FOLDER=("AtlasQuant","LAB","MT5_7FX_BIDASK_ANCHORS")
 _OFFSETS=(-15,15,60,240)
 _HEADERS=("anchor","anchor_epoch_msc","tick_time_msc","bid","ask")
@@ -54,6 +58,10 @@ def _blocked(reason:str,*,root_id:str|None=None,read_calls:int=0)->dict[str,Any]
         "tick_snapshots_selected":0,"local_files_written":0,
         "private_event_directory":None,
         "source_kind":SOURCE_KIND,
+        "price_observation_kind":PRICE_OBSERVATION_KIND,
+        "can_substitute_tick_anchors_for_frozen_m15_ohlc":False,
+        "matches_frozen_m15_baseline_and_endpoint_definition":False,
+        "fx_price_change_or_pnl_from_tick_anchors_allowed":False,
         "bidask_original_sha256_by_pair_local_claim":None,
         "broker_company_observed_locally_not_authenticated":None,
         "archive_replayed_by_independent_offline_validator":False,
@@ -228,6 +236,8 @@ def export_manual_mt5_7fx_bidask_anchors_lab(
             manifest={
                 "schema":SCHEMA,"event_root":root_id,
                 "source_kind":SOURCE_KIND,
+                "price_observation_kind":PRICE_OBSERVATION_KIND,
+                "can_substitute_tick_anchors_for_frozen_m15_ohlc":False,
                 "captured_at_utc":ended.isoformat(),
                 "sha256_by_pair":hashes,
                 "broker_company_label_claim":local_company,
@@ -294,11 +304,15 @@ def load_manual_mt5_bidask_receipt_lab(
                           object_pairs_hook=_unique_json_pairs)
         if (type(source) is not dict or set(source)!={
             "schema","event_root","source_kind","captured_at_utc",
+            "price_observation_kind",
+            "can_substitute_tick_anchors_for_frozen_m15_ohlc",
             "sha256_by_pair","broker_company_label_claim",
             "read_only_no_trades_or_accounts",
             "independent_broker_provenance_verified",
         } or source["schema"]!=SCHEMA or source["event_root"]!=event_root
                 or source["source_kind"]!=SOURCE_KIND
+                or source["price_observation_kind"]!=PRICE_OBSERVATION_KIND
+                or source["can_substitute_tick_anchors_for_frozen_m15_ohlc"] is not False
                 or source["read_only_no_trades_or_accounts"] is not True
                 or source["independent_broker_provenance_verified"] is not False
                 or type(source["captured_at_utc"]) is not str):
@@ -320,6 +334,6 @@ def load_manual_mt5_bidask_receipt_lab(
 
 
 __all__=(
-    "SCHEMA","export_manual_mt5_7fx_bidask_anchors_lab",
+    "SCHEMA","PRICE_OBSERVATION_KIND","export_manual_mt5_7fx_bidask_anchors_lab",
     "load_manual_mt5_bidask_receipt_lab",
 )
