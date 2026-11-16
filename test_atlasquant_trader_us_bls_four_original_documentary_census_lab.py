@@ -228,6 +228,18 @@ class FourBlsActualsDocumentaryCensusTests(unittest.TestCase):
         self.safe(r)
         self.assertEqual(r["state"],"LAB_BLS_FOUR_EVENT_CENSUS_BLOCKED_NO_GO")
 
+    def test_24_two_captures_same_second_neither_visible_previous_second(self):
+        a=list(sources())
+        a[0]=replace(a[0],
+            capture_finished_at_utc=a[1].capture_finished_at_utc,
+            capture_started_at_utc=a[1].capture_started_at_utc)
+        before=check(tuple(a),cutoff=D[("2026-09","PPI")]-timedelta(seconds=1))
+        at=check(tuple(a),cutoff=D[("2026-09","PPI")])
+        self.safe(before)
+        self.safe(at)
+        self.assertEqual(before["documentary_originals_reconciled_at_cutoff"],2)
+        self.assertEqual(at["documentary_originals_reconciled_at_cutoff"],4)
+
     def test_23_no_fx_predictions_even_with_four_originals(self):
         r=check()
         self.safe(r)
