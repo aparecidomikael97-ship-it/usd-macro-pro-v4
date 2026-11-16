@@ -143,8 +143,20 @@ def _ppi_table1_sep_2026_values(raw_html: bytes, *, edition: str) -> dict[str, D
     first, second = layout_rows[:2]
     if len(first) != 5 or len(second) != 8:
         return None
-    if any(kind != "th" or rs != 1 or cs != 1
-           for cells in (first, second) for _, kind, rs, cs in cells):
+    # The REAL two BLS pages use HTML rowspan/colspan for the top
+    # five headings. The existing issuer parser also permits the known
+    # implicit (all 1x1) layout. Accept ONLY these two fixed grammars;
+    # never silently flatten arbitrary spans into a guessed month.
+    if any(kind != "th" for cells in (first, second)
+           for _, kind, _, _ in cells):
+        return None
+    top_spans = tuple((row_span, col_span)
+                      for _, _, row_span, col_span in first)
+    observed_bls_spans = ((2, 1), (1, 2), (2, 1), (1, 1), (1, 5))
+    implicit_spans = ((1, 1),) * 5
+    if (top_spans not in (observed_bls_spans, implicit_spans)
+            or any((row_span, col_span) != (1, 1)
+                   for _, _, row_span, col_span in second)):
         return None
     top = tuple(" ".join(x.split()).casefold() for x, _, _, _ in first)
     if top[0] != TOP[0] or top[1] != TOP[1]:
