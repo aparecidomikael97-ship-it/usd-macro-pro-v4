@@ -192,44 +192,54 @@ def inspect_real_ppi_sep2026_release_vintages_lab(
     out = _blocked("INVALID_CUTOFF_OR_MISSING_RELEASE_ORIGINALS")
     if now is None:
         return out
-    sep_visible = now >= SEP_CAPTURE
-    oct_visible = now >= OCT_CAPTURE
-    n = int(sep_visible) + int(oct_visible)
-    if not (sep_visible and oct_visible):
-        # In the historical interval [14 Nov, 16 Nov), only the Oct PPI
-        # archived body is available to *local* research. A retrospective
-        # delta must not import the later-retrieved September source.
+    # A timestamp makes an original TIME-ELIGIBLE, not actually present.
+    # Only count a document after checking its physical bytes, pinned SHA
+    # and strict source/metric identity. Future originals are not even
+    # inspected before their own local capture cutoff.
+    sep_eligible = now >= SEP_CAPTURE
+    oct_eligible = now >= OCT_CAPTURE
+    verified = 0
+    if oct_eligible:
+        if (type(oct_original_html) is not bytes
+                or sha256(oct_original_html).hexdigest() != OCT_HASH):
+            return _blocked("LOCALLY_ELIGIBLE_OCT_ORIGINAL_MISSING_OR_SHA_INVALID")
+        actual = inspect_ppi_oct2026_first_print_lab(
+            raw_html=oct_original_html,
+            receipt=ClaimedPostReleaseHTTP(
+                OCT_PIN[7], 200, "text/html",
+                OCT_CAPTURE - timedelta(seconds=1), OCT_CAPTURE, OCT_HASH,
+            ),
+            as_of_utc=now,
+        )
+        if (actual["state"] != "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED"
+                or actual.get("source_sha256") != OCT_HASH
+                or actual.get("headline_final_demand_sa_mom_pct_body_claim") != "0.3"
+                or actual.get("core_ex_food_energy_sa_mom_pct_body_claim") != "0.3"):
+            return _blocked("OCTOBER_BLS_SOURCE_OR_ID_NOT_CONFIRMED")
+        verified += 1
+    if sep_eligible:
+        if (type(sep_original_html) is not bytes
+                or sha256(sep_original_html).hexdigest() != SEP_HASH):
+            return _blocked("LOCALLY_ELIGIBLE_SEP_ORIGINAL_MISSING_OR_SHA_INVALID")
+        sep_checked = inspect_sep2026_bls_release_body_lab(
+            kind="PPI", raw_html=sep_original_html)
+        if (sep_checked is None
+                or sep_checked.get("sa_mom_pct_body_claim") != "1.3"
+                or sep_checked.get("original_sha256") != SEP_HASH):
+            return _blocked("SEPTEMBER_BLS_RELEASE_ID_OR_HEADLINE_MISMATCH")
+        verified += 1
+    if not (sep_eligible and oct_eligible):
+        # Document without an actual pinned source is NOT counted merely
+        # because its alleged capture timestamp has elapsed.
         out.update({
             "reason": "ONE_OR_BOTH_ORIGINALS_NOT_YET_CAPTURED_AT_LOCAL_CUTOFF",
-            "originals_visible_at_local_cutoff": n,
-            "original_sep_release_visible": sep_visible,
-            "oct_release_with_sep_revision_visible": oct_visible,
+            "originals_visible_at_local_cutoff": verified,
+            "original_sep_release_visible": sep_eligible and verified >= 1,
+            "oct_release_with_sep_revision_visible": oct_eligible,
         })
         return out
-    if (type(sep_original_html) is not bytes
-            or type(oct_original_html) is not bytes
-            or sha256(sep_original_html).hexdigest() != SEP_HASH
-            or sha256(oct_original_html).hexdigest() != OCT_HASH
-            or sep_original_html == oct_original_html):
-        return _blocked("REAL_ORIGINAL_SHA256_MISSING_MISMATCH_OR_REUSED", visible=2)
-    sep_checked = inspect_sep2026_bls_release_body_lab(kind="PPI", raw_html=sep_original_html)
-    if (sep_checked is None
-            or sep_checked.get("sa_mom_pct_body_claim") != "1.3"
-            or sep_checked.get("original_sha256") != SEP_HASH):
-        return _blocked("SEPTEMBER_BLS_RELEASE_ID_OR_HEADLINE_MISMATCH", visible=2)
-    actual = inspect_ppi_oct2026_first_print_lab(
-        raw_html=oct_original_html,
-        receipt=ClaimedPostReleaseHTTP(
-            OCT_PIN[7], 200, "text/html",
-            OCT_CAPTURE - timedelta(seconds=1), OCT_CAPTURE, OCT_HASH,
-        ),
-        as_of_utc=now,
-    )
-    if (actual["state"] != "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED"
-            or actual.get("source_sha256") != OCT_HASH
-            or actual.get("headline_final_demand_sa_mom_pct_body_claim") != "0.3"
-            or actual.get("core_ex_food_energy_sa_mom_pct_body_claim") != "0.3"):
-        return _blocked("OCTOBER_BLS_FIRST_PRINT_OR_ID_NOT_CONFIRMED", visible=2)
+    if sep_original_html == oct_original_html:
+        return _blocked("REUSED_ORIGINAL_FOR_TWO_EDITION_IDENTITIES")
     first = _ppi_table1_sep_2026_values(sep_original_html, edition="sep")
     later = _ppi_table1_sep_2026_values(oct_original_html, edition="oct")
     if (first is None or later is None
