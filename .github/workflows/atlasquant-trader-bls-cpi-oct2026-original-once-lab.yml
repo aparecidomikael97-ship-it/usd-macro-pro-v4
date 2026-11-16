@@ -1,0 +1,132 @@
+name: AtlasQuant BLS CPI Oct2026 Original One-Time LAB
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - ".github/workflows/atlasquant-trader-bls-cpi-oct2026-original-once-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-cpi-official-get:
+    name: BLS October 2026 CPI original plus PIT replay (NO-GO)
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout LAB only, no saved credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: First run the offline mocked HTTP and CPI release semantic tests
+        shell: bash
+        run: |
+          python -m unittest -q test_atlasquant_trader_us_oct2026_cpi_original_capture_once_lab test_atlasquant_trader_us_oct2026_cpi_release_text_guard_lab test_atlasquant_trader_us_cpi_ppi_official_body_join_lab
+      - name: One real BLS HTML GET with original-byte SHA and local receipt replay
+        id: official
+        # One initial PR workflow change OR deliberate manual dispatch. No cron.
+        # Later commits to other files do not rerun this one-time capture.
+        env:
+          ORIGINAL_ROOT: ${{ runner.temp }}/bls_oct2026_cpi_original
+        shell: bash
+        run: |
+          mkdir -p "$ORIGINAL_ROOT"
+          python -m atlasquant_trader_us_oct2026_cpi_original_capture_once_lab --capture-official --output-root "$ORIGINAL_ROOT"
+      - name: Research-only join of actual ORIGINAL bytes at two PIT cutoffs
+        shell: bash
+        env:
+          ORIGINAL_ROOT: ${{ runner.temp }}/bls_oct2026_cpi_original
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+          from hashlib import sha256
+          from atlasquant_trader_us_oct2026_cpi_original_capture_once_lab import (
+              replay_cpi_oct2026_original_lab,
+          )
+          from atlasquant_trader_us_cpi_ppi_official_body_join_lab import (
+              inspect_us_cpi_ppi_official_body_join_lab as inspect,
+          )
+          from atlasquant_trader_us_cpi_ppi_pit_visibility_cutoff_lab import EventVintageClaim
+          from atlasquant_trader_fx28_macro_event_surprise_reaction_contract_lab import (
+              MetricIdentity, OfficialActual,
+          )
+          from atlasquant_trader_us_oct2026_cpi_release_text_guard_lab import (
+              ClaimedBLSHtmlReceipt, URL, RELEASE_FLOOR_UTC,
+          )
+          root = Path(os.environ["ORIGINAL_ROOT"])
+          directories = [p for p in root.iterdir() if p.is_dir() and p.name.startswith("US_BLS_CPI_OCT2026_")]
+          assert len(directories) == 1, "MISSING_OR_AMBIGUOUS_LOCAL_CPI"
+          dirname = directories[0].name
+          meta = json.loads((directories[0] / "receipt.json").read_text("utf-8"))
+          raw = (directories[0] / "original.html").read_bytes()
+          end = datetime.fromisoformat(meta["finished_at_utc"].replace("Z","+00:00")).astimezone(timezone.utc)
+          saved = replay_cpi_oct2026_original_lab(output_root=root, archive_basename=dirname, as_of_utc=end)
+          assert saved["original_local_replayed"] is True
+          assert saved["documentary_headline_sa_mom_pct"] == "0.4"
+          assert saved["documentary_core_sa_mom_pct"] == "0.3"
+          assert saved["month_oct2026_yoy_available"] is False
+          assert sha256(raw).hexdigest() == meta["body_sha256"]
+          receipt = ClaimedBLSHtmlReceipt(URL, 200, meta["content_type"], end, meta["body_sha256"])
+          actual = OfficialActual(
+              metric=MetricIdentity(currency="USD",series_id="US_CPI_U_HEADLINE",
+                                    reference_period="2026-10",transformation="MOM",
+                                    seasonal_adjustment="SA",unit="PERCENT"),
+              numeric_value="0.4",official_source_url=URL,
+              original_sha256_claim=meta["body_sha256"],
+              scheduled_release_at_utc=RELEASE_FLOOR_UTC,
+              published_at_utc=RELEASE_FLOOR_UTC,
+              locally_captured_at_utc=end,
+              first_print_vintage_claim="FIRST_PRINT_CLAIM_ONLY")
+          roster=(EventVintageClaim("CPI",None,None,actual,raw),
+                  EventVintageClaim("PPI",None,None,None,None))
+          receipts={"CPI":receipt,"PPI":None}
+          def check(instant):
+              return inspect(decision_cutoff_utc=instant, research_horizon="D1",
+                             event_claims=roster,actual_http_receipts=receipts)
+          invisible=check(end-timedelta(seconds=1))
+          assert invisible["economic_events_reconciled"] == 2
+          assert invisible["research_events_with_first_print_visible_at_cutoff_claim_only"] == 0
+          assert invisible["original_actual_value_checked_against_document_body"] == []
+          visible=check(end)
+          assert visible["state"] == "LAB_CPI_PPI_OFFICIAL_BODY_JOIN_UNATTESTED_NO_GO"
+          assert visible["original_actual_value_checked_against_document_body"] == ["CPI"]
+          assert visible["research_events_with_first_print_visible_at_cutoff_claim_only"] == 1
+          assert visible["feature_rows"][0]["actual_first_print_percent_local_claim_visible"] == "0.4"
+          assert visible["documentary_surprises_comparable_after_release_only"] == 0
+          assert visible["trade_authorized"] is False and visible["publishable"] is False
+          assert visible["source_first_seen_independently_authenticated"] is False
+          assert visible["original_672_campaign_slots_modified"] is False
+          print("CPI original BLS HTML bytes:",len(raw))
+          print("SHA256:",meta["body_sha256"])
+          print("CPI headline +0.4% SA MoM and core +0.3% SA MoM, documentary only")
+          print("PIT immediately before end of captured receipt: CPI HIDDEN")
+          print("PIT at receipt end: CPI visible, NO consensus or market forecast")
+          print("LAB/AGUARDAR/HARD NO-GO, first-seen unproven, no trading")
+          PY
+      - name: Preserve post-release original source and receipt for 30 days
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: atlasquant-bls-cpi-oct2026-postrelease-original-lab
+          path: ${{ runner.temp }}/bls_oct2026_cpi_original/US_BLS_CPI_OCT2026_*/
+          if-no-files-found: error
+          retention-days: 30
+
+# The source is the archived BLS October 2026 CPI release; no redirect,
+# fallback provider, paid API, credentials, retry, worker, trade, or deployment.
+# This captures a POST-RELEASE copy, NOT proof of 10-Nov initial publication
+# timestamp, vintage, predictive signal, independent source first-seen,
+# broker impact or an out-of-sample Forex edge.
+# All 672 FX28 pre-registered slots and their calendar remain untouched.
