@@ -293,7 +293,11 @@ class CpiPpiConsensusBodyGateTests(unittest.TestCase):
             r=audit(p,rows=rows,receipts=rec,at=TE_END+timedelta(seconds=1))
         self.safety(r)
         self.assertTrue(r["ppi_consensus_admitted_from_two_pinned_pre_event_html"])
-        self.assertEqual(r["research_events_with_first_print_visible_at_cutoff_claim_only"],0)
+        # CPI was already released/captured on 10-Nov. Only PPI is
+        # FUTURE at 11-Nov: one visible CPI actual, zero PPI actuals.
+        self.assertEqual(r["research_events_with_first_print_visible_at_cutoff_claim_only"],1)
+        self.assertIsNotNone(r["feature_rows"][0]["actual_first_print_percent_local_claim_visible"])
+        self.assertIsNone(r["feature_rows"][1]["actual_first_print_percent_local_claim_visible"])
         self.assertEqual(r["documentary_surprises_comparable_after_release_only"],0)
 
     def test_22_invalid_event_roster_blocks(self):
