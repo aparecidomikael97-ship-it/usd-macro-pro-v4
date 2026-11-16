@@ -29,14 +29,10 @@ New-Item -ItemType Directory -Force -Path $root | Out-Null
 
 # Exemplo do provedor Trading Economics, CPI. Só é seguro executar
 # entre 03/dez/2026 13:30Z e 10/dez/2026 12:30Z, após conferir BLS.
-python -m atlasquant_trader_us_dec2026_consensus_original_one_get_lab \
-  --capture-official --confirm-bls-schedule-reviewed \
-  --event-root US_CPI_NOV2026 --provider TRADING_ECONOMICS \
-  --source-url https://tradingeconomics.com/united-states/calendar \
-  --output-root $root
+python -m atlasquant_trader_us_dec2026_consensus_original_one_get_lab --capture-official --confirm-bls-schedule-reviewed --event-root US_CPI_NOV2026 --provider TRADING_ECONOMICS --source-url https://tradingeconomics.com/united-states/calendar --output-root $root
 ```
 
-No PowerShell, use o comando em **uma linha** ou o caractere próprio de continuação (`\``) em vez da barra invertida exibida como orientação visual acima. Para o PPI, alterar o evento para `US_PPI_NOV2026` e usar sua janela. Para TD Economics, usar o `upcoming.htm` específico comprovado na semana e `--provider TD_ECONOMICS`.
+Para o PPI, alterar o evento para `US_PPI_NOV2026` e usar sua janela. Para TD Economics, usar o `upcoming.htm` específico comprovado na semana e `--provider TD_ECONOMICS`.
 
 O programa **faz uma única GET**, sem tentativa de repetição nem provedor alternativo; salva `original.html` e `receipt.json` em subdiretório único, verifica SHA-256 dos bytes gravados e reexecuta o validador PIT. Só depois de receber sucesso desse replay existe cópia documental local. O resultado **não é consenso semântico validado**.
 
