@@ -221,8 +221,9 @@ class ExternalReplayAnchorTests(unittest.TestCase):
         self.assertEqual(r["reason"],"LOCAL_REPLAY_DB_IDENTITY_OR_FLOOR_INVALID")
 
     def test_16_missing_floor_row_blocks_matching_fake_anchor(self):
+        independently_prepared_anchor=self.anchor()
         self.conn.execute(f"DELETE FROM {TABLE}")
-        r=self.check()
+        r=self.check(raw=independently_prepared_anchor)
         self.safe(r)
         self.assertEqual(r["reason"],"LOCAL_REPLAY_DB_IDENTITY_OR_FLOOR_INVALID")
 
