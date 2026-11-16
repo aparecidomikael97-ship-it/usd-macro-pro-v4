@@ -17,6 +17,7 @@ from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from typing import Any
 
+from atlasquant_trader_fx28_macro_event_surprise_reaction_contract_lab import OfficialActual
 from atlasquant_trader_us_cpi_ppi_pit_visibility_cutoff_lab import (
     EventVintageClaim, inspect_us_cpi_ppi_pit_cutoff_lab,
 )
@@ -118,6 +119,9 @@ def inspect_us_cpi_ppi_official_body_join_lab(
         row = by_kind[kind]
         rec = actual_http_receipts[kind]
         actual = row.actual
+        if actual is not None and type(actual) is not OfficialActual:
+            return _result(cutoff=cutoff, horizon=research_horizon, claims=(),
+                           reason=f"{kind}_INVALID_ACTUAL_OBJECT_TYPE")
         if actual is None:
             if row.actual_source_bytes is not None or rec is not None:
                 return _result(cutoff=cutoff, horizon=research_horizon, claims=(),
