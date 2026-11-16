@@ -17,10 +17,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from typing import Any
 import re
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
+from atlasquant_trader_us_dec2026_frozen_evaluation_protocol_lab import (
+    FROZEN_PLAN, PINNED_PLAN_SHA256, canonical_frozen_plan_bytes_lab,
+)
 
 SCHEMA="ATLASQUANT_MOTOR_A_MACRO_OOS_EVENT_CLUSTER_LEDGER_LAB_V1"
 _HORIZONS=("M15","H1","H4")
@@ -31,6 +35,10 @@ _STUDY_MAX=timedelta(hours=4)
 _BASELINE_PRE=timedelta(minutes=15)
 _SPLIT_EMBARGO=timedelta(hours=4)
 _PRECOMMIT_LOOKBACK=timedelta(hours=12)
+_PRECOMMIT_FREEZE_BEFORE_RELEASE=timedelta(hours=1)
+_FROZEN_DEC_ROOTS={
+    row["root_id"]:row for row in FROZEN_PLAN["event_roots"]
+}
 
 @dataclass(frozen=True)
 class MacroEventCohortClaim:
@@ -66,6 +74,11 @@ def _base(reason:str)->dict[str,Any]:
         "state":"LAB_MOTOR_A_EVENT_COHORT_LEDGER_BLOCKED_NO_GO",
         "reason":reason,
         "untrusted_event_roots_checked":0,
+        "untrusted_abstention_event_roots_checked":0,
+        "untrusted_directional_forecast_claims_checked":0,
+        "frozen_dec2026_event_roots_seen":[],
+        "frozen_dec2026_abstain_rule_verified_claim_only":False,
+        "directional_forecast_freeze_before_release_minutes":60,
         "untrusted_metric_rows_checked":0,
         "untrusted_fx_pair_observations_checked":0,
         "untrusted_candidate_cluster_count":0,
@@ -109,6 +122,14 @@ def audit_historical_macro_event_cohorts_lab(
             or type(event_claims) not in (tuple,list)
             or len(event_claims)>512):
         return out
+    pinned=canonical_frozen_plan_bytes_lab(FROZEN_PLAN)
+    if (pinned is None or sha256(pinned).hexdigest()!=PINNED_PLAN_SHA256
+            or len(_FROZEN_DEC_ROOTS)!=2
+            or set(_FROZEN_DEC_ROOTS)!={
+                "US_CPI_NOV2026","US_PPI_NOV2026"
+            }):
+        out["reason"]="FROZEN_DEC2026_RESEARCH_PROTOCOL_SHA_OR_ROOTS_CHANGED"
+        return out
     if len(event_claims)==0:
         out.update({
             "state":"LAB_MOTOR_A_NO_HISTORICAL_EVENT_CLAIMS_NO_GO",
@@ -127,6 +148,7 @@ def audit_historical_macro_event_cohorts_lab(
     intervals:list[tuple[datetime,datetime]]=[]
     cohorts:list[MacroEventCohortClaim]=[]
     by_root:dict[str,int]={}
+    frozen_roots_seen=[]
     for e in claims:
         rel=_utc(e.scheduled_release_at_utc)
         cons=_utc(e.consensus_locally_captured_at_utc)
@@ -175,11 +197,26 @@ def audit_historical_macro_event_cohorts_lab(
         if e.pre_event_forecast_direction not in ("UP","DOWN","ABSTAIN"):
             out["reason"]="INVALID_FORECAST_ENUM_NO_REAL_SIGNAL"
             return out
+        # These exact December research events were pre-registered with
+        # ABSTAIN and zero model forecasts in the SHA-pinned plan. No
+        # separate historical ledger may replace ABSTAIN with a caller's
+        # after-the-fact UP/DOWN claim or rename their release clock.
+        frozen=_FROZEN_DEC_ROOTS.get(e.root_id)
+        if frozen is not None:
+            if (e.issuer_currency!="USD"
+                    or rel.isoformat()!=frozen["release_utc"]
+                    or frozen["forecast_direction"]!="ABSTAIN"
+                    or e.pre_event_forecast_direction!="ABSTAIN"
+                    or e.pre_event_forecast_issued_at_utc is not None):
+                out["reason"]="FROZEN_DEC2026_EVENT_ABSTAIN_OR_CLOCK_OVERRIDE"
+                return out
+            frozen_roots_seen.append(e.root_id)
         if ((e.pre_event_forecast_direction=="ABSTAIN" and
              e.pre_event_forecast_issued_at_utc is not None)
                 or (e.pre_event_forecast_direction in ("UP","DOWN")
                     and (forecast_time is None
-                         or not rel-_PRECOMMIT_LOOKBACK<=forecast_time<rel
+                         or not rel-_PRECOMMIT_LOOKBACK<=forecast_time
+                               <= rel-_PRECOMMIT_FREEZE_BEFORE_RELEASE
                          or forecast_time>now
                          or forecast_time<cons))):
             out["reason"]="MISSING_LATE_OR_REWRITTEN_PRE_EVENT_FORECAST"
@@ -284,6 +321,12 @@ def audit_historical_macro_event_cohorts_lab(
         "state":"LAB_MOTOR_A_MACRO_EVENT_CLUSTER_LEDGER_RECONCILED_NO_GO",
         "reason":"ALL_EVENT_ORIGINALS_CONSENSUS_CLOCKS_AND_PRICE_CUSTODY_UNATTESTED",
         "untrusted_event_roots_checked":len(cohorts),
+        "untrusted_abstention_event_roots_checked":sum(
+            e.pre_event_forecast_direction=="ABSTAIN" for e in cohorts),
+        "untrusted_directional_forecast_claims_checked":sum(
+            e.pre_event_forecast_direction in ("UP","DOWN") for e in cohorts),
+        "frozen_dec2026_event_roots_seen":sorted(frozen_roots_seen),
+        "frozen_dec2026_abstain_rule_verified_claim_only":True,
         "untrusted_metric_rows_checked":sum(len(e.metric_ids) for e in cohorts),
         "untrusted_fx_pair_observations_checked":7*len(cohorts),
         "untrusted_candidate_cluster_count":train+holdout+purged,
