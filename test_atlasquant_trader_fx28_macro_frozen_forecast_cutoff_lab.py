@@ -86,7 +86,8 @@ class FrozenDecemberNoRetrospectivePredictionTests(unittest.TestCase):
             r["untrusted_abstention_event_roots_checked"] +
             r["untrusted_directional_forecast_claims_checked"])
         self.assertEqual(r["untrusted_candidate_cluster_count"] +
-                         r["quarantined_unresolved_confounder_cluster_count"],
+                         r["quarantined_unresolved_confounder_cluster_count"] +
+                         r["quarantined_known_same_time_corelease_cluster_count"],
                          r["untrusted_total_cluster_count"])
         return r
 
@@ -112,7 +113,10 @@ class FrozenDecemberNoRetrospectivePredictionTests(unittest.TestCase):
         self.assertEqual(r["untrusted_abstention_event_roots_checked"],1)
         self.assertEqual(r["untrusted_directional_forecast_claims_checked"],0)
         self.assertEqual(r["frozen_dec2026_event_roots_seen"],[CPI])
-        self.assertEqual(r["untrusted_candidate_cluster_count"],1)
+        self.assertEqual(r["untrusted_candidate_cluster_count"],0)
+        self.assertEqual(r["quarantined_unresolved_confounder_cluster_count"],1)
+        self.assertEqual(r["clusters"][0]["official_bls_same_time_coreleases"],
+                         ["US_REAL_EARNINGS_NOV2026"])
 
     def test_03_ppi_correct_clock_and_abstention_retained_denominator(self):
         r=self.success([fixed(PPI)])
@@ -124,9 +128,10 @@ class FrozenDecemberNoRetrospectivePredictionTests(unittest.TestCase):
         self.assertEqual(r["untrusted_abstention_event_roots_checked"],2)
         self.assertEqual(r["untrusted_directional_forecast_claims_checked"],0)
         self.assertEqual(r["frozen_dec2026_event_roots_seen"],[CPI,PPI])
-        self.assertEqual(r["untrusted_candidate_cluster_count"],2)
-        self.assertEqual(r["candidate_train_cluster_count"],1)
+        self.assertEqual(r["untrusted_candidate_cluster_count"],1)
+        self.assertEqual(r["candidate_train_cluster_count"],0)
         self.assertEqual(r["candidate_holdout_cluster_count"],1)
+        self.assertEqual(r["quarantined_unresolved_confounder_cluster_count"],1)
         self.assertFalse(any(c["forecasts_can_be_scored"] for c in r["clusters"]))
 
     def test_05_cpi_up_forecast_even_pre_release_is_frozen_override(self):
