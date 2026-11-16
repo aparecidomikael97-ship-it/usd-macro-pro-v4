@@ -135,11 +135,13 @@ class _TERowReader(HTMLParser):
         self.header_table_ids: list[int | None] = []
         self.header_row_ids: list[int | None] = []
         self.row_table_ids: list[int | None] = []
+        self.row_tr_ids: list[int | None] = []
         self.open_tr_ids: list[int] = []
         self.next_tr_id = 0
         self.table_stack: list[int] = []
         self.table_id = 0
         self.current_row_table: int | None = None
+        self.current_row_id: int | None = None
         self.current_header_table: int | None = None
         self.current_header_row: int | None = None
         self.th: list[str] | None = None
@@ -182,6 +184,8 @@ class _TERowReader(HTMLParser):
             self.date_class=""
             self.current_row_table=(self.table_stack[-1]
                                      if self.table_stack else None)
+            self.current_row_id=(self.open_tr_ids[-1]
+                                 if self.open_tr_ids else None)
             return
         if not self.active:
             return
@@ -236,7 +240,9 @@ class _TERowReader(HTMLParser):
                     raise ValueError("UNCLOSED_OUTER_CELL")
                 self.rows.append((self.key,self.date_class,tuple(self.cells)))
                 self.row_table_ids.append(self.current_row_table)
+                self.row_tr_ids.append(self.current_row_id)
                 self.current_row_table=None
+                self.current_row_id=None
                 self.active=False
 
 
@@ -255,20 +261,27 @@ def _td_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str]] | None:
     header_positions=[i for i, row in enumerate(doc.rows) if row==_TD_HEADER]
     if len(header_positions)!=1:
         return None
-    table_id=doc.row_table_ids[header_positions[0]]
+    header_index=header_positions[0]
+    table_id=doc.row_table_ids[header_index]
     if table_id is None:
         return None
-    if not any(
-        doc.row_table_ids[i]==table_id
+    # Title, named consensus columns and the two metric rows must be in
+    # DOCUMENT ORDER, not merely somewhere in the same table. A header
+    # appended below data cannot retroactively define that data's columns.
+    title_positions=[
+        i for i, row in enumerate(doc.rows)
+        if doc.row_table_ids[i]==table_id
         and any(spec["week_title"] in cell for cell in row)
-        for i, row in enumerate(doc.rows)
-    ):
+    ]
+    if len(title_positions)!=1 or not title_positions[0]<header_index:
         return None
     parsed: dict[str, tuple[str,str]]={}
     for kind, name in zip(("headline","core"),spec["td_names"]):
         matches=[i for i,r in enumerate(doc.rows)
                  if len(r)==8 and r[3]==name]
-        if len(matches)!=1 or doc.row_table_ids[matches[0]]!=table_id:
+        if (len(matches)!=1
+                or doc.row_table_ids[matches[0]]!=table_id
+                or matches[0]<=header_index):
             return None
         r=doc.rows[matches[0]]
         if (r[0]!=spec["date_short"] or r[1]!="8:30" or r[2]!=""
@@ -291,7 +304,8 @@ def _te_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str, str]] | No
                 or doc.table_stack or doc.open_tr_ids
                 or len(doc.row_table_ids)!=len(doc.rows)
                 or len(doc.header_table_ids)!=len(doc.headers)
-                or len(doc.header_row_ids)!=len(doc.headers)):
+                or len(doc.header_row_ids)!=len(doc.headers)
+                or len(doc.row_tr_ids)!=len(doc.rows)):
             return None
     except (UnicodeError, ValueError, TypeError, OverflowError, RecursionError):
         return None
@@ -311,7 +325,9 @@ def _te_values(raw: bytes, *, root: str) -> dict[str, tuple[str, str, str]] | No
     if (len(own_headers)!=len(_TE_HEADER)
             or tuple(h for h,_ in own_headers)!=_TE_HEADER
             or any(row_id is None or row_id!=own_headers[0][1]
-                   for _,row_id in own_headers)):
+                   for _,row_id in own_headers)
+            or any(row_id is None or row_id<=own_headers[0][1]
+                   for row_id in doc.row_tr_ids)):
         return None
     parsed: dict[str,tuple[str,str,str]]={}
     for kind, route, label in zip(
