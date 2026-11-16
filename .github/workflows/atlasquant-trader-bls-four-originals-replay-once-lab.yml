@@ -126,7 +126,10 @@ jobs:
               source_claims=tuple(docs),research_cutoff_utc=last-timedelta(seconds=1))
           after=inspect_four_bls_original_documentary_events_lab(
               source_claims=tuple(docs),research_cutoff_utc=last)
-          assert before["documentary_originals_reconciled_at_cutoff"]==3
+          prior_cutoff=last-timedelta(seconds=1)
+          expected_prior=sum(1 for rec in docs if rec.capture_finished_at_utc<=prior_cutoff)
+          assert expected_prior<4
+          assert before["documentary_originals_reconciled_at_cutoff"]==expected_prior
           assert after["state"]=="LAB_BLS_FOUR_EVENT_DOCUMENTARY_CENSUS_NO_GO"
           assert after["frozen_documentary_release_denominator"]==4
           assert after["documentary_originals_reconciled_at_cutoff"]==4
