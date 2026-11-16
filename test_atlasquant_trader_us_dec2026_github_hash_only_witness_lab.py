@@ -183,12 +183,14 @@ class DecemberGithubWitnessTests(unittest.TestCase):
         self.assertIn("CLAIM_ONLY", result["state"])
 
     def test_04_source_html_tampered_blocks(self):
+        original_public_hash_only_mock = self.raw()
         path = self.root/self.archive/"original.html"
         path.write_bytes(path.read_bytes() + b"x")
         result = self.prepared()
         self.safe(result)
         self.assertFalse(result["public_hash_only_body_ready"])
-        self.assertFalse(self.inspect()["exact_hash_only_github_comment_locally_reconciled"])
+        self.assertFalse(self.inspect(raw=original_public_hash_only_mock)[
+            "exact_hash_only_github_comment_locally_reconciled"])
 
     def test_05_source_receipt_tampered_blocks(self):
         path = self.root/self.archive/"receipt.json"
@@ -277,8 +279,11 @@ class DecemberGithubWitnessTests(unittest.TestCase):
             "exact_hash_only_github_comment_locally_reconciled"])
 
     def test_19_duplicate_json_keys_rejected(self):
-        raw = self.raw().rstrip(b"}") + b',"id":1}'
-        self.assertFalse(self.inspect(raw=raw)[
+        raw = self.raw()
+        needle = (b'"id": ' + str(ID).encode() + b',')
+        self.assertEqual(raw.count(needle), 1)
+        duplicate = raw.replace(needle, needle+b' "id": 1,', 1)
+        self.assertFalse(self.inspect(raw=duplicate)[
             "exact_hash_only_github_comment_locally_reconciled"])
 
     def test_20_malformed_json_or_id_rejected(self):
