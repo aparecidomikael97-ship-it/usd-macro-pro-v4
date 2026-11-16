@@ -148,9 +148,11 @@ class FrozenDecemberNoRetrospectivePredictionTests(unittest.TestCase):
             "FROZEN_DEC2026_EVENT_ABSTAIN_OR_CLOCK_OVERRIDE")
 
     def test_08_ppi_wrong_release_date_cannot_shift_frozen_plan(self):
+        # The generic actual-before-release PIT gate legitimately rejects
+        # this invalid clock BEFORE the frozen policy check is reached.
         self.reject([fixed(PPI,
             scheduled_release_at_utc=RELEASE[PPI]+timedelta(days=1))],
-            "FROZEN_DEC2026_EVENT_ABSTAIN_OR_CLOCK_OVERRIDE")
+            "EVENT_ID_TIME_METRIC_OR_CONFOUNDER_CONTRADICTION")
 
     def test_09_cpi_wrong_release_minute_refused(self):
         self.reject([fixed(CPI,
@@ -158,8 +160,10 @@ class FrozenDecemberNoRetrospectivePredictionTests(unittest.TestCase):
             "FROZEN_DEC2026_EVENT_ABSTAIN_OR_CLOCK_OVERRIDE")
 
     def test_10_ppi_wrong_issuer_fails_no_renaming_to_cad_news(self):
+        # Seven USD crosses cannot masquerade as the CAD issuer cohort;
+        # the canonical pair-set gate rejects it first, also fail-closed.
         self.reject([fixed(PPI,issuer_currency="CAD")],
-            "FROZEN_DEC2026_EVENT_ABSTAIN_OR_CLOCK_OVERRIDE")
+            "INCOMPLETE_NONCANONICAL_SEVEN_CROSS_FX_COHORT")
 
     def test_11_cpi_abstain_with_fake_issue_time_not_permitted(self):
         self.reject([fixed(CPI,
