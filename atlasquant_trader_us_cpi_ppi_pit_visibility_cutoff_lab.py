@@ -27,7 +27,10 @@ from atlasquant_trader_fx28_macro_event_surprise_reaction_contract_lab import (
 )
 from atlasquant_trader_us_cpi_source_custody_lab import RELEASE as CPI_RELEASE
 from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
-    RELEASE_UTC as PPI_RELEASE,
+    RELEASE_UTC as PPI_RELEASE, MAX_BYTES as PPI_ACTUAL_MAX_BYTES,
+)
+from atlasquant_trader_us_oct2026_cpi_release_text_guard_lab import (
+    MAX_HTML_BYTES as CPI_ACTUAL_MAX_BYTES,
 )
 
 SCHEMA = "ATLASQUANT_TRADER_US_CPI_PPI_PIT_CUTOFF_NO_LOOKAHEAD_LAB_V1"
@@ -39,7 +42,11 @@ _IDS = {
     "PPI": "US_PPI_FINAL_DEMAND",
 }
 _NUM = re.compile(r"-?(?:0|[1-9][0-9]{0,2})(?:\.[0-9]{1,3})?\Z")
-_MAX_SOURCE = 512_000
+_MAX_SOURCE = 512_000  # Default small caller-supplied consensus envelope.
+# The original BLS PPI October HTML was ~1.6 MB: do not reject valid
+# original bytes with a smaller limit than the already audited BLS parser.
+_ACTUAL_LIMIT = {"CPI": CPI_ACTUAL_MAX_BYTES, "PPI": PPI_ACTUAL_MAX_BYTES}
+_CONSENSUS_LIMIT = {"CPI": 1024 * 1024, "PPI": 2 * 1024 * 1024}
 _HORIZONS = frozenset(("D1", "W1", "M1"))
 _LOOKBACK = timedelta(days=60)
 
@@ -72,8 +79,8 @@ def _pct(v: Any) -> Decimal | None:
         return None
 
 
-def _sha_ok(data: Any, digest: Any) -> bool:
-    return (type(data) is bytes and 1 <= len(data) <= _MAX_SOURCE
+def _sha_ok(data: Any, digest: Any, *, max_bytes: int = _MAX_SOURCE) -> bool:
+    return (type(data) is bytes and 1 <= len(data) <= max_bytes
             and type(digest) is str
             and sha256(data).hexdigest() == digest)
 
@@ -198,7 +205,8 @@ def inspect_us_cpi_ppi_pit_cutoff_lab(
                             <= consensus_capture < release
                     or not _origin(consensus.source_url, bls=False)
                     or not _sha_ok(claim.consensus_source_bytes,
-                                   consensus.original_sha256_claim)):
+                                   consensus.original_sha256_claim,
+                                   max_bytes=_CONSENSUS_LIMIT[kind])):
                 out["reason"] = "INVALID_PRE_RELEASE_CONSENSUS_VINTAGE_OR_METRIC"
                 return out
         if actual is not None:
@@ -214,7 +222,8 @@ def inspect_us_cpi_ppi_pit_cutoff_lab(
                     or actual.first_print_vintage_claim != "FIRST_PRINT_CLAIM_ONLY"
                     or not _origin(actual.official_source_url, bls=True)
                     or not _sha_ok(claim.actual_source_bytes,
-                                   actual.original_sha256_claim)):
+                                   actual.original_sha256_claim,
+                                   max_bytes=_ACTUAL_LIMIT[kind])):
                 out["reason"] = "INVALID_FIRST_PRINT_OR_WRONG_METRIC_OR_RELEASE_CLOCK"
                 return out
 
