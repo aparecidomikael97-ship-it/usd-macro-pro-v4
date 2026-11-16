@@ -15,7 +15,8 @@ UTC = timezone.utc
 
 def synthetic_table(*, edition="sep", headline="1.3", core="0.7",
                     month_swap=False, duplicate=False, wrong_code=False,
-                    remove_core=False):
+                    remove_core=False, real_top_spans=False,
+                    wrong_top_spans=False):
     h = LOWER[edition]
     if month_swap:
         h = tuple(reversed(h))
@@ -24,7 +25,14 @@ def synthetic_table(*, edition="sep", headline="1.3", core="0.7",
            "Seasonally adjusted 1-month percent change (2)")
     lower = ("Group code", "Item code", "Sept. 2025 to Sept. 2026 (p)"
              if edition == "sep" else "Oct. 2025 to Oct. 2026 (p)", *h)
-    def ths(xs):
+    def ths(xs, *, top_row=False):
+        if top_row and (real_top_spans or wrong_top_spans):
+            spans = [(2,1),(1,2),(2,1),(1,1),(1,5)]
+            if wrong_top_spans:
+                spans[1] = (1,3)  # fabricated ambiguous commodity-code width
+            return "<tr>"+"".join(
+                f'<th rowspan="{rs}" colspan="{cs}">{label}</th>'
+                for label,(rs,cs) in zip(xs,spans))+"</tr>"
         return "<tr>"+"".join(f"<th>{s}</th>" for s in xs)+"</tr>"
     def row(label, code, actual):
         monthly = ["0.1", "0.2", "0.3", "0.4", "0.5"]
@@ -48,7 +56,7 @@ def synthetic_table(*, edition="sep", headline="1.3", core="0.7",
         f"and weights for Final Demand-Intermediate Demand groupings, "
         f"seasonally adjusted ["
         f"{'September 2026' if edition == 'sep' else 'October 2026'}]"
-        f"</p><table><thead>{ths(top)}{ths(lower)}</thead>"
+        f"</p><table><thead>{ths(top,top_row=True)}{ths(lower)}</thead>"
         f"<tbody>{rows}</tbody></table></body></html>"
     ).encode()
 
@@ -122,15 +130,17 @@ class RealPpiVintageRulesTests(unittest.TestCase):
     def test_10_at_oct_capture_only_one_original_is_visible(self):
         out = self.inspect(OCT_CAPTURE)
         self.assert_no_market(out)
-        self.assertEqual(out["originals_visible_at_local_cutoff"],1)
+        # A capture-time claim is NOT a preserved original. Fake bytes
+        # cannot be counted even after their claimed timestamp elapsed.
+        self.assertEqual(out["originals_visible_at_local_cutoff"],0)
         self.assertFalse(out["original_sep_release_visible"])
-        self.assertTrue(out["oct_release_with_sep_revision_visible"])
+        self.assertFalse(out["oct_release_with_sep_revision_visible"])
         self.assertIsNone(out["oct_reported_revised_sep2026_sa_mom_headline_pct"])
 
     def test_11_just_before_sep_archive_no_lookahead(self):
         out = self.inspect(SEP_CAPTURE-timedelta(microseconds=1))
         self.assert_no_market(out)
-        self.assertEqual(out["originals_visible_at_local_cutoff"],1)
+        self.assertEqual(out["originals_visible_at_local_cutoff"],0)
         self.assertIsNone(out["sep_reported_sep2026_sa_mom_headline_pct"])
 
     def test_12_at_last_capture_synthetic_bytes_still_rejected(self):
@@ -143,7 +153,7 @@ class RealPpiVintageRulesTests(unittest.TestCase):
         out = self.inspect(SEP_CAPTURE+timedelta(days=1),
                            sep=b"fake oct",oct=b"fake sep")
         self.assert_no_market(out)
-        self.assertEqual(out["originals_visible_at_local_cutoff"],2)
+        self.assertEqual(out["originals_visible_at_local_cutoff"],0)
         self.assertIsNone(out["original_sep_release_html_sha256"])
 
     def test_14_naive_or_malformed_cutoff_rejected(self):
@@ -164,6 +174,26 @@ class RealPpiVintageRulesTests(unittest.TestCase):
             out = self.inspect(cutoff)
             self.assert_no_market(out)
             self.assertIsNone(out["oct2026_actual_headline_sa_mom_pct"])
+
+
+    def test_17_real_bls_top_header_spans_with_known_shape_pass(self):
+        # The preserved BLS HTML contains rowspan/colspan metadata;
+        # accepting it must not imply accepting arbitrary spans.
+        for edition,headline,core in (
+                ("sep","1.3","0.7"),("oct","1.4","0.8")):
+            data = synthetic_table(edition=edition, headline=headline,
+                                   core=core, real_top_spans=True)
+            result = _ppi_table1_sep_2026_values(data, edition=edition)
+            self.assertIsNotNone(result)
+            self.assertEqual(str(result["headline"]),headline)
+            self.assertEqual(str(result["core_ex_food_energy"]),core)
+
+    def test_18_ambiguous_bls_top_header_colspan_fails_closed(self):
+        for edition in ("sep","oct"):
+            self.assertIsNone(_ppi_table1_sep_2026_values(
+                synthetic_table(edition=edition,wrong_top_spans=True),
+                edition=edition))
+
 
 
 if __name__ == "__main__":
