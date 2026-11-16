@@ -1,0 +1,151 @@
+name: AtlasQuant BLS Four Preserved Real Bytes E2E LAB
+
+on:
+  push:
+    branches: [lab/trader-bls4-real-source-e2e-20261116]
+    paths:
+      - .github/workflows/atlasquant-bls-four-real-bridge-e2e-lab.yml
+  pull_request:
+    paths:
+      - .github/workflows/atlasquant-bls-four-real-bridge-e2e-lab.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  bls-four-source-bridge-real-e2e:
+    name: Recheck #2003 exact code on 3 immutable original Action archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout LAB branch (no persisted credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Download exactly the 3 existing GH Actions archives, without BLS requests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for entry in sep:14192770992 oct_cpi:14189754220 oct_ppi:14120274042; do
+            key="${entry%%:*}"; artifact="${entry##*:}"
+            curl --fail --silent --show-error --location --retry 0 --max-time 50 \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header 'Accept: application/vnd.github+json' \
+              --output "${RUNNER_TEMP}/bls_${key}.zip" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact}/zip"
+            test -s "${RUNNER_TEMP}/bls_${key}.zip"
+          done
+      - name: Verify archive pins, reconstruct only ephemeral outer wrapper and replay true bytes
+        shell: bash
+        env:
+          BLS_LAB_TMP: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from hashlib import sha256
+          from io import BytesIO
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from zipfile import ZipFile, ZIP_STORED
+          import json, os
+
+          from atlasquant_trader_bls_four_real_originals_pit_replay_lab import (
+              ARCHIVES, PINS, MANIFEST_SCHEMA, inspect_four_real_bls_originals_lab,
+          )
+
+          root = Path(os.environ['BLS_LAB_TMP'])
+          source_zips = {}
+          # Hardcoded module SHA pins are independent of this generated wrapper.
+          for key, (member, expected_sha) in ARCHIVES.items():
+              data = (root / ('bls_' + key + '.zip')).read_bytes()
+              assert sha256(data).hexdigest() == expected_sha, ('ARCHIVE_SHA_MISMATCH', key)
+              source_zips[member] = data
+          originals = {}
+          for event_id, pin in PINS.items():
+              archive_key, body_name, receipt_name, body_sha, receipt_sha, capture, release, url, period = pin
+              archive_member = ARCHIVES[archive_key][0]
+              with ZipFile(BytesIO(source_zips[archive_member])) as nested:
+                  original = nested.read(body_name)
+                  receipt = nested.read(receipt_name)
+              assert sha256(original).hexdigest() == body_sha, ('BODY_SHA_MISMATCH', event_id)
+              assert sha256(receipt).hexdigest() == receipt_sha, ('RECEIPT_SHA_MISMATCH', event_id)
+              assert datetime.fromisoformat(capture) > datetime.fromisoformat(release)
+              kind = 'CPI' if '_CPI_' in event_id else 'PPI'
+              originals[period + '_' + kind] = {
+                  'html_sha256': body_sha,
+                  'html_bytes': len(original),
+                  'original_archive': archive_member,
+                  'original_zip_inside_path': body_name,
+                  'source_url': url,
+                  'captured_after_release': True,
+              }
+          manifest = {
+              'schema': MANIFEST_SCHEMA,
+              'independent_publisher_first_seen_attested': False,
+              'price_or_forex_forecast_verified': False,
+              'economic_originals': originals,
+              'actions_archives': [
+                  {'zip_path': member, 'zip_sha256': sha256(data).hexdigest()}
+                  for member, data in source_zips.items()
+              ],
+          }
+          # Outer wrapper is NEW and ephemeral, NOT the formerly downloaded
+          # c1ac... package. Its THREE INNER archive bytes match their pins.
+          with TemporaryDirectory(prefix='atlasquant-bls4-e2e-') as tmp:
+              package = Path(tmp) / 'ephemeral_reassembled_outer.zip'
+              with ZipFile(package, 'w', compression=ZIP_STORED) as outer:
+                  for member, data in source_zips.items():
+                      outer.writestr(member, data)
+                  outer.writestr('manifesto_sha256.json', json.dumps(manifest, sort_keys=True))
+                  outer.writestr('LEIA_ME_PTBR.md', 'Temporary read-only E2E wrapper; no first-seen proof.\n')
+                  outer.writestr('verificar_pacote.py', '# Temporary wrapper, checks are in LAB module.\n')
+              cutoffs = [
+                  ('2026-11-13T13:30:00+00:00', 0),
+                  ('2026-11-14T16:00:52.999999+00:00', 0),
+                  ('2026-11-14T16:00:53+00:00', 1),
+                  ('2026-11-16T01:15:45+00:00', 2),
+                  ('2026-11-16T02:20:26.999999+00:00', 2),
+                  ('2026-11-16T02:20:27+00:00', 4),
+              ]
+              for stamp, count in cutoffs:
+                  result = inspect_four_real_bls_originals_lab(
+                      package_path=package, as_of_utc=datetime.fromisoformat(stamp))
+                  assert result['state'] == 'LAB_BLS_FOUR_REAL_POSTRELEASE_ORIGINALS_PIT_DOCUMENTARY_NO_GO', (stamp, result)
+                  assert result['event_denominator'] == 4
+                  assert result['visible_postrelease_originals'] == count, (stamp, result)
+                  assert result['source_body_semantics_reconciled_count'] == count
+                  assert result['not_yet_visible_originals'] == 4 - count
+                  assert result['forecast_count_verified'] == 0
+                  assert result['trade_authorized'] is False
+                  assert result['publishable'] is False
+                  assert result['accuracy'] is None
+                  assert result['usd_bias'] is None
+                  assert result['operational_bias'] == 'AGUARDAR'
+                  assert result['changes_to_fx28_672_slots'] is False
+                  if count < 4:
+                      assert all('actual_headline_sa_mom_pct_documentary' not in e
+                                 for e in result['events'] if not e['document_original_verified'])
+                  else:
+                      assert [e['actual_headline_sa_mom_pct_documentary']
+                              for e in result['events']] == ['0.6', '1.3', '0.4', '0.3']
+                      assert all(e['metric_authenticated_first_print'] is False
+                                 for e in result['events'])
+                  print('E2E_REAL_ORIGINAL_BYTES_PIT:', stamp, 'visible=', count, '/4',
+                        'NO_GO / no FX forecast')
+          print('SUCCESS: 3 exact original Action ZIP SHA pins; 4 HTML/receipt pins; '
+                '6 PIT cutoffs; semantic bridge #2003; no first-seen/consensus/price claim')
+          PY
+
+# Explicitly LAB. All evidence is a retrospective post-release capture.
+# No HTML source re-fetch, artifact upload, cron, deploy, MT5, price, alert or trade.
