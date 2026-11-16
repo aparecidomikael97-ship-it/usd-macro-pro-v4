@@ -78,7 +78,7 @@ class MockOpen:
         assert timeout==15
         if k==self.fail_at:
             raise HTTPError(request.full_url,403,"Forbidden",{},None)
-        return Response(self.items[k],url=SPECS[k]["url"],**self.bad[k])
+        return Response(self.items[k],**{"url":SPECS[k]["url"],**self.bad[k]})
 
 
 def times():
