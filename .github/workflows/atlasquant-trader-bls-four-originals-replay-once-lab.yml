@@ -1,0 +1,165 @@
+name: AtlasQuant BLS CPI PPI Four Retained Originals Replay LAB
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlasquant-trader-bls-four-originals-replay-once-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  four-historical-bls-releases:
+    name: Sep and Oct CPI/PPI original post-release bytes, 4 events, no forecast
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout isolated LAB code without stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Four-issuer-document census synthetic tests offline
+        shell: bash
+        run: |
+          python -m unittest -q test_atlasquant_trader_us_bls_four_original_documentary_census_lab
+      - name: Read ONLY September 2026 CPI/PPI pair archived by prior Actions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: atlasquant-bls-sep2026-cpi-ppi-postrelease-originals-lab
+          repository: aparecidomikael97-ship-it/usd-macro-pro-v4
+          run-id: 43791551985
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/bls_sep2026_source_archive
+      - name: Read ONLY October 2026 CPI original archived by prior Actions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: atlasquant-bls-cpi-oct2026-postrelease-original-lab
+          repository: aparecidomikael97-ship-it/usd-macro-pro-v4
+          run-id: 43785198670
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/bls_oct2026_cpi_source_archive
+      - name: Read ONLY October 2026 PPI original archived by prior Actions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: atlasquant-bls-ppi-oct2026-postrelease-original-lab
+          repository: aparecidomikael97-ship-it/usd-macro-pro-v4
+          run-id: 43613236536
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/bls_oct2026_ppi_source_archive
+      - name: Cross-verify exactly four release roots, original SHA and historical visibility
+        env:
+          SOURCES_ROOT: ${{ runner.temp }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime,timezone,timedelta
+          from hashlib import sha256
+          from pathlib import Path
+          import json,os
+          from atlasquant_trader_us_bls_sep2026_original_pair_once_lab import (
+              SPECS,_pair_digest,inspect_sep2026_bls_release_body_lab,
+          )
+          from atlasquant_trader_us_bls_four_original_documentary_census_lab import (
+              OriginalBlsReleaseClaim,inspect_four_bls_original_documentary_events_lab,
+          )
+          root=Path(os.environ["SOURCES_ROOT"])
+          def receipt_and_parent(name):
+              stage=root/name
+              assert stage.is_dir()
+              files=list(stage.rglob("receipt.json"))
+              assert len(files)==1, (name,"RECEIPT_MISSING_OR_AMBIGUOUS")
+              p=files[0]
+              assert not p.is_symlink() and p.stat().st_size<8192
+              return json.loads(p.read_text("utf-8")),p.parent
+          def utc(value):
+              return datetime.fromisoformat(value.replace("Z","+00:00")).astimezone(timezone.utc)
+          docs=[]
+          sep,folder=receipt_and_parent("bls_sep2026_source_archive")
+          assert set(sep["sources"])=={"CPI","PPI"}
+          sep_raw={}
+          for k in ("CPI","PPI"):
+              r=sep["sources"][k]
+              f=folder/(k.lower()+"_original.html")
+              assert not f.is_symlink() and f.is_file()
+              raw=f.read_bytes()
+              assert len(raw)==r["raw_bytes"]
+              assert sha256(raw).hexdigest()==r["raw_sha256"]
+              assert r["url"]==SPECS[k]["url"]
+              assert r["publisher_first_seen_independently_attested"] is False
+              parsed=inspect_sep2026_bls_release_body_lab(kind=k,raw_html=raw)
+              assert parsed is not None and parsed["sa_mom_pct_body_claim"]==r["sa_mom_pct_body_claim"]
+              sep_raw[k]=raw
+              docs.append(OriginalBlsReleaseClaim("2026-09",k,r["url"],raw,
+                  r["http_status"],r["content_type"],utc(r["started_utc"]),
+                  utc(r["finished_utc"]),r["raw_sha256"]))
+          assert sep["pair_digest"]==_pair_digest(sep_raw)
+          assert len(sep_raw)==2
+          for k,stage in (("CPI","bls_oct2026_cpi_source_archive"),
+                          ("PPI","bls_oct2026_ppi_source_archive")):
+              rec,folder=receipt_and_parent(stage)
+              f=folder/"original.html"
+              assert not f.is_symlink() and f.is_file()
+              raw=f.read_bytes()
+              digest=sha256(raw).hexdigest()
+              sha_field="body_sha256" if k=="CPI" else "raw_sha256"
+              assert digest==rec[sha_field]
+              assert rec["body_bytes"]==len(raw)
+              url=rec["source_url"]
+              if k=="CPI":
+                  assert digest=="ee0bffd2cfb13f9faf79b5b23e5b74d87d67f61888dfd34346f81dee9182a320"
+              else:
+                  assert digest=="5115165ee0d2c8b006fc24d01cb913df5d8e7bbe169b11ee6193df628387385a"
+              docs.append(OriginalBlsReleaseClaim("2026-10",k,url,raw,
+                  rec["status_code"],rec["content_type"],utc(rec["started_at_utc"]),
+                  utc(rec["finished_at_utc"]),digest))
+          last=max(r.capture_finished_at_utc for r in docs)
+          before=inspect_four_bls_original_documentary_events_lab(
+              source_claims=tuple(docs),research_cutoff_utc=last-timedelta(seconds=1))
+          after=inspect_four_bls_original_documentary_events_lab(
+              source_claims=tuple(docs),research_cutoff_utc=last)
+          prior_cutoff=last-timedelta(seconds=1)
+          expected_prior=sum(1 for rec in docs if rec.capture_finished_at_utc<=prior_cutoff)
+          assert expected_prior<4
+          assert before["documentary_originals_reconciled_at_cutoff"]==expected_prior
+          assert after["state"]=="LAB_BLS_FOUR_EVENT_DOCUMENTARY_CENSUS_NO_GO"
+          assert after["frozen_documentary_release_denominator"]==4
+          assert after["documentary_originals_reconciled_at_cutoff"]==4
+          assert [x["actual_headline_sa_mom_pct_documentary"] for x in after["events"]]==[
+              "0.6","1.3","0.4","0.3"]
+          assert after["historical_consensus_events_independently_authenticated"]==0
+          assert after["independent_precommitted_forex_predictions_verified"]==0
+          assert after["sample_size_for_validated_oos_scoring"]==0
+          assert after["out_of_sample_directional_accuracy"] is None
+          assert after["trade_authorized"] is False
+          assert after["fx28_672_campaign_slots_modified"] is False
+          print("LAB_BLS_FOUR_REAL_ORIGINALS_SEP_AND_OCT2026_REPLAYED_POSTRELEASE")
+          print(json.dumps({
+              "fixed_roots":[x["root_id"] for x in after["events"]],
+              "headline_sa_mom_pct_by_root":{x["root_id"]:x["actual_headline_sa_mom_pct_documentary"] for x in after["events"]},
+              "original_source_sha256":{x["root_id"]:x["original_sha256"] for x in after["events"]},
+              "bytes_by_root":{x.reference_period+"_"+x.indicator:len(x.html_original_bytes) for x in docs},
+              "all_originals_usable_only_after_last_local_capture_utc":last.isoformat(),
+              "visible_previous_second":before["documentary_originals_reconciled_at_cutoff"],
+              "visible_at_last_capture":after["documentary_originals_reconciled_at_cutoff"],
+              "independent_pre_event_forecasts":0,
+              "validated_fx_accuracy":None,
+              "sep2026_pre_event_consensus_authenticated":False,
+              "past_first_seen_independently_authenticated":False,
+              "fx28_slots_mutated":False,
+              "status":"LAB/AGUARDAR/HARD NO-GO",
+          },sort_keys=True,indent=2))
+          PY
+
+# Reuse previously retained real originals. Never consult the BLS again in
+# this workflow. The four original HTML snapshots are POST-RELEASE evidence,
+# not first-print publication time or independent historical FX predictions.
+# No subscription, added scheduler, MT5 call, trading order or FX28 change.
