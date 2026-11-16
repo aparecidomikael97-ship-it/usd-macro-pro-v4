@@ -38,7 +38,6 @@ SCHEMA = "ATLASQUANT_US_CPI_PPI_OCT2026_TWO_EVENT_DENOMINATOR_LAB_V1"
 KIND_ROOTS = (("CPI", "US_CPI_OCT2026", CPI_RELEASE),
               ("PPI", "US_PPI_OCT2026", PPI_RELEASE))
 _STUDY_OK = "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO"
-_SOURCE_OK = "LAB_CPI_PPI_OFFICIAL_BODY_JOIN_UNATTESTED_NO_GO"
 # The source-bound gate replaces the official-body schema with its own.
 _SOURCE_BOUND_OK = "LAB_CPI_PPI_OFFICIAL_BODY_JOIN_UNATTESTED_NO_GO"
 
@@ -164,8 +163,7 @@ def inspect_oct2026_us_cpi_ppi_two_event_coverage_lab(
                 or (c is None) != (consensus is None)
                 or (d is None) != (diff is None)
                 or (d is not None and (a is None or c is None or d != a-c))
-                or (a is not None and cutoff < release)
-                or (c is not None and cutoff < release and c is None)):
+                or (a is not None and cutoff < release)):
             out["reason"] = "RELEASE_DATE_SERIES_OR_SURPRISE_MISMATCH"
             return out
         if kind == "CPI" and (c is not None or diff is not None):
@@ -236,7 +234,7 @@ def inspect_oct2026_us_cpi_ppi_two_event_coverage_lab(
             or packet.get("pre_event_directional_forecasts_registered") != 0
             or packet.get("forex_crosses_observed") != len(USD_FX)
             or packet.get("seven_spot_observations_not_seven_independent_trials") is not True
-            or packet.get("ppi_exclusive_causality_verified") is True
+            or packet.get("descriptive_reaction_cannot_be_exclusively_attributed_to_ppi") is not True
             or packet.get("mt5_server_or_broker_independently_authenticated") is not False
             or packet.get("post_event_price_reactions_count_as_predictive_hits") is not False
             or ppi_study.get("trade_authorized") is not False):
