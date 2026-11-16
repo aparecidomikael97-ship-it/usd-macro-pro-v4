@@ -1,0 +1,127 @@
+name: AtlasQuant Trader PPI Original PIT Replay Once LAB
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlasquant-trader-ppi-real-original-pit-replay-once-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ppi-original-documentary-replay:
+    name: BLS PPI original artifact / local document join (NO-GO)
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout isolated LAB branch (no push)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Download existing 2026-11-14 original PPI GitHub artifact (no BLS request)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: atlasquant-bls-ppi-oct2026-postrelease-original-lab
+          repository: aparecidomikael97-ship-it/usd-macro-pro-v4
+          run-id: 43613236536
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/bls_original_20261114
+      - name: Verify retained original, receipt, parser and PIT cutoff without live impact
+        shell: bash
+        env:
+          ORIGINAL_ROOT: ${{ runner.temp }}/bls_original_20261114
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from dataclasses import dataclass
+          from datetime import datetime, timezone, timedelta
+          from hashlib import sha256
+          from pathlib import Path
+          from atlasquant_trader_fx28_macro_event_surprise_reaction_contract_lab import (
+              MetricIdentity, OfficialActual,
+          )
+          from atlasquant_trader_us_cpi_ppi_pit_visibility_cutoff_lab import EventVintageClaim
+          from atlasquant_trader_us_cpi_ppi_official_body_join_lab import (
+              inspect_us_cpi_ppi_official_body_join_lab,
+          )
+          from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
+              ClaimedPostReleaseHTTP, OFFICIAL_URL, RELEASE_UTC,
+              inspect_ppi_oct2026_first_print_lab,
+          )
+          root = Path(os.environ["ORIGINAL_ROOT"])
+          documents = list(root.rglob("original.html"))
+          receipts = list(root.rglob("receipt.json"))
+          assert len(documents) == len(receipts) == 1, "AMBIGUOUS_OR_MISSING_SOURCE"
+          docfile, receiptfile = documents[0], receipts[0]
+          assert docfile.parent == receiptfile.parent, "SPLIT_RECEIPT_AND_SOURCE"
+          assert not docfile.is_symlink() and not receiptfile.is_symlink()
+          body = docfile.read_bytes()
+          rec = json.loads(receiptfile.read_text("utf-8"))
+          expected_sha = "5115165ee0d2c8b006fc24d01cb913df5d8e7bbe169b11ee6193df628387385a"
+          digest = sha256(body).hexdigest()
+          assert len(body) == 1_612_602 and digest == expected_sha, "PPI_ORIGINAL_BYTES_NOT_IDENTICAL"
+          assert rec["raw_sha256"] == digest and rec["body_bytes"] == len(body)
+          assert rec["source_url"] == rec["final_url"] == OFFICIAL_URL
+          assert rec["status_code"] == 200
+          assert rec["content_type"].split(";")[0].strip().lower() == "text/html"
+          def stamp(value):
+              return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+          start = stamp(rec["started_at_utc"])
+          end = stamp(rec["finished_at_utc"])
+          assert RELEASE_UTC <= start <= end
+          http = ClaimedPostReleaseHTTP(OFFICIAL_URL, 200, rec["content_type"],
+                                       start, end, digest)
+          parsed = inspect_ppi_oct2026_first_print_lab(raw_html=body,
+                                                        receipt=http, as_of_utc=end)
+          assert parsed["state"] == "LAB_PPI_OCT2026_BLS_TABLE1_BODY_VALUES_UNATTESTED"
+          assert parsed["headline_final_demand_sa_mom_pct_body_claim"] == "0.3"
+          actual = OfficialActual(
+              metric=MetricIdentity(
+                  currency="USD", series_id="US_PPI_FINAL_DEMAND",
+                  reference_period="2026-10", transformation="MOM",
+                  seasonal_adjustment="SA", unit="PERCENT",
+              ),
+              numeric_value=parsed["headline_final_demand_sa_mom_pct_body_claim"],
+              official_source_url=OFFICIAL_URL,
+              original_sha256_claim=digest,
+              scheduled_release_at_utc=RELEASE_UTC,
+              published_at_utc=RELEASE_UTC,
+              locally_captured_at_utc=end,
+              first_print_vintage_claim="FIRST_PRINT_CLAIM_ONLY",
+          )
+          roster=(
+              EventVintageClaim("CPI", None, None, None, None),
+              EventVintageClaim("PPI", None, None, actual, body),
+          )
+          http_receipts={"CPI": None, "PPI": http}
+          def check(cutoff):
+              return inspect_us_cpi_ppi_official_body_join_lab(
+                  decision_cutoff_utc=cutoff, research_horizon="D1",
+                  event_claims=roster, actual_http_receipts=http_receipts)
+          past = check(end-timedelta(seconds=1))
+          assert past["original_actual_value_checked_against_document_body"] == []
+          assert past["research_events_with_first_print_visible_at_cutoff_claim_only"] == 0
+          now = check(end)
+          assert now["state"] == "LAB_CPI_PPI_OFFICIAL_BODY_JOIN_UNATTESTED_NO_GO"
+          assert now["economic_events_reconciled"] == 2
+          assert now["original_actual_value_checked_against_document_body"] == ["PPI"]
+          assert now["research_events_with_first_print_visible_at_cutoff_claim_only"] == 1
+          assert now["documentary_surprises_comparable_after_release_only"] == 0
+          assert now["feature_rows"][1]["actual_first_print_percent_local_claim_visible"] == "0.3"
+          assert now["trade_authorized"] is False and now["publishable"] is False
+          assert now["source_first_seen_independently_authenticated"] is False
+          assert now["validated_fx_accuracy"] is None
+          assert now["original_672_campaign_slots_modified"] is False
+          print("LAB/NO-GO: retained 1,612,602-byte PPI BLS HTML/receipt SHA reconciled")
+          print("BLS Table-1 final demand SA MoM: +0.3%, post-event documentary ONLY")
+          print("Capture timestamp is 2026-11-14, not first availability on release.")
+          print("As-of just before receipt capture: PPI hidden. As-of capture: PPI visible.")
+          print("Zero directional FX forecast, zero efficacy claim, zero broker I/O.")
+          PY
