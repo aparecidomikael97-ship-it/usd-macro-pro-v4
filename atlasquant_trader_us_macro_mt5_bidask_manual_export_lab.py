@@ -96,18 +96,19 @@ def _safe_root(value:Any)->Path|None:
         return None
 
 
-def _tick_csv_for_pair(api:Any,*,pair:str,release:datetime,digits:int)->tuple[bytes,int]:
+def _tick_csv_for_pair(
+    api:Any,*,pair:str,release:datetime,digits:int,read_counter:list[int],
+)->bytes:
     output=StringIO(newline="")
     writer=csv.writer(output,lineterminator="\n")
     writer.writerow(_HEADERS)
-    calls=0
     for label,offset in zip(ANCHORS,_OFFSETS):
         anchor=release+timedelta(minutes=offset)
         anchor_ms=int(anchor.timestamp())*1000
         start_ms=anchor_ms-_MAX_AGE_MS
         start=datetime.fromtimestamp(start_ms/1000,tz=timezone.utc)
+        read_counter[0]+=1
         ticks=api.copy_ticks_range(pair,start,anchor,api.COPY_TICKS_INFO)
-        calls+=1
         if ticks is None or not 1<=len(ticks)<=_MAX_PER_WINDOW:
             raise ValueError("MISSING_OR_UNBOUNDED_TICK_WINDOW")
         latest=None
@@ -132,7 +133,7 @@ def _tick_csv_for_pair(api:Any,*,pair:str,release:datetime,digits:int)->tuple[by
         if latest is None:
             raise ValueError("TICK_QUOTE_WINDOW_EMPTY")
         writer.writerow((label,anchor_ms,latest[0],latest[1],latest[2]))
-    return output.getvalue().encode("utf-8"),calls
+    return output.getvalue().encode("utf-8")
 
 
 def export_manual_mt5_7fx_bidask_anchors_lab(
@@ -146,7 +147,10 @@ def export_manual_mt5_7fx_bidask_anchors_lab(
     if (allow_explicit_manual_export is not True or root_id is None
             or root is None or not callable(clock)):
         return out
-    now=_utc(clock())
+    try:
+        now=_utc(clock())
+    except (ValueError,TypeError,RuntimeError,OverflowError):
+        now=None
     if now is None:
         out["reason"]="INVALID_LOCAL_CAPTURE_CLOCK"
         return out
@@ -158,7 +162,7 @@ def export_manual_mt5_7fx_bidask_anchors_lab(
     if target.exists() or target.is_symlink():
         out["reason"]="ORIGINAL_EVENT_ARCHIVE_ALREADY_EXISTS_NO_OVERWRITE"
         return out
-    read_calls=0
+    read_counter=[0]
     pending={}
     local_company=None
     try:
@@ -178,9 +182,9 @@ def export_manual_mt5_7fx_bidask_anchors_lab(
                 raise ValueError("SYMBOL_BASE_QUOTE_OR_PRECISION_INVALID")
             # Accumulate the number of calls in a mutable proxy so a raised
             # exception cannot report a fabricated success counter.
-            raw,used=_tick_csv_for_pair(
-                api,pair=pair,release=release,digits=spec["digits_claim"])
-            read_calls+=used
+            raw=_tick_csv_for_pair(
+                api,pair=pair,release=release,digits=spec["digits_claim"],
+                read_counter=read_counter)
             after=api.symbol_info(pair)
             if (after is None or type(getattr(after,"visible",None)) is not bool
                     or after.visible!=visible):
@@ -192,10 +196,10 @@ def export_manual_mt5_7fx_bidask_anchors_lab(
     except (ValueError,OSError,TypeError,AttributeError,RuntimeError,
             OverflowError,KeyError,IndexError) as exc:
         return _blocked("MT5_READ_ONLY_TICK_EXPORT_REJECTED:"+str(exc)[:90],
-                        root_id=root_id,read_calls=read_calls)
+                        root_id=root_id,read_calls=read_counter[0])
 
     out=_blocked("PRIVATE_LOCAL_ARCHIVE_WRITE_OR_REPLAY_FAILED",
-                 root_id=root_id,read_calls=read_calls)
+                 root_id=root_id,read_calls=read_counter[0])
     try:
         root.mkdir(parents=True,exist_ok=True)
         if _safe_root(root) is None or target.exists() or target.is_symlink():
@@ -257,6 +261,65 @@ def export_manual_mt5_7fx_bidask_anchors_lab(
     return out
 
 
+def _unique_json_pairs(entries:list[tuple[str,Any]])->dict[str,Any]:
+    result={}
+    for key,value in entries:
+        if key in result:
+            raise ValueError("DUPLICATED_LOCAL_MANIFEST_JSON_KEY")
+        result[key]=value
+    return result
+
+
+def load_manual_mt5_bidask_receipt_lab(
+    *,archive_root:Any,event_root:Any,inspected_at_utc:Any,
+)->LocalMT5BidAskAnchorReceipt:
+    """Reopen a previously exported receipt; never trust an arbitrary dict.
+
+    Raises ValueError on any archive/cutoff mismatch. Replays all 7 CSVs
+    under the independently developed #1994 offline source-file validator.
+    A local SHA still is not an independent broker/origin attestation.
+    """
+    root=_safe_root(archive_root)
+    now=_utc(inspected_at_utc)
+    if root is None or now is None or type(event_root) is not str or event_root not in EVENTS:
+        raise ValueError("INVALID_PRIVATE_ROOT_EVENT_OR_REPLAY_CUTOFF")
+    folder=root/event_root
+    manifest_path=folder/"receipt.json"
+    if (folder.is_symlink() or not folder.is_dir()
+            or manifest_path.is_symlink() or not manifest_path.is_file()
+            or not 100<=manifest_path.stat().st_size<=4096):
+        raise ValueError("PRIVATE_LOCAL_RECEIPT_MISSING_OR_UNSAFE")
+    try:
+        source=json.loads(manifest_path.read_text("utf-8"),
+                          object_pairs_hook=_unique_json_pairs)
+        if (type(source) is not dict or set(source)!={
+            "schema","event_root","source_kind","captured_at_utc",
+            "sha256_by_pair","broker_company_label_claim",
+            "read_only_no_trades_or_accounts",
+            "independent_broker_provenance_verified",
+        } or source["schema"]!=SCHEMA or source["event_root"]!=event_root
+                or source["source_kind"]!=SOURCE_KIND
+                or source["read_only_no_trades_or_accounts"] is not True
+                or source["independent_broker_provenance_verified"] is not False
+                or type(source["captured_at_utc"]) is not str):
+            raise ValueError("MANIFEST_SCHEMA_OR_POLICY_INVALID")
+        timestamp=datetime.fromisoformat(source["captured_at_utc"])
+        receipt=LocalMT5BidAskAnchorReceipt(
+            event_root=event_root,source_kind=SOURCE_KIND,
+            captured_at_utc=timestamp,
+            sha256_by_pair=source["sha256_by_pair"],
+            broker_company_label_claim=source["broker_company_label_claim"],
+        )
+        replay=inspect_local_mt5_7fx_bidask_anchor_archive_lab(
+            archive_root=root,receipt=receipt,inspected_at_utc=now)
+        if replay["state"]!=_OK_REPLAY or replay["trade_authorized"] is not False:
+            raise ValueError("REPLAY_FAILED_OR_ORIGINAL_TAMPERED")
+        return receipt
+    except (OSError,UnicodeError,KeyError,TypeError,ValueError,RuntimeError) as exc:
+        raise ValueError("LOCAL_RECEIPT_OR_REPLAY_NOT_AUTHENTICATED") from exc
+
+
 __all__=(
     "SCHEMA","export_manual_mt5_7fx_bidask_anchors_lab",
+    "load_manual_mt5_bidask_receipt_lab",
 )
