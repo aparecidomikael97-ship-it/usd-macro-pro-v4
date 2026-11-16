@@ -84,7 +84,7 @@ def _utc(value:Any)->datetime|None:
 
 
 def _safe_root(value:Any)->Path|None:
-    if type(value) is not Path or not value.is_absolute():
+    if not isinstance(value,Path) or not value.is_absolute():
         return None
     if value.parts[-3:]!=_MANUAL_FOLDER or ".." in value.parts:
         return None
