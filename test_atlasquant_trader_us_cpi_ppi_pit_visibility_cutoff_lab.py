@@ -101,15 +101,16 @@ class CpiPpiPitCutoffTests(unittest.TestCase):
     def test_02_day_before_cpi_release_consensus_only_zero_future_actuals(self):
         r=self.examine(cutoff=CPI-timedelta(hours=2))
         self.guard(r)
-        self.assertEqual(r["research_events_with_pre_release_consensus_visible"],2)
+        self.assertEqual(r["research_events_with_pre_release_consensus_visible"],1)
         self.assertEqual(r["research_events_with_first_print_visible_at_cutoff_claim_only"],0)
         self.assertTrue(all(x["actual_first_print_percent_local_claim_visible"] is None
                             for x in r["feature_rows"]))
         self.assertTrue(all(x["actual_minus_consensus_percentage_points_documentary"] is None
                             for x in r["feature_rows"]))
-        self.assertTrue(all(x["cutoff_stage"] ==
-            "PRE_RELEASE_CONSENSUS_LOCAL_CLAIM_VISIBLE_NO_GO"
-            for x in r["feature_rows"]))
+        self.assertEqual(r["feature_rows"][0]["cutoff_stage"],
+                         "PRE_RELEASE_CONSENSUS_LOCAL_CLAIM_VISIBLE_NO_GO")
+        self.assertEqual(r["feature_rows"][1]["cutoff_stage"],
+                         "PRE_RELEASE_CONSENSUS_NOT_YET_VISIBLE")
 
     def test_03_just_before_first_cpi_release_no_lookahead(self):
         r=self.examine(cutoff=CPI-timedelta(seconds=1))
