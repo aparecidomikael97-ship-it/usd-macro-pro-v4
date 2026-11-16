@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from types import ModuleType
 import unittest
 
 from atlasquant_trader_fx28_temporal_radar_runtime_binding_lab import (
@@ -30,6 +31,11 @@ from atlasquant_trader_radar_compact_ui import _fx28_temporal_integrity_html
 
 UTC=timezone.utc
 NOW=datetime(2026,11,15,23,58,tzinfo=UTC)
+
+# Offline CI intentionally omits Streamlit and other production UI deps.
+# Stub only the already-authorized access checker at the integration seam.
+_ACCESS_STUB=ModuleType("atlasquant_central_hub_ui")
+_ACCESS_STUB.assert_area_access=lambda *args,**kwargs: None
 
 
 class TemporalRadarLocalRuntimeTests(unittest.TestCase):
@@ -200,7 +206,7 @@ class TemporalRadarLocalRuntimeTests(unittest.TestCase):
         st=FakeSt()
         access={"allowed":True,"role":"ADMIN","display_name":"TEST"}
         # Only the trusted local adapter is allowed to produce the report.
-        with (patch("atlasquant_central_hub_ui.assert_area_access"),
+        with (patch.dict("sys.modules",{"atlasquant_central_hub_ui":_ACCESS_STUB}),
               patch("atlasquant_reference_ui._component",
                     return_value=fake_component),
               patch("atlasquant_reference_ui._fx28_runtime_temporal_readonly_report_lab",
@@ -221,7 +227,8 @@ class TemporalRadarLocalRuntimeTests(unittest.TestCase):
         def fake_component(**kwargs):return Result()
         st=FakeSt()
         access={"allowed":True,"role":"ADMIN","display_name":"TEST"}
-        with (patch("atlasquant_reference_ui._component",
+        with (patch.dict("sys.modules",{"atlasquant_central_hub_ui":_ACCESS_STUB}),
+              patch("atlasquant_reference_ui._component",
                     return_value=fake_component),
               patch("atlasquant_reference_ui._fx28_runtime_temporal_readonly_report_lab",
                     side_effect=AssertionError("Other area accessed local archive"))):
