@@ -24,6 +24,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from atlasquant_trader_us_dec2026_pre_event_consensus_custody_lab import (
     EVENTS, SOURCE_NAMES, OriginalPreEventSourceClaim,
     _TD_URL, _TE_URL, _MAX_BYTES,
+    _td_edition_in_capture_window,
     inspect_us_dec2026_pre_event_consensus_custody_lab,
 )
 
@@ -245,6 +246,12 @@ def capture_dec2026_one_get_original_lab(
     if (start is None or not release-timedelta(days=7) <= start
             or start > release-timedelta(hours=1)):
         return _blocked("PRE_EVENT_CAPTURE_WINDOW_NOT_OPEN_OR_ALREADY_FROZEN")
+    # The weekly TD archive cannot claim to exist at a date BEFORE its
+    # own YYYY-MM-DD edition, even if an attacker supplied an HTTP 200 body.
+    # This preflight occurs BEFORE the single permitted GET.
+    if provider == "TD_ECONOMICS" and not _td_edition_in_capture_window(
+            source_url, release=release, captured_start=start):
+        return _blocked("TD_WEEKLY_EDITION_POSTDATES_CAPTURE")
 
     req=Request(source_url,headers={
         "User-Agent":"AtlasQuantTrader-LAB-Research/1.0",
