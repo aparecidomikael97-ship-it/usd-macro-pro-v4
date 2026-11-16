@@ -173,7 +173,7 @@ class D1CalendarGateTests(unittest.TestCase):
                   present_symbols=FX_28,expected_symbols=FX_28,
                   as_of_utc=datetime(2026,11,15,22,1,tzinfo=timezone.utc))
         self.assertEqual(row["reason"],
-                         "SERVER_OFFSET_REQUIRED_TO_CHECK_UTC_FUTURE_DATE")
+                         "FUTURE_D1_DATE_REQUIRES_SERVER_OFFSET_TO_CHECK_CALENDAR")
 
     def test_monday_server_gmt2_from_sunday_utc_is_suspect_not_complete(self):
         sunday=datetime(2026,11,15,22,1,tzinfo=timezone.utc)
@@ -263,6 +263,115 @@ class D1CalendarGateTests(unittest.TestCase):
         self.assertFalse(row["single_pair_backtest_authorized"])
         self.assertIsNone(row["direction_probability"])
         self.assertFalse(row["trade_authorized"])
+
+    # Three independently audited defects only: open current D1, precise
+    # UTC/server labels, and descriptive blocked reason for future day.
+    def test_current_utc_day_0010_1500_2359_never_complete(self):
+        for hh,mm in ((0,10),(15,0),(23,59)):
+            with self.subTest(clock=(hh,mm)):
+                now=datetime(2026,11,16,hh,mm,tzinfo=timezone.utc)
+                row=check(trading_date=now.date(),present_symbols=FX_28,
+                          expected_symbols=FX_28,as_of_utc=now)
+                self.assertEqual(row["status"],
+                                 "LAB_D1_CURRENT_DAY_CANDLE_NOT_CLOSED")
+                self.assertEqual(row["observed_count"],28)
+                self.assertFalse(row["rank_28fx_coverage_complete"])
+                self.assertEqual(row["operational_bias"],"AGUARDAR")
+                self.assertFalse(row["trade_authorized"])
+
+    def test_yesterday_weekday_with_28_stays_documentary_complete(self):
+        now=datetime(2026,11,17,15,0,tzinfo=timezone.utc)
+        row=check(trading_date=date(2026,11,16),
+                  present_symbols=FX_28,expected_symbols=FX_28,
+                  as_of_utc=now)
+        self.assertEqual(row["status"],
+                         "LAB_ALL_28_D1_BARS_PRESENT_DOCUMENTARY_UNATTESTED")
+        self.assertTrue(row["rank_28fx_coverage_complete"])
+        self.assertFalse(row["historical_broker_source_independently_verified"])
+        self.assertFalse(row["trade_authorized"])
+
+    def test_previous_friday_28_still_documentary_complete(self):
+        now=datetime(2026,11,16,18,0,tzinfo=timezone.utc)
+        row=check(trading_date=date(2026,11,13),
+                  present_symbols=FX_28,expected_symbols=FX_28,
+                  as_of_utc=now)
+        self.assertEqual(row["status"],
+                         "LAB_ALL_28_D1_BARS_PRESENT_DOCUMENTARY_UNATTESTED")
+        self.assertTrue(row["rank_28fx_coverage_complete"])
+        self.assertFalse(row["trading_calendar_independently_verified"])
+
+    def test_current_server_day_gmt2_and_gmt3_cannot_be_complete(self):
+        now=datetime(2026,11,16,15,0,tzinfo=timezone.utc)
+        for offset in (2,3):
+            with self.subTest(offset=offset):
+                row=check(trading_date=date(2026,11,16),
+                          present_symbols=FX_28,expected_symbols=FX_28,
+                          as_of_utc=now,server_utc_offset_hours=offset)
+                self.assertEqual(row["status"],
+                                 "LAB_D1_CURRENT_DAY_CANDLE_NOT_CLOSED")
+                self.assertFalse(row["rank_28fx_coverage_complete"])
+
+    def test_today_weekends_stay_weekend_suspect_over_current_day(self):
+        for now in (datetime(2026,11,14,15,tzinfo=timezone.utc),
+                    datetime(2026,11,15,15,tzinfo=timezone.utc)):
+            for offset in (None,2,3):
+                with self.subTest(now=now,offset=offset):
+                    row=check(trading_date=now.date(),present_symbols=FX_28,
+                              expected_symbols=FX_28,as_of_utc=now,
+                              server_utc_offset_hours=offset)
+                    self.assertEqual(
+                        row["status"],
+                        "LAB_D1_WEEKEND_CALENDAR_SUSPECT_UNAUTHENTICATED")
+                    self.assertFalse(row["rank_28fx_coverage_complete"])
+                    self.assertTrue(row["weekend_server_calendar_suspect"])
+
+    def test_sunday_utc_monday_server_has_specific_label_priority(self):
+        sunday=datetime(2026,11,15,22,1,tzinfo=timezone.utc)
+        row=check(trading_date=date(2026,11,16),
+                  present_symbols=FX_28,expected_symbols=FX_28,
+                  as_of_utc=sunday,server_utc_offset_hours=2)
+        self.assertEqual(
+            row["status"],
+            "LAB_D1_UTC_SUNDAY_SERVER_MONDAY_SUSPECT_UNAUTHENTICATED")
+        self.assertTrue(row["server_day_ahead_of_utc_calendar"])
+        self.assertFalse(row["rank_28fx_coverage_complete"])
+        self.assertFalse(row["trade_authorized"])
+
+    def test_tuesday_server_from_monday_utc_gets_generic_label(self):
+        monday=datetime(2026,11,16,23,30,tzinfo=timezone.utc)
+        row=check(trading_date=date(2026,11,17),present_symbols=FX_28,
+                  expected_symbols=FX_28,as_of_utc=monday,
+                  server_utc_offset_hours=3)
+        self.assertEqual(
+            row["status"],
+            "LAB_D1_SERVER_DAY_AHEAD_OF_UTC_SUSPECT_UNAUTHENTICATED")
+        self.assertEqual(
+            row["reason"],"SERVER_DAY_AHEAD_OF_UTC_NOT_CLOSED_D1")
+        self.assertTrue(row["server_day_ahead_of_utc_calendar"])
+        self.assertFalse(row["rank_28fx_coverage_complete"])
+
+    def test_future_year_2999_no_offset_block_reason_mentions_future(self):
+        row=check(trading_date=date(2999,1,1),present_symbols=FX_28,
+                  expected_symbols=FX_28,
+                  as_of_utc=datetime(2026,11,16,18,tzinfo=timezone.utc))
+        self.assertEqual(row["status"],"LAB_D1_CALENDAR_BLOCKED")
+        self.assertEqual(
+            row["reason"],
+            "FUTURE_D1_DATE_REQUIRES_SERVER_OFFSET_TO_CHECK_CALENDAR")
+        self.assertFalse(row["rank_28fx_coverage_complete"])
+        self.assertFalse(row["trade_authorized"])
+
+    def test_current_partial_cohort_still_not_called_complete(self):
+        now=datetime(2026,11,16,15,tzinfo=timezone.utc)
+        for count in (0,13,27,28):
+            with self.subTest(count=count):
+                row=check(trading_date=now.date(),
+                          present_symbols=FX_28[:count],
+                          expected_symbols=FX_28,as_of_utc=now)
+                self.assertEqual(row["status"],
+                                 "LAB_D1_CURRENT_DAY_CANDLE_NOT_CLOSED")
+                self.assertEqual(row["missing_count"],28-count)
+                self.assertFalse(row["rank_28fx_coverage_complete"])
 
 
 if __name__ == "__main__":
