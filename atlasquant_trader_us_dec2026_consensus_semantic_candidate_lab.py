@@ -19,7 +19,7 @@ This is a pure offline source interpreter: no disk/network/MT5/writes/jobs.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from html.parser import HTMLParser
@@ -33,6 +33,10 @@ from atlasquant_trader_us_dec2026_pre_event_consensus_custody_lab import (
 from atlasquant_trader_us_ppi_pre_event_preview_lab import _Tables as _TDTables
 
 SCHEMA = "ATLASQUANT_US_DEC2026_CONSENSUS_SEMANTIC_CANDIDATE_LAB_V1"
+# Same event, same rough moment: one publisher's week-old forecast may not
+# be passed off as corroboration of a freshly captured market consensus.
+# Conservative documentary threshold, NOT proof of matching poll vintages.
+_MAX_TWO_PROVIDER_CAPTURE_GAP = timedelta(minutes=30)
 _EVENT = {
     "US_CPI_NOV2026": {
         "date_short": "Dec 10", "date_te": "2026-12-10",
@@ -359,6 +363,8 @@ def _blocked(reason: str) -> dict[str, Any]:
             "reference_period":period,
             "release_utc":t.isoformat(),
             "locally_reconciled_two_source_bytes":False,
+            "two_provider_local_capture_gap_seconds_claim":None,
+            "capture_times_independently_attested":False,
             "provisional_consensus_headline_mom_sa_pct":None,
             "provisional_consensus_core_mom_sa_pct":None,
             "td_previous_headline_mom_pct":None,
@@ -416,6 +422,16 @@ def inspect_dec2026_consensus_semantic_candidate_lab(
         if td is None or te is None:
             result.append(base)
             continue
+        # Both documents can be individually pre-event and SHA-valid while
+        # describing DIFFERENT vintage snapshots of changing expectations.
+        # Do not even parse one provider's economic columns until the pair
+        # was captured within a single conservative 30-minute window.
+        td_end=_utc(td.finished_at_utc)
+        te_end=_utc(te.finished_at_utc)
+        if (td_end is None or te_end is None
+                or abs(td_end-te_end)>_MAX_TWO_PROVIDER_CAPTURE_GAP):
+            return _blocked("TWO_PROVIDER_CAPTURE_VINTAGES_TOO_FAR_APART")
+        local_skew_seconds=abs(td_end-te_end).total_seconds()
         tdv=_td_values(td.html_original_bytes,root=root)
         tev=_te_values(te.html_original_bytes,root=root)
         if tdv is None or tev is None:
@@ -425,6 +441,7 @@ def inspect_dec2026_consensus_semantic_candidate_lab(
                 return _blocked("TWO_SOURCES_CONSENSUS_OR_PREVIOUS_DISAGREE")
         row={**base,
             "locally_reconciled_two_source_bytes":True,
+            "two_provider_local_capture_gap_seconds_claim":local_skew_seconds,
             "provisional_consensus_headline_mom_sa_pct":tdv["headline"][0],
             "provisional_consensus_core_mom_sa_pct":tdv["core"][0],
             "td_previous_headline_mom_pct":tdv["headline"][1],
