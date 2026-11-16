@@ -39,6 +39,16 @@ _PRECOMMIT_FREEZE_BEFORE_RELEASE=timedelta(hours=1)
 _FROZEN_DEC_ROOTS={
     row["root_id"]:row for row in FROZEN_PLAN["event_roots"]
 }
+# BLS official December-2026 selected release calendar: on Dec 10 at
+# 08:30 Eastern, CPI and Real Earnings (both November 2026) are released
+# SIMULTANEOUSLY. This is a co-release of related information, not proof
+# of an independent news shock or any directional Forex effect.
+# Public page was checked 2026-11-16 and displays Last Modified
+# 2026-11-09; no local immutable source snapshot/first-seen was taken.
+_BLS_CALENDAR_URL="https://www.bls.gov/schedule/2026/12_sched_list.htm"
+_BLS_SAME_TIME_CORELEASES={
+    "US_CPI_NOV2026":("US_REAL_EARNINGS_NOV2026",),
+}
 
 @dataclass(frozen=True)
 class MacroEventCohortClaim:
@@ -85,6 +95,9 @@ def _base(reason:str)->dict[str,Any]:
         "untrusted_total_cluster_count":0,
         "unresolved_competing_release_root_count":0,
         "quarantined_unresolved_confounder_cluster_count":0,
+        "quarantined_known_same_time_corelease_cluster_count":0,
+        "official_bls_same_time_calendar_url":_BLS_CALENDAR_URL,
+        "official_bls_calendar_first_seen_independently_attested":False,
         "candidate_train_cluster_count":0,
         "candidate_holdout_cluster_count":0,
         "candidate_purged_boundary_cluster_count":0,
@@ -227,6 +240,14 @@ def audit_historical_macro_event_cohorts_lab(
         actual_sha_roots[e.actual_original_sha256_claim]=e.root_id
         seen_roots.add(e.root_id)
 
+    # Caller-supplied competing roots are NOT an exhaustive economic
+    # calendar. The known simultaneous BLS Real Earnings release must
+    # remain visible even when omitted by a caller. Do not manufacture a
+    # third "event" or modify the 2-event pre-registered ABSTAIN plan.
+    effective_coreleases=tuple(tuple(dict.fromkeys(
+        e.competing_release_roots+
+        _BLS_SAME_TIME_CORELEASES.get(e.root_id,())
+    )) for e in cohorts)
     # Union-find: overlapping event price windows cannot enter both train
     # and holdout. Confounder labels that are present join the same cluster.
     # Unknown named confounders do NOT prove absence of competing releases.
@@ -248,13 +269,13 @@ def audit_historical_macro_event_cohorts_lab(
             elif (e.consensus_original_sha256_claim==cohorts[j].consensus_original_sha256_claim
                   or e.price_archive_sha256_claim==cohorts[j].price_archive_sha256_claim):
                 union(i,j)
-        for other in e.competing_release_roots:
+        for other in effective_coreleases[i]:
             if other in by_root:
                 union(i,by_root[other])
     # A later event can point at an earlier or later event; second pass
     # ensures all references count regardless of lexical order.
     for i,e in enumerate(cohorts):
-        for other in e.competing_release_roots:
+        for other in effective_coreleases[i]:
             if other in by_root:union(i,by_root[other])
 
     # CRITICAL: a competing release outside this input roster is NOT proof
@@ -265,7 +286,7 @@ def audit_historical_macro_event_cohorts_lab(
     # omitted from the group and model evaluation.
     unresolved_by_root:dict[str,int]={}
     for i,e in enumerate(cohorts):
-        for other in e.competing_release_roots:
+        for other in effective_coreleases[i]:
             if other in by_root:
                 continue
             previous=unresolved_by_root.get(other)
@@ -278,7 +299,7 @@ def audit_historical_macro_event_cohorts_lab(
     for i in range(len(cohorts)):
         groups.setdefault(find(i),[]).append(i)
     rendered=[]
-    train=holdout=purged=quarantined=0
+    train=holdout=purged=quarantined=known_quarantine=0
     for members in sorted(groups.values(),key=lambda a:(
         min(intervals[i][0] for i in a),
         tuple(cohorts[i].root_id for i in a),
@@ -287,15 +308,24 @@ def audit_historical_macro_event_cohorts_lab(
         latest=max(intervals[i][1] for i in members)
         missing_conf=sorted({
             ref for i in members
-            for ref in cohorts[i].competing_release_roots
+            for ref in effective_coreleases[i]
             if ref not in by_root
         })
-        # The only defensible statistical classification for missing
-        # competing-news provenance is QUARANTINE, not a purported
-        # training/holdout sample. Retain it visibly in the denominator.
+        same_time_bls=sorted({
+            ref for i in members
+            for ref in _BLS_SAME_TIME_CORELEASES.get(cohorts[i].root_id,())
+        })
+        # Even if an untrusted caller inserts a fake Real Earnings event
+        # to resolve the missing-root label, the simultaneous CPI release
+        # cannot be described as CPI's EXCLUSIVE causal price reaction.
+        # Missing source custody -> unresolved quarantine; locally named
+        # co-release -> distinct documentary quarantine.
         if missing_conf:
             partition="QUARANTINED_UNRESOLVED_COMPETING_RELEASE_NO_GO"
             quarantined+=1
+        elif same_time_bls:
+            partition="QUARANTINED_KNOWN_SAME_TIME_BLS_CORELEASE_NO_EXCLUSIVE_CAUSALITY"
+            known_quarantine+=1
         elif latest < split-_SPLIT_EMBARGO:
             partition="CANDIDATE_TRAIN_UNATTESTED"
             train+=1
@@ -314,6 +344,8 @@ def audit_historical_macro_event_cohorts_lab(
             "claimed_last_h4_close_utc":latest.isoformat(),
             "partition":partition,
             "other_macro_releases_not_locally_resolved":missing_conf,
+            "official_bls_same_time_coreleases":same_time_bls,
+            "exclusive_cpi_causality_claim_allowed":False,
             "can_count_as_authenticated_trial":False,
             "forecasts_can_be_scored":False,
         })
@@ -333,6 +365,7 @@ def audit_historical_macro_event_cohorts_lab(
         "untrusted_total_cluster_count":len(rendered),
         "unresolved_competing_release_root_count":len(unresolved_by_root),
         "quarantined_unresolved_confounder_cluster_count":quarantined,
+        "quarantined_known_same_time_corelease_cluster_count":known_quarantine,
         "candidate_train_cluster_count":train,
         "candidate_holdout_cluster_count":holdout,
         "candidate_purged_boundary_cluster_count":purged,
