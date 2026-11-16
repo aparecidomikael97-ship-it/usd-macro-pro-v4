@@ -5,6 +5,11 @@ on:
     types: [opened, synchronize]
     paths:
       - ".github/workflows/atlasquant-trader-bls-sep2026-two-original-once-lab.yml"
+  push:
+    branches:
+      - lab/trader-bls-sep2026-cpi-ppi-original-pair-20261115
+    paths:
+      - ".github/workflows/atlasquant-trader-bls-sep2026-two-original-once-lab.yml"
   workflow_dispatch:
 
 permissions:
