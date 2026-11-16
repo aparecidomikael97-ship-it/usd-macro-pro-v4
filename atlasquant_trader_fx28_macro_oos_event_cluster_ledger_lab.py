@@ -49,6 +49,17 @@ _BLS_CALENDAR_URL="https://www.bls.gov/schedule/2026/12_sched_list.htm"
 _BLS_SAME_TIME_CORELEASES={
     "US_CPI_NOV2026":("US_REAL_EARNINGS_NOV2026",),
 }
+# A LOCAL entry with this official identifier must not claim an arbitrary
+# observation clock, issuer or unrelated metric. The public BLS calendar
+# pins this publication alongside CPI; this check verifies only internal
+# roster consistency, NOT publisher authentication or first-seen.
+_BLS_KNOWN_CORELEASE_IDENTITY={
+    "US_REAL_EARNINGS_NOV2026":{
+        "release_utc":_FROZEN_DEC_ROOTS["US_CPI_NOV2026"]["release_utc"],
+        "issuer_currency":"USD",
+        "metric_prefix":"US_REAL_EARNINGS_",
+    },
+}
 
 @dataclass(frozen=True)
 class MacroEventCohortClaim:
@@ -187,6 +198,18 @@ def audit_historical_macro_event_cohorts_lab(
                        or k==e.root_id for k in e.competing_release_roots)
                 or len(set(e.competing_release_roots))!=len(e.competing_release_roots)):
             out["reason"]="EVENT_ID_TIME_METRIC_OR_CONFOUNDER_CONTRADICTION"
+            return out
+        # A caller must not invent a later/earlier Real Earnings release,
+        # label Canadian rows as this BLS USD publication, or put PPI/CPI
+        # metrics under its name to "resolve" the missing corelease. An
+        # impostor in ANY submitted cohort blocks the WHOLE local roster.
+        scheduled=_BLS_KNOWN_CORELEASE_IDENTITY.get(e.root_id)
+        if scheduled is not None and (
+                rel.isoformat()!=scheduled["release_utc"]
+                or e.issuer_currency!=scheduled["issuer_currency"]
+                or any(not metric.startswith(scheduled["metric_prefix"])
+                       for metric in e.metric_ids)):
+            out["reason"]="BLS_CORELEASE_IDENTITY_CLOCK_CURRENCY_OR_METRIC_MISMATCH"
             return out
         expected=tuple(p for p in OFFICIAL_PAIRS
                        if e.issuer_currency in split_pair(p))
