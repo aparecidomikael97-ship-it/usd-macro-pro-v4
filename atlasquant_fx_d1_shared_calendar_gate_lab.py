@@ -27,6 +27,10 @@ SUSPECT_WEEKEND = "LAB_D1_WEEKEND_CALENDAR_SUSPECT_UNAUTHENTICATED"
 SUSPECT_UTC_SERVER_BOUNDARY = (
     "LAB_D1_UTC_SUNDAY_SERVER_MONDAY_SUSPECT_UNAUTHENTICATED"
 )
+SUSPECT_OTHER_SERVER_DAY_AHEAD = (
+    "LAB_D1_SERVER_DAY_AHEAD_OF_UTC_SUSPECT_UNAUTHENTICATED"
+)
+CURRENT_DAY_NOT_CLOSED = "LAB_D1_CURRENT_DAY_CANDLE_NOT_CLOSED"
 
 
 def _valid_utc(value: Any) -> datetime | None:
@@ -53,6 +57,19 @@ def inspect_d1_date_coverage_lab(
     An optional explicit GMT+2/+3 server offset allows at most the server's
     CURRENT date; if it is one day ahead of UTC, flag SUSPECT and never
     mark documentary coverage complete. No DST inference or broker IO.
+
+    Conservative D1 close rule: a claimed trading_date is NOT closed until
+    the next calendar date begins in the relevant stated clock. With an
+    explicit server offset, the claimed +2/+3 server date also controls the
+    cutoff; its timezone, candle-open boundary and live Pepperstone candles
+    are NOT independently authenticated. If the claimed date is the current
+    UTC date OR the current claimed server date, do not mark it complete.
+
+    Priority: weekend-labelled dates remain WEEKEND SUSPECT; for a weekday
+    date ahead of UTC, use its specific Sunday-UTC/Monday-server label only
+    if that exact pairing exists, otherwise the generic server-day-ahead
+    suspect label. BOTH are unclosed, and take precedence over the generic
+    CURRENT_DAY_NOT_CLOSED status. Other current weekdays use that status.
     """
     result = {
         "schema": SCHEMA, "date": None,
@@ -97,7 +114,7 @@ def inspect_d1_date_coverage_lab(
     utc_date = now.date()
     if trading_date > utc_date:
         if server_utc_offset_hours is None:
-            result["reason"] = "SERVER_OFFSET_REQUIRED_TO_CHECK_UTC_FUTURE_DATE"
+            result["reason"] = "FUTURE_D1_DATE_REQUIRES_SERVER_OFFSET_TO_CHECK_CALENDAR"
             return result
         # Only the EXPLICIT +2/+3 server calendar may allow the server
         # to have entered Monday while the UTC clock still says Sunday.
@@ -127,12 +144,33 @@ def inspect_d1_date_coverage_lab(
         result["weekend_server_calendar_suspect"] = True
         return result
     if trading_date > utc_date:
-        # e.g., Sunday 22:01Z + GMT+2 = Monday 00:01 server; or
-        # Sunday 21:01Z + GMT+3 = Monday 00:01 server.
-        # 28 synthetic entries do NOT prove a D1 close at the opening.
-        result["status"] = SUSPECT_UTC_SERVER_BOUNDARY
-        result["reason"] = "SERVER_MONDAY_WHILE_UTC_SUNDAY_NOT_CLOSED_D1"
+        # The offset is an unverified +2/+3 claim. The server's next
+        # calendar day is still OPEN: never call 28 claimed candles final.
+        # Preserve the original Sunday→Monday label ONLY for that pairing.
+        sunday_to_monday = (
+            utc_date.weekday() == 6 and trading_date.weekday() == 0
+        )
+        result["status"] = (SUSPECT_UTC_SERVER_BOUNDARY
+                            if sunday_to_monday
+                            else SUSPECT_OTHER_SERVER_DAY_AHEAD)
+        result["reason"] = (
+            "SERVER_MONDAY_WHILE_UTC_SUNDAY_NOT_CLOSED_D1"
+            if sunday_to_monday else
+            "SERVER_DAY_AHEAD_OF_UTC_NOT_CLOSED_D1"
+        )
         result["server_day_ahead_of_utc_calendar"] = True
+        return result
+    # A D1 stamped with the current day cannot be final merely because
+    # the caller supplied 28 symbols. This is a calendar-only precaution,
+    # not evidence of the true Pepperstone D1 session-close timestamp.
+    # For provided offsets, neither UTC-current nor server-current
+    # should be accepted as a finished D1 bar.
+    if (trading_date == utc_date
+            or (server_utc_offset_hours is not None
+                and trading_date ==
+                    (now + timedelta(hours=server_utc_offset_hours)).date())):
+        result["status"] = CURRENT_DAY_NOT_CLOSED
+        result["reason"] = "CURRENT_D1_CANDLE_NOT_CLOSED_OR_BROKER_TIME_UNVERIFIED"
         return result
     if n == 28:
         status = "LAB_ALL_28_D1_BARS_PRESENT_DOCUMENTARY_UNATTESTED"
