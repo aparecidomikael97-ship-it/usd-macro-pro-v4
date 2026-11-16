@@ -33,7 +33,7 @@ from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     CAMPAIGN_ID, _nominal_windows,
 )
 
-SCHEMA = "ATLASQUANT_TRADER_FX28_EXPERIMENTAL_MACRO_RELATIVE_SCORE_LAB_V3"
+SCHEMA = "ATLASQUANT_TRADER_FX28_EXPERIMENTAL_MACRO_RELATIVE_SCORE_LAB_V4"
 WEIGHTS: dict[str, int] = {
     "policy_expectations": 40,
     "inflation_impact": 20,
@@ -86,6 +86,7 @@ def _configuration_digest() -> str:
         "shared_event_root_pair_veto": True,
         "shared_event_root_pair_veto_version": "V1_ALWAYS_ABSTAIN_OVERLAPPING_ROOT",
         "same_source_alias_different_event_roots_veto": True,
+        "same_raw_source_sha_across_categories_or_capture_clocks_veto": True,
     }
     return sha256(json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
@@ -183,6 +184,10 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
     root_by_claimed_source_identity: dict[
         tuple[str, str, datetime, datetime], str
     ] = {}
+    # A different category, event name or local download time cannot
+    # turn the SAME ORIGINAL bytes into a second economic catalyst.
+    # This is only a conservative alias veto, not publisher identity proof.
+    root_by_raw_source_sha: dict[str, str] = {}
     for claim in claimed_factors:
         if (not isinstance(claim, HypotheticalMacroFactorClaim)
                 or claim.currency not in CURRENCIES
@@ -220,8 +225,16 @@ def evaluate_experimental_fx28_macro_relative_score_lab(
             # issuer/hash/time collisions, and same-currency double counts.
             out["reason"] = "REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR"
             return out
+        other_root_for_raw_bytes = root_by_raw_source_sha.get(
+            claim.source_sha256_claim)
+        if (other_root_for_raw_bytes is not None
+                and other_root_for_raw_bytes != claim.event_root_id):
+            out["reason"] = (
+                "SAME_ORIGINAL_SHA_RELABELED_ACROSS_CATEGORIES_OR_CAPTURES")
+            return out
         roots[claim.event_root_id] = root_identity
         root_by_claimed_source_identity[root_identity] = claim.event_root_id
+        root_by_raw_source_sha[claim.source_sha256_claim] = claim.event_root_id
         root_currencies.setdefault(claim.event_root_id, set()).add(claim.currency)
         seen[key] = claim
 

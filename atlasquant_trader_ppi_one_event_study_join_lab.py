@@ -34,6 +34,10 @@ from atlasquant_trader_ppi_fx_breadth_lab import (
 from atlasquant_trader_ppi_competing_calendar_lab import (
     PreEventCalendarClaim, audit_ppi_competing_calendar_lab,
 )
+from atlasquant_trader_ppi_td_same_minute_fx28_guard_lab import (
+    PASS as TD_SAME_MINUTE_CAD_DOCUMENTARY,
+    inspect_ppi_td_same_minute_fx28_lab,
+)
 from atlasquant_trader_ppi_official_schedule_archive_lab import (
     inspect_ppi_three_official_schedule_files_lab,
 )
@@ -180,6 +184,11 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
+    # Independent TD table re-read: protected source hash + country sections.
+    # Does not alter the frozen event protocol or auxiliary calendar claims.
+    td_same_minute = inspect_ppi_td_same_minute_fx28_lab(
+        td_original_html=packet.td_html)
+
     actual = inspect_ppi_oct2026_first_print_lab(
         raw_html=packet.bls_html, receipt=packet.bls_capture, as_of_utc=now)
     stages["BLS_FIRST_PRINT"] = actual.get("state")
@@ -245,6 +254,17 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
+    # The three auxiliary official schedule pages are PARTIAL. Their empty
+    # M15 candidate list must not hide a CAD release present in the TD original.
+    # If the exact TD bytes are absent in synthetic tests, report UNKNOWN,
+    # never assert that there was no competing M15 release.
+    td_cad_confirmed = td_same_minute["state"] == TD_SAME_MINUTE_CAD_DOCUMENTARY
+    other_m15 = (competing.get("candidate_competing_roots_by_reaction_window")
+                 or {}).get("M15")
+    combined_m15 = (sorted(set(other_m15 or [])
+                           | {"CAD_MANUFACTURING_SALES_SEP2026"})
+                    if td_cad_confirmed else None)
+
     out = _blocked("ONE_UNATTESTED_EVENT_NOT_A_PREDICTIVE_SAMPLE",
                    "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
     out["source_stage_states"] = stages
@@ -273,6 +293,15 @@ def inspect_ppi_one_event_study_lab(
             "candidate_other_root_count": competing["candidate_competing_root_count_documentary"],
             "candidate_other_roots_in_baseline": competing["candidate_baseline_contamination_roots_documentary"],
             "candidate_other_roots_by_window": competing["candidate_competing_roots_by_reaction_window"],
+            "td_same_minute_cad_source_gate_state": td_same_minute["state"],
+            "td_additional_cad_root_from_pinned_original": (
+                "CAD_MANUFACTURING_SALES_SEP2026" if td_cad_confirmed else None),
+            "td_seven_cad_currency_pairs_exposed_documentary": (
+                td_same_minute["cad_pairs_exposed_to_cad_release"]
+                if td_cad_confirmed else None),
+            "cross_source_candidate_other_roots_in_m15": combined_m15,
+            "cross_source_m15_empty_calendar_proven": False,
+            "ppi_exclusive_usdcad_causality_proven": False,
             "source_and_event_times_independently_verified": False,
             "ppi_causal_isolation_verified": False,
             "no_competing_events_proven": False,

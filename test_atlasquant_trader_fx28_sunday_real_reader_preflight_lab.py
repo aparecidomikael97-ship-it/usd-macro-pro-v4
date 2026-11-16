@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import Mock
 import unittest
 
 from atlasquant_trader_fx28_single_readiness_panel_lab import (
@@ -29,6 +30,17 @@ from test_atlasquant_trader_fx28_eight_policy_raw_source_join_lab import (
 )
 from test_atlasquant_trader_nzd_rbnz_ocr_decision_article_lab import (
     page, receipt as article_receipt,
+)
+from atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
+    capture_oct2026_bls_original_once_lab as capture_ppi,
+)
+from test_atlasquant_trader_us_ppi_oct2026_original_capture_lab import (
+    MockResponse as SyntheticPpiResponse,
+    START as PPI_CAPTURE_START,
+    FINISH as PPI_CAPTURE_FINISH,
+)
+from test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
+    raw as synthetic_ppi_html,
 )
 
 UTC = timezone.utc
@@ -205,6 +217,71 @@ class SundayRealReaderPreflightTests(unittest.TestCase):
         self.assertEqual(r["pairs_with_both_policy_documents"],15)
         self.assertIsNone(r["directional_bias"])
         self.assertFalse(r["trade_authorized"])
+
+
+    def _capture_synthetic_ppi(self, td: str) -> dict:
+        """True disk capture/replay API with an injected synthetic BLS reply."""
+        body=synthetic_ppi_html(head="0.3",core="0.3",extra="0.5")
+        response=Mock(return_value=SyntheticPpiResponse(body=body))
+        result=capture_ppi(
+            allow_one_get=True,
+            local_appdata=td,
+            open_url=response,
+            clock=Mock(side_effect=[PPI_CAPTURE_START,PPI_CAPTURE_FINISH]),
+        )
+        response.assert_called_once()
+        self.assertTrue(result["raw_bytes_and_receipt_replayed"])
+        self.assertTrue(result["ppi_can_feed_research_only"])
+        self.assertFalse(result["ppi_can_feed_fx28_directional_model"])
+        self.assertEqual(
+            [r["actual_pct_local_documentary_claim"]
+             for r in result["documentary_series"]],["0.3","0.3","0.5"])
+        return result
+
+    def test_11_true_source_to_panel_ppi_optional_replay_never_issues_bias(self):
+        """No mocks across policy archive, actual PPI bytes, factor gate or panel."""
+        with TemporaryDirectory() as td:
+            synth_folder(td)
+            ppi=self._capture_synthetic_ppi(td)
+            archive=ppi["archive_directory_basename"]
+            default=self.ready(td)
+            enabled=panel(
+                local_appdata=td,inspected_at_utc=SUNDAY_PREFLIGHT,
+                ppi_archive_basename=archive,
+            )
+        self.safe(enabled)
+        self.assertEqual(
+            enabled["state"],"LAB_FX28_SINGLE_READINESS_PANEL_RECONCILED_NO_GO")
+        self.assertFalse(default["ppi_original_local_replayed_for_context"])
+        self.assertEqual(default["factors_with_any_relevant_local_document"],6)
+        self.assertTrue(enabled["ppi_original_local_replayed_for_context"])
+        self.assertFalse(enabled["cpi_original_local_replayed_for_context"])
+        # Six monetary documents plus ONE USD inflation slot (not 7 USD pairs).
+        self.assertEqual(enabled["factors_with_any_relevant_local_document"],7)
+        self.assertEqual(enabled["issuer_policy_document_count"],6)
+        self.assertEqual(enabled["slots_accounted"],672)
+        self.assertIsNone(enabled["directional_bias"])
+        self.assertIsNone(enabled["calibrated_probability"])
+        self.assertFalse(enabled["trade_authorized"])
+
+    def test_12_true_disk_tamper_after_valid_ppi_capture_blocks_optional_panel(self):
+        """Hash mismatch must not silently fall back to no-PPI dashboard."""
+        with TemporaryDirectory() as td:
+            synth_folder(td)
+            ppi=self._capture_synthetic_ppi(td)
+            archive=ppi["archive_directory_basename"]
+            folder=(Path(td)/"AtlasQuant"/"LAB"/"official_macro_receipts"/archive)
+            source=folder/"original.html"
+            source.write_bytes(source.read_bytes()+b"adversarial-byte")
+            invalid=panel(
+                local_appdata=td,inspected_at_utc=SUNDAY_PREFLIGHT,
+                ppi_archive_basename=archive,
+            )
+        self.safe(invalid)
+        self.assertEqual(invalid["state"],
+                         "LAB_FX28_SINGLE_READINESS_PANEL_BLOCKED_NO_GO")
+        self.assertFalse(invalid["ppi_original_local_replayed_for_context"])
+        self.assertEqual(invalid["slots_accounted"],0)
 
 
 if __name__=="__main__":

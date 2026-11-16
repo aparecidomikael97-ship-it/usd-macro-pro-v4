@@ -502,5 +502,83 @@ class Fx28ExperimentalAggregationTests(unittest.TestCase):
         self.assertFalse(first["trade_authorized"])
 
 
+    def test_33_same_original_usd_policy_and_inflation_alias_rejected(self):
+        factors=samples(values={"USD":90})
+        base=next(x for x in factors if x.currency=="USD"
+                  and x.category=="policy_expectations")
+        i=next(i for i,x in enumerate(factors)
+               if x.currency=="USD" and x.category=="inflation_impact")
+        factors[i]=replace(factors[i],
+                            source_sha256_claim=base.source_sha256_claim)
+        out=self.blocked(inputs=factors)
+        self.assertEqual(out["reason"],
+            "SAME_ORIGINAL_SHA_RELABELED_ACROSS_CATEGORIES_OR_CAPTURES")
+        self.assertEqual(out["hypothetical_labeled_pair_count"],0)
+
+    def test_34_same_original_eur_activity_vs_usd_inflation_alias_rejected(self):
+        factors=samples(values={"EUR":80,"USD":-80})
+        usd=next(x for x in factors if x.currency=="USD"
+                 and x.category=="inflation_impact")
+        i=next(i for i,x in enumerate(factors)
+               if x.currency=="EUR" and x.category=="activity_impact")
+        factors[i]=replace(factors[i],
+                            source_sha256_claim=usd.source_sha256_claim)
+        out=self.blocked(inputs=factors)
+        self.assertEqual(out["reason"],
+            "SAME_ORIGINAL_SHA_RELABELED_ACROSS_CATEGORIES_OR_CAPTURES")
+        self.assertIsNone(out["calibrated_probability"])
+
+    def test_35_same_original_different_capture_clock_not_new_event(self):
+        factors=samples()
+        usd=next(x for x in factors if x.currency=="USD"
+                 and x.category=="inflation_impact")
+        i=next(i for i,x in enumerate(factors)
+               if x.currency=="EUR" and x.category=="inflation_impact")
+        factors[i]=replace(
+            factors[i],source_sha256_claim=usd.source_sha256_claim,
+            source_locally_captured_at_utc=
+                usd.source_locally_captured_at_utc+timedelta(minutes=1))
+        out=self.blocked(inputs=factors)
+        self.assertEqual(out["reason"],
+            "SAME_ORIGINAL_SHA_RELABELED_ACROSS_CATEGORIES_OR_CAPTURES")
+
+    def test_36_cross_category_alias_rejection_is_input_order_invariant(self):
+        factors=samples(values={"EUR":90,"JPY":-90})
+        usd=next(x for x in factors if x.currency=="USD"
+                 and x.category=="inflation_impact")
+        i=next(i for i,x in enumerate(factors)
+               if x.currency=="JPY" and x.category=="labor_impact")
+        factors[i]=replace(factors[i],
+                            source_sha256_claim=usd.source_sha256_claim)
+        original=self.blocked(inputs=factors)
+        reversed_out=self.blocked(inputs=list(reversed(factors)))
+        self.assertEqual(original,reversed_out)
+        self.assertEqual(original["reason"],
+            "SAME_ORIGINAL_SHA_RELABELED_ACROSS_CATEGORIES_OR_CAPTURES")
+
+    def test_37_same_root_different_categories_also_remains_rejected(self):
+        factors=samples()
+        first=next(x for x in factors if x.currency=="USD"
+                   and x.category=="inflation_impact")
+        i=next(i for i,x in enumerate(factors)
+               if x.currency=="EUR" and x.category=="activity_impact")
+        factors[i]=replace(
+            factors[i],event_root_id=first.event_root_id,
+            source_sha256_claim=first.source_sha256_claim)
+        out=self.blocked(inputs=factors)
+        self.assertEqual(out["reason"],
+            "REUSED_CATALYST_NOT_AN_INDEPENDENT_MACRO_FACTOR")
+
+    def test_38_independent_digests_do_not_modify_existing_research_math(self):
+        r=self.execute(inputs=samples(values={"EUR":80,"USD":-50}))
+        self.safe(r)
+        self.assertEqual(r["state"],
+            "LAB_FX28_HYPOTHETICAL_MACRO_SCORE_COHERENT_NO_GO")
+        self.assertEqual(r["hypothetical_labeled_pair_count"],13)
+        self.assertIsNone(r["calibrated_probability"])
+        self.assertFalse(r["trade_authorized"])
+        self.assertEqual(len(r["model_contract_sha256"]),64)
+
+
 if __name__=="__main__":
     unittest.main()

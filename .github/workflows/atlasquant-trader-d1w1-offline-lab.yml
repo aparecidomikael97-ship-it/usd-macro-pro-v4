@@ -108,6 +108,8 @@ jobs:
             atlasquant_trader_gbp_boe_bank_rate_manual_capture_lab.py \
             atlasquant_trader_jpy_boj_guideline_source_receipt_lab.py \
             atlasquant_trader_jpy_boj_guideline_manual_capture_lab.py \
+            atlasquant_trader_jpy_boj_rejected_home_quarantine_lab.py \
+            atlasquant_trader_jpy_boj_one_attempt_diagnostic_runner_lab.py \
             atlasquant_trader_chf_snb_current_policy_receipt_lab.py \
             atlasquant_trader_chf_snb_current_policy_manual_capture_lab.py \
             atlasquant_trader_aud_rba_cash_target_receipt_lab.py \
@@ -130,14 +132,23 @@ jobs:
             atlasquant_trader_fx28_eight_policy_raw_source_join_lab.py \
             atlasquant_trader_fx28_policy_local_archive_replay_lab.py \
             atlasquant_trader_fx28_policy_why_wait_matrix_lab.py \
+            atlasquant_trader_fx28_historical_release_overlay_lab.py \
+            atlasquant_trader_jpy_boj_release_cycle_expiry_lab.py \
+            atlasquant_trader_fx28_staged_bundle_integrity_lab.py \
             atlasquant_trader_fx28_five_bank_capture_once_lab.py \
             atlasquant_trader_fx28_28pair_source_readiness_manual_lab.py \
             atlasquant_trader_fx28_policy_ppi_unified_readiness_lab.py \
             atlasquant_trader_fx28_pre_window_source_gate_lab.py \
+            atlasquant_trader_fx28_preflight_actual_run_temporal_audit_lab.py \
             atlasquant_trader_fx28_pre_window_32_factor_source_veto_lab.py \
             atlasquant_trader_fx28_source_lineage_lab.py \
             atlasquant_trader_fx28_macro_relative_score_prototype_lab.py \
+            atlasquant_trader_fx28_672_scoring_protocol_lab.py \
             atlasquant_trader_fx28_32_factor_source_admission_lab.py \
+            atlasquant_trader_fx28_macro_source_to_bias_firewall_lab.py \
+            atlasquant_trader_fx28_macro_event_surprise_reaction_contract_lab.py \
+            atlasquant_trader_fx28_ppi_to_generic_event_bridge_lab.py \
+            atlasquant_trader_fx28_macro_oos_event_cluster_ledger_lab.py \
             atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab.py \
             atlasquant_trader_fx28_policy_local_archive_manual_audit_lab.py \
             atlasquant_trader_bls_cpi_u_official_bytes_readonly_lab.py \
@@ -153,15 +164,42 @@ jobs:
             atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab.py \
             atlasquant_trader_us_ppi_oct2026_macro_context_lab.py \
             atlasquant_trader_us_ppi_oct2026_original_capture_lab.py \
+            atlasquant_trader_us_cpi_ppi_pit_visibility_cutoff_lab.py \
             atlasquant_trader_ppi_usd_fx_forward_reaction_lab.py \
             atlasquant_trader_ppi_m15_spread_context_lab.py \
             atlasquant_trader_ppi_one_event_study_join_lab.py \
             atlasquant_trader_ppi_pre_event_protocol_lab.py \
             atlasquant_trader_ppi_fx_breadth_lab.py \
             atlasquant_trader_ppi_competing_calendar_lab.py \
+            atlasquant_trader_ppi_td_same_minute_fx28_guard_lab.py \
             atlasquant_trader_ppi_official_schedule_archive_lab.py \
             atlasquant_trader_ppi_preflight_lab.py \
             atlasquant_trader_ppi_mt5_m15_capture_lab.py \
+            atlasquant_trader_ppi7_m15_closed_observation_lab.py \
+            atlasquant_trader_fx28_ny17_m15_writeonce_capture_lab.py \
+            atlasquant_trader_fx28_m15_semantic_postcheck_lab.py \
+            atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab.py \
+            atlasquant_trader_fx28_first_m15_archive_census_readonly_lab.py \
+            atlasquant_trader_fx28_first_m15_672_slot_outcome_quarantine_lab.py \
+            atlasquant_trader_fx28_sunday_open_research_protocol_lab.py \
+            atlasquant_trader_fx28_sunday_open_poll_bracket_contract_lab.py \
+            atlasquant_trader_fx28_sunday_open_external_witness_contract_lab.py \
+            atlasquant_trader_fx28_sunday_open_github_rest_inventory_lab.py \
+            atlasquant_trader_fx28_sunday_server_utc_discrepancy_guard_lab.py \
+            atlasquant_trader_fx28_sunday_tick_m15_utc_pair_guard_lab.py \
+            atlasquant_trader_fx28_sunday_mt5_raw_time_adapter_lab.py \
+            atlasquant_trader_fx28_672_temporal_scoring_firewall_lab.py \
+            atlasquant_trader_radar_compact_ui.py \
+            atlasquant_trader_fx28_temporal_radar_runtime_binding_lab.py \
+            atlasquant_trader_fx28_signed_status_envelope_lab.py \
+            atlasquant_trader_fx28_durable_replay_floor_sqlite_lab.py \
+            atlasquant_trader_fx28_external_replay_anchor_guard_lab.py \
+            atlasquant_reference_ui.py \
+            atlasquant_trader_fx28_first_m15_atomic_claim_lab.py \
+            atlasquant_trader_fx28_first_m15_claimed_driver_lab.py \
+            atlasquant_trader_fx28_first_m15_claimed_cli_lab.py \
+            atlasquant_trader_fx28_first_m15_scheduler_guard_lab.py \
+            atlasquant_trader_fx28_precommit_roster_archive_lab.py \
             atlasquant_trader_ppi7_mt5_real_history_preflight_lab.py \
             atlasquant_trader_ppi7_mt5_bidask_tick_preflight_lab.py \
             atlasquant_trader_ppi7_mt5_pre_post_event_bidask_lab.py \
@@ -240,6 +278,8 @@ jobs:
             test_atlasquant_trader_us_fed_board_target_range_receipt_lab \
             test_atlasquant_trader_gbp_boe_bank_rate_history_receipt_lab \
             test_atlasquant_trader_jpy_boj_guideline_source_receipt_lab \
+            test_atlasquant_trader_jpy_boj_rejected_home_quarantine_lab \
+            test_atlasquant_trader_jpy_boj_one_attempt_diagnostic_runner_lab \
             test_atlasquant_trader_chf_snb_current_policy_receipt_lab \
             test_atlasquant_trader_aud_rba_cash_target_receipt_lab \
             test_atlasquant_trader_nzd_rbnz_ocr_receipt_lab \
@@ -262,15 +302,24 @@ jobs:
             test_atlasquant_trader_fx28_eight_policy_raw_source_join_lab \
             test_atlasquant_trader_fx28_policy_local_archive_replay_lab \
             test_atlasquant_trader_fx28_policy_why_wait_matrix_lab \
+            test_atlasquant_trader_fx28_historical_release_overlay_lab \
+            test_atlasquant_trader_jpy_boj_release_cycle_expiry_lab \
+            test_atlasquant_trader_fx28_staged_bundle_integrity_lab \
             test_atlasquant_trader_fx28_five_bank_capture_once_lab \
             test_atlasquant_trader_fx28_28pair_source_readiness_manual_lab \
             test_atlasquant_trader_fx28_28pair_real_archive_e2e_lab \
             test_atlasquant_trader_fx28_policy_ppi_unified_readiness_lab \
             test_atlasquant_trader_fx28_pre_window_source_gate_lab \
+            test_atlasquant_trader_fx28_preflight_actual_run_temporal_audit_lab \
             test_atlasquant_trader_fx28_pre_window_32_factor_source_veto_lab \
             test_atlasquant_trader_fx28_source_lineage_lab \
             test_atlasquant_trader_fx28_macro_relative_score_prototype_lab \
+            test_atlasquant_trader_fx28_672_scoring_protocol_lab \
             test_atlasquant_trader_fx28_32_factor_source_admission_lab \
+            test_atlasquant_trader_fx28_macro_source_to_bias_firewall_lab \
+            test_atlasquant_trader_fx28_macro_event_surprise_reaction_contract_lab \
+            test_atlasquant_trader_fx28_ppi_to_generic_event_bridge_lab \
+            test_atlasquant_trader_fx28_macro_oos_event_cluster_ledger_lab \
             test_atlasquant_trader_us_bls_cpi_u_nsa_mom_capture_lab \
             test_atlasquant_trader_bls_cpi_u_official_bytes_readonly_lab \
             test_atlasquant_trader_bls_cpi_u_capture_receipt_lab \
@@ -291,9 +340,35 @@ jobs:
             test_atlasquant_trader_ppi_pre_event_protocol_lab \
             test_atlasquant_trader_ppi_fx_breadth_lab \
             test_atlasquant_trader_ppi_competing_calendar_lab \
+            test_atlasquant_trader_ppi_td_same_minute_fx28_guard_lab \
             test_atlasquant_trader_ppi_official_schedule_archive_lab \
             test_atlasquant_trader_ppi_preflight_lab \
             test_atlasquant_trader_ppi_mt5_m15_capture_lab \
+            test_atlasquant_trader_ppi7_m15_closed_observation_lab \
+            test_atlasquant_trader_fx28_ny17_m15_writeonce_capture_lab \
+            test_atlasquant_trader_fx28_m15_semantic_postcheck_lab \
+            test_atlasquant_trader_fx28_first_m15_no_duplicate_precheck_lab \
+            test_atlasquant_trader_fx28_first_m15_archive_census_readonly_lab \
+            test_atlasquant_trader_fx28_first_m15_672_slot_outcome_quarantine_lab \
+            test_atlasquant_trader_fx28_sunday_open_research_protocol_lab \
+            test_atlasquant_trader_fx28_sunday_open_poll_bracket_contract_lab \
+            test_atlasquant_trader_fx28_sunday_open_external_witness_contract_lab \
+            test_atlasquant_trader_fx28_sunday_open_github_rest_inventory_lab \
+            test_atlasquant_trader_fx28_sunday_server_utc_discrepancy_guard_lab \
+            test_atlasquant_trader_fx28_sunday_tick_m15_utc_pair_guard_lab \
+            test_atlasquant_trader_fx28_sunday_mt5_raw_time_adapter_lab \
+            test_atlasquant_trader_fx28_672_temporal_scoring_firewall_lab \
+            test_atlasquant_trader_radar_temporal_integrity_ui_lab \
+            test_atlasquant_trader_fx28_temporal_radar_runtime_binding_lab \
+            test_atlasquant_trader_fx28_signed_status_envelope_lab \
+            test_atlasquant_trader_fx28_durable_replay_floor_sqlite_lab \
+            test_atlasquant_trader_fx28_external_replay_anchor_guard_lab \
+            test_atlasquant_trader_us_cpi_ppi_pit_visibility_cutoff_lab \
+            test_atlasquant_trader_fx28_first_m15_atomic_claim_lab \
+            test_atlasquant_trader_fx28_first_m15_claimed_driver_lab \
+            test_atlasquant_trader_fx28_first_m15_claimed_cli_lab \
+            test_atlasquant_trader_fx28_first_m15_scheduler_guard_lab \
+            test_atlasquant_trader_fx28_precommit_roster_archive_lab \
             test_atlasquant_trader_ppi7_mt5_real_history_preflight_lab \
             test_atlasquant_trader_ppi7_mt5_bidask_tick_preflight_lab \
             test_atlasquant_trader_ppi7_mt5_pre_post_event_bidask_lab \

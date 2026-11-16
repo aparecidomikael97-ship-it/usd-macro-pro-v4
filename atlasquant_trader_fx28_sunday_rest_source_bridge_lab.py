@@ -39,6 +39,9 @@ from atlasquant_trader_fx28_ny17_672_slot_issuance_ledger_lab import (
 from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     FROZEN_START_UTC, EXPECTED_PAIR_HORIZON_SLOTS, _nominal_windows,
 )
+from atlasquant_trader_fx28_672_scoring_protocol_lab import (
+    COVERAGE_SCHEMA, inspect_fx28_672_two_axis_coverage_lab,
+)
 
 SCHEMA = "ATLASQUANT_FX28_SUNDAY_GITHUB_REST_LEDGER_SOURCE_BRIDGE_LAB_V1"
 MAX_REST_SNAPSHOT_AGE = timedelta(minutes=10)
@@ -103,6 +106,12 @@ def _blocked(reason: str) -> dict[str, Any]:
         "ledger_slots_accounted": 0,
         "ledger_future_no_supplied_witness": None,
         "ledger_past_no_supplied_witness": None,
+        "coverage_two_axis_nominal_census_reconciled": False,
+        "coverage_forecast_unknown_no_authenticated_roster": None,
+        "coverage_price_not_yet_labelable_by_clock": None,
+        "coverage_price_closed_but_without_verified_source": None,
+        "coverage_missing_input_never_promoted_to_not_issued": True,
+        "rest_metadata_never_promoted_to_directional_forecast": True,
         "no_supplied_witness_never_proves_github_absence": True,
         "prewindow_absence_is_not_missing_forecast_yet": True,
         "all_56_first_window_forecasts_authenticated": False,
@@ -154,6 +163,52 @@ def inspect_sunday_fx28_cross_source_preflight_lab(
         out["reason"] = "FROZEN_672_LEDGER_FAILED_OR_INCONSISTENT"
         return out
 
+    # Independently rebuild the frozen census on TWO axes. Even one or
+    # two structurally eligible GitHub headers are NOT canonical roster
+    # bytes: do not inject them as directional forecasts here.
+    coverage = inspect_fx28_672_two_axis_coverage_lab(
+        as_of_utc=now, supplied_slot_claims=())
+    cohorts = coverage.get("per_horizon")
+    if (coverage.get("schema") != COVERAGE_SCHEMA
+            or coverage.get("state") !=
+               "LAB_FX28_672_TWO_AXIS_COVERAGE_CLAIM_ONLY_NO_GO"
+            or coverage.get("all_slots_accounted") is not True
+            or type(cohorts) is not dict
+            or set(cohorts) != {"D1", "W1"}
+            or cohorts["D1"].get("slots") != 560
+            or cohorts["W1"].get("slots") != 112
+            or sum(x.get("forecast_unknown_no_supplied_evidence", -999)
+                   for x in cohorts.values()) != 672
+            or sum(x.get("forecast_not_issued_claim_only", -999)
+                   for x in cohorts.values()) != 0
+            or sum(x.get("forecast_directional_claim_only", -999)
+                   for x in cohorts.values()) != 0
+            or sum(x.get("forecast_abstain_claim_only", -999)
+                   for x in cohorts.values()) != 0
+            or sum(x.get("not_started", -999)
+                   for x in cohorts.values()) != ledger["not_yet_due_slots"]
+            or sum(x.get("window_open", -999)
+                   + x.get("window_closed", -999)
+                   for x in cohorts.values()) !=
+               ledger["not_issued_before_window_slots"]
+            or sum(x.get("price_not_yet_labelable_by_clock", -999)
+                   for x in cohorts.values()) != sum(
+                   x.get("not_started", -999) + x.get("window_open", -999)
+                   for x in cohorts.values())
+            or sum(x.get("price_unknown_no_supplied_evidence", -999)
+                   for x in cohorts.values()) != sum(
+                   x.get("window_closed", -999) for x in cohorts.values())):
+        out["reason"] = "TWO_AXIS_COVERAGE_DISAGREES_WITH_FROZEN_672_LEDGER"
+        return out
+
+    out.update({
+        "coverage_two_axis_nominal_census_reconciled": True,
+        "coverage_forecast_unknown_no_authenticated_roster": 672,
+        "coverage_price_not_yet_labelable_by_clock": sum(
+            x["price_not_yet_labelable_by_clock"] for x in cohorts.values()),
+        "coverage_price_closed_but_without_verified_source": sum(
+            x["price_unknown_no_supplied_evidence"] for x in cohorts.values()),
+    })
     first_due = 56 if now >= FROZEN_START_UTC else 0
     first_future = 56-first_due
     out.update({

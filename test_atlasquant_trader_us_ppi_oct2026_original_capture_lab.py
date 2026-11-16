@@ -381,6 +381,17 @@ class BLSOriginalPpiCaptureTests(unittest.TestCase):
         self.assertEqual(report["source_file_writes_attempted"],0)
         self.assertEqual(report["documentary_series_count"],0)
         self.assertFalse((Path(self.temp.name)/"AtlasQuant").exists())
+        # A rejected BLS table may expose safe structural metadata,
+        # but NEVER economic values from unvalidated source rows.
+        shapes = report.get("table1_selected_row_shape_diagnostic")
+        self.assertIsInstance(shapes, list)
+        self.assertGreater(len(shapes), 0)
+        for row in shapes:
+            self.assertEqual(set(row), {
+                "row_label_prefix", "group_code", "item_code",
+                "physical_columns",
+            })
+            self.assertNotIn("last_two_columns", row)
 
     def test_24_repeated_fd49116_row_is_ambiguous_and_blocks(self):
         original=raw()
@@ -436,6 +447,30 @@ class BLSOriginalPpiCaptureTests(unittest.TestCase):
         self.safe(report)
         self.assertEqual(report["documentary_series_count"],0)
         self.assertEqual(report["capture_get_attempts"],0)
+
+
+    def test_29_pr_updates_validate_offline_without_automatic_bls_get(self):
+        """Workflow PR events must not silently repeat external BLS capture."""
+        workflow = (
+            Path(__file__).resolve().parent / ".github" / "workflows" /
+            "atlasquant-trader-bls-ppi-oct2026-original-once-lab.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("  pull_request:", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
+        fetch_step = workflow.split(
+            "      - name: Exactly one official post-event BLS HTML GET and verified local replay",
+            1,
+        )[1].split("      - name: Preserve ORIGINAL", 1)[0]
+        self.assertIn("if: github.event_name == 'workflow_dispatch'", fetch_step)
+        self.assertIn("id: source", fetch_step)
+        upload_step = workflow.split(
+            "      - name: Preserve ORIGINAL BLS bytes plus post-event SHA/UTC receipt for research",
+            1,
+        )[1]
+        self.assertIn(
+            "if: github.event_name == 'workflow_dispatch' && steps.source.outcome == 'success'",
+            upload_step,
+        )
 
 
 if __name__=="__main__":

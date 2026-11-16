@@ -219,6 +219,41 @@ class OneEventStudyJoinTests(unittest.TestCase):
             "SEVEN_FX_USD_NORMALIZED_BREADTH",
             "PRE_EVENT_CONCURRENT_MACRO_CALENDAR"})
 
+    def test_td_cad_co_release_is_added_to_m15_without_undoing_no_go(self):
+        # A deliberate synthetic stub for the already separately tested
+        # exact-SHA TD reader. No copyrighted original HTML in CI.
+        cad_pairs = ["USD/CAD", "EUR/CAD", "GBP/CAD", "AUD/CAD",
+                     "NZD/CAD", "CAD/JPY", "CAD/CHF"]
+        with self.isolated_synthetic_pre_event_receipts():
+            with patch(
+                "atlasquant_trader_ppi_one_event_study_join_lab.inspect_ppi_td_same_minute_fx28_lab",
+                return_value={
+                    "state": "LAB_PPI_TD_CAD_SAME_MINUTE_DOCUMENTARY_CONFOUNDER_NO_GO",
+                    "cad_pairs_exposed_to_cad_release": cad_pairs,
+                },
+            ):
+                report = self.run_study()
+        self.assertEqual(report["state"],
+                         "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
+        context = report["one_event_study"]["competing_macro_calendar_context_documentary"]
+        self.assertIsNone(context["candidate_other_root_count"])
+        self.assertEqual(context["cross_source_candidate_other_roots_in_m15"],
+                         ["CAD_MANUFACTURING_SALES_SEP2026"])
+        self.assertEqual(context["td_seven_cad_currency_pairs_exposed_documentary"],
+                         cad_pairs)
+        self.assertFalse(context["cross_source_m15_empty_calendar_proven"])
+        self.assertFalse(context["ppi_exclusive_usdcad_causality_proven"])
+        self.assertEqual(report["independent_directional_trials_verified"], 0)
+
+    def test_unpinned_td_co_release_stays_unknown_not_zero_competing(self):
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        context = report["one_event_study"]["competing_macro_calendar_context_documentary"]
+        self.assertEqual(context["td_same_minute_cad_source_gate_state"],
+                         "LAB_PPI_TD_CO_RELEASE_SOURCE_BLOCKED_NO_GO")
+        self.assertIsNone(context["cross_source_candidate_other_roots_in_m15"])
+        self.assertFalse(context["cross_source_m15_empty_calendar_proven"])
+        self.assertFalse(report["trade_authorized"])
     def test_post_hoc_protocol_direction_flip_blocks_seven_pair_study(self):
         from atlasquant_trader_ppi_pre_event_protocol_lab import FROZEN_PROTOCOL
         with patch.dict(FROZEN_PROTOCOL, {"pre_event_research_direction": "USD_UP"}):

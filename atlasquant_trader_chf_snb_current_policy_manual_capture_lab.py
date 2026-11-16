@@ -54,27 +54,64 @@ def collect_snb_current_policy_once_lab(
 def save_snb_policy_public_bytes_lab(
     *, body:bytes,receipt:dict[str,Any],local_appdata:str,
 )->tuple[Path,Path]:
-    if not local_appdata or not Path(local_appdata).is_absolute():
-        raise ValueError("LOCALAPPDATA_ROOT_MUST_BE_ABSOLUTE")
-    root=(Path(local_appdata)/"AtlasQuant"/"LAB").resolve()
-    source_folder=root/"official_macro_receipts"
-    if source_folder.is_symlink():
-        raise ValueError("SOURCE_FOLDER_IS_SYMLINK")
-    folder=source_folder.resolve()
-    if not folder.is_relative_to(root):
+    # This function is also public to callers: validate the ACTUAL bytes
+    # and receipt before creating a directory or accepting a source.
+    if (type(local_appdata) is not str or not local_appdata
+            or not Path(local_appdata).is_absolute()
+            or Path(local_appdata).is_symlink()
+            or type(body) is not bytes or type(receipt) is not dict):
+        raise ValueError("LOCALAPPDATA_OR_ORIGINAL_SOURCE_INVALID")
+    try:
+        finished=datetime.strptime(
+            receipt["finished_at_utc"],"%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+    except (KeyError,TypeError,ValueError,OverflowError):
+        raise ValueError("SNB_SOURCE_CAPTURE_CLOCK_INVALID") from None
+    checked=inspect_snb_current_policy_receipt_lab(
+        original_html=body,receipt=receipt,decision_at_utc=finished)
+    if (checked.get("state") !=
+            "LAB_CHF_SNB_CURRENT_POLICY_HTML_LOCALLY_CHECKED_NO_GO"
+            or checked.get("original_html_sha256_locally_matching") is not True
+            or checked.get("http_transport_claim_locally_consistent") is not True):
+        raise ValueError("SNB_SOURCE_BYTES_OR_RECEIPT_NOT_VALIDATED")
+
+    root=Path(local_appdata)
+    atlas=root/"AtlasQuant"
+    lab=atlas/"LAB"
+    folder=lab/"official_macro_receipts"
+    if any(p.is_symlink() for p in (atlas,lab,folder)):
+        raise ValueError("ISOLATED_LAB_DIRECTORY_SYMLINK_REFUSED")
+    if not folder.resolve(strict=False).is_relative_to(
+            root.resolve(strict=False)):
         raise ValueError("SOURCE_FOLDER_ESCAPES_ISOLATED_LAB")
-    folder.mkdir(parents=True,exist_ok=True)
     stamp=receipt["finished_at_utc"].replace("-","").replace(":","")
     stem=f"CHF_SNB_CURRENT_POLICY_{stamp}_{receipt['body_sha256'][:12]}"
     orig=folder/(stem+".html")
     meta=folder/(stem+".receipt.json")
-    if orig.exists() or meta.exists():
+    if (orig.exists() or orig.is_symlink()
+            or meta.exists() or meta.is_symlink()):
         raise FileExistsError("CAPTURE_ALREADY_EXISTS")
-    with orig.open("xb") as file:
-        file.write(body)
-    with meta.open("xb") as file:
-        file.write(
-            (json.dumps(receipt,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+    receipt_bytes=(json.dumps(receipt,sort_keys=True,indent=2)+"\n").encode("utf-8")
+    folder.mkdir(parents=True,exist_ok=True)
+    original_created=False
+    receipt_created=False
+    try:
+        with orig.open("xb") as file:
+            original_created=True
+            file.write(body)
+        with meta.open("xb") as file:
+            receipt_created=True
+            file.write(receipt_bytes)
+        if orig.read_bytes()!=body or meta.read_bytes()!=receipt_bytes:
+            raise OSError("LOCAL_SNB_ARCHIVE_READBACK_FAILED")
+    except Exception:
+        # Never leave a half-paired archive behind when the second create,
+        # write, or readback fails. Never delete pre-existing artifacts.
+        if receipt_created and meta.is_file() and not meta.is_symlink():
+            meta.unlink()
+        if original_created and orig.is_file() and not orig.is_symlink():
+            orig.unlink()
+        raise
     return orig,meta
 
 def main()->int:
