@@ -29,6 +29,7 @@ from atlasquant_trader_us_dec2026_consensus_original_one_get_lab import (
     _ROOT as _ARCHIVE_FILENAME,
     _source_claim,
     _unique_json_pairs,
+    _reconcile,
     replay_dec2026_one_get_original_lab,
 )
 from atlasquant_trader_us_dec2026_pre_event_consensus_custody_lab import (
@@ -155,14 +156,24 @@ def replay_dec2026_archives_to_semantic_candidates_lab(
                     or proof["provider"]!=s.provider
                     or proof["trade_authorized"] is not False):
                 return _blocked("PHYSICAL_ORIGINAL_SHA_RECEIPT_REPLAY_REJECTED")
-            receipt=json.loads(receipt_path.read_text(encoding="utf-8"),
-                               object_pairs_hook=_unique_json_pairs)
+            # The physical replay validated ONE pair of raw HTML/receipt
+            # snapshots. Bind the second read to BOTH exact hashes, not
+            # merely the HTML hash and two identity keys. Otherwise a receipt
+            # can be replaced between disk reads to launder changed HTTP or
+            # BLS-review metadata into provisional economic semantics.
+            receipt_bytes=receipt_path.read_bytes()
             body=html_path.read_bytes()
             if (sha256(body).hexdigest()!=proof["source_original_sha256"]
                     or len(body)!=proof["source_original_bytes"]
-                    or receipt["event_root"]!=s.event_root
-                    or receipt["provider"]!=s.provider):
-                return _blocked("REOPENED_ORIGINAL_BYTES_CHANGED_AFTER_REPLAY")
+                    or sha256(receipt_bytes).hexdigest()!=proof["source_receipt_sha256"]):
+                return _blocked("REOPENED_ORIGINAL_OR_RECEIPT_CHANGED_AFTER_REPLAY")
+            receipt=json.loads(receipt_bytes.decode("utf-8","strict"),
+                               object_pairs_hook=_unique_json_pairs)
+            if (receipt["event_root"]!=s.event_root
+                    or receipt["provider"]!=s.provider
+                    or receipt["finished_at_utc"]!=proof["local_receipt_finished_utc_claim"]
+                    or not _reconcile(body,receipt,cutoff=now)):
+                return _blocked("REOPENED_RECEIPT_CUSTODY_OR_EVENT_BINDING_REJECTED")
             original_claims.append(_source_claim(body,receipt))
         except (OSError, UnicodeError, ValueError, TypeError, KeyError,
                 OverflowError, RuntimeError):

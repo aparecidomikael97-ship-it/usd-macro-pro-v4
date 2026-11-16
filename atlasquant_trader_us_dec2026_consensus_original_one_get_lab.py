@@ -95,6 +95,7 @@ def _blocked(reason: str, *, get_attempts: int = 0) -> dict[str, Any]:
         "reason": reason, "http_get_attempts": get_attempts,
         "original_replayed_from_disk": False,
         "source_original_sha256": None,
+        "source_receipt_sha256": None,
         "source_original_bytes": None,
         "archive_basename": None,
         "event_root": None, "provider": None,
@@ -190,7 +191,11 @@ def replay_dec2026_one_get_original_lab(
                 or metadata.stat().st_size > 8192
                 or not 100 <= original.stat().st_size <= max(_MAX_BYTES.values())):
             return out
-        receipt=json.loads(metadata.read_text("utf-8"),
+        # Bind the semantic bridge to the EXACT receipt bytes replayed here.
+        # Re-serializing a parsed JSON dict would erase legitimate byte-level
+        # changes (whitespace, key ordering) between independent disk reads.
+        receipt_bytes=metadata.read_bytes()
+        receipt=json.loads(receipt_bytes.decode("utf-8","strict"),
                            object_pairs_hook=_unique_json_pairs)
         if type(receipt) is not dict:
             return out
@@ -210,6 +215,7 @@ def replay_dec2026_one_get_original_lab(
             "reason": "ORIGINAL_BYTES_AND_LOCAL_PRE_EVENT_CLAIM_VERIFIED_NOT_CONSENSUS",
             "original_replayed_from_disk": True,
             "source_original_sha256": sha256(raw).hexdigest(),
+            "source_receipt_sha256": sha256(receipt_bytes).hexdigest(),
             "source_original_bytes": len(raw),
             "archive_basename": archive_basename,
             "event_root": receipt["event_root"], "provider": receipt["provider"],
