@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           python -m py_compile atlasquant_trader_us_dec2026_bls_schedule_once_lab.py test_atlasquant_trader_us_dec2026_bls_schedule_once_lab.py
-      - name: Offline 17 adversarial tests with synthetic calendar pages
+      - name: Offline 19 adversarial tests with synthetic calendar pages
         shell: bash
         run: |
           python -m unittest -v test_atlasquant_trader_us_dec2026_bls_schedule_once_lab
