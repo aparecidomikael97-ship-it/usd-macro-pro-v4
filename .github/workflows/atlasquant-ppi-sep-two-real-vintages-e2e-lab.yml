@@ -1,0 +1,134 @@
+name: AtlasQuant Real PPI September Revision Vintage E2E LAB
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/atlasquant-ppi-sep-two-real-vintages-e2e-lab.yml"
+      - "atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab.py"
+      - "test_atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-sep-ppi-first-print-and-revision-from-real-bodies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout research branch (no persisted credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Offline syntax + 16 adversarial synthetic guards
+        shell: bash
+        run: |
+          python -m py_compile atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab.py test_atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab.py
+          python -m unittest -v test_atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab
+      - name: Reuse EXACT existing historic BLS Action ZIPs (no new BLS requests)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 0 --max-time 60 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -o "${RUNNER_TEMP}/bls_sep.zip" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/14192770992/zip"
+          curl --fail --silent --show-error --location --retry 0 --max-time 60 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -o "${RUNNER_TEMP}/bls_oct_ppi.zip" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/14120274042/zip"
+      - name: Verify official HTML original SHAs and two real September PPI vintages
+        shell: bash
+        env:
+          BLS_REAL_TMP: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          from datetime import timedelta
+          from hashlib import sha256
+          from pathlib import Path
+          from zipfile import ZipFile
+          import os
+          from atlasquant_trader_bls_four_real_originals_pit_replay_lab import ARCHIVES, PINS
+          from atlasquant_trader_us_ppi_sep2026_two_real_vintages_lab import (
+              SEP_CAPTURE, OCT_CAPTURE, inspect_real_ppi_sep2026_release_vintages_lab,
+          )
+          root = Path(os.environ["BLS_REAL_TMP"])
+          sources = {}
+          for name, archive_id in [("sep", "sep"), ("oct", "oct_ppi")]:
+              path = root / ("bls_" + name + ("" if name == "sep" else "_ppi") + ".zip")
+              data = path.read_bytes()
+              archive_name, expected_sha = ARCHIVES[archive_id]
+              assert sha256(data).hexdigest() == expected_sha, ("ZIP_SHA_MISMATCH", name)
+              with ZipFile(path) as z:
+                  assert z.testzip() is None, ("ZIP_CRC_BROKEN", name)
+                  pin = PINS["US_PPI_SEP2026" if name == "sep" else "US_PPI_OCT2026"]
+                  body = z.read(pin[1])
+                  receipt = z.read(pin[2])
+                  assert sha256(body).hexdigest() == pin[3], ("HTML_SHA_MISMATCH", name)
+                  assert sha256(receipt).hexdigest() == pin[4], ("RECEIPT_SHA_MISMATCH", name)
+                  sources[name] = body
+          cases = [
+              (OCT_CAPTURE - timedelta(microseconds=1), 0, False),
+              (OCT_CAPTURE, 1, False),
+              (SEP_CAPTURE - timedelta(microseconds=1), 1, False),
+              (SEP_CAPTURE, 2, True),
+          ]
+          for when, expected_count, complete in cases:
+              out = inspect_real_ppi_sep2026_release_vintages_lab(
+                  sep_original_html=sources["sep"],
+                  oct_original_html=sources["oct"],
+                  research_cutoff_utc=when,
+              )
+              assert out["originals_visible_at_local_cutoff"] == expected_count, (when, out)
+              assert out["trade_authorized"] is False
+              assert out["publishable"] is False
+              assert out["accuracy"] is None
+              assert out["bias_usd"] is None
+              assert out["independent_directional_fx_predictions"] == 0
+              assert out["fx28_672_slots_changed"] is False
+              if not complete:
+                  assert out["later_revision_minus_first_release_headline_pp"] is None
+              else:
+                  assert out["state"] == "LAB_PPI_SEP2026_TWO_REAL_VINTAGES_RECONCILED_NO_GO", out
+                  assert (
+                      out["sep_reported_sep2026_sa_mom_headline_pct"],
+                      out["oct_reported_revised_sep2026_sa_mom_headline_pct"],
+                      out["sep_reported_sep2026_sa_mom_core_ex_food_energy_pct"],
+                      out["oct_reported_revised_sep2026_sa_mom_core_ex_food_energy_pct"],
+                  ) == ("1.3", "1.4", "0.7", "0.8")
+                  assert out["later_revision_minus_first_release_headline_pp"] == "0.1"
+                  assert out["later_revision_minus_first_release_core_pp"] == "0.1"
+                  assert out["oct2026_actual_headline_sa_mom_pct"] == "0.3"
+                  assert out["oct2026_actual_core_ex_food_energy_sa_mom_pct"] == "0.3"
+                  assert out["original_first_print_time_independently_authenticated"] is False
+                  assert out["economic_consensus_pre_event_authenticated"] is False
+              print("REAL_PPI_SEP_VINTAGE_PIT:", when.isoformat(), "visible", expected_count,
+                    "complete", complete, "NO_GO")
+          changed = bytearray(sources["oct"])
+          changed[-1] ^= 1
+          rejected = inspect_real_ppi_sep2026_release_vintages_lab(
+              sep_original_html=sources["sep"],
+              oct_original_html=bytes(changed),
+              research_cutoff_utc=SEP_CAPTURE,
+          )
+          assert rejected["state"].endswith("_HARD_NO_GO")
+          assert rejected["later_revision_minus_first_release_headline_pp"] is None
+          print("SUCCESS: two SHA256-pinned real BLS originals, receipt pins, "
+                "four local PIT cutoffs and a corruption rejection; no forecast or trade")
+          PY
+
+# These are official PUBLIC POST-RELEASE HTML originals captured 14-16 Nov.
+# No pre-event provider consensus, no witness of first publication, no price,
+# no broker connection, no job artifact upload, no cron, no trade.
