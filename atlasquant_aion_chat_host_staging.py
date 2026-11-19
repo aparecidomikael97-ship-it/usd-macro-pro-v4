@@ -15,6 +15,7 @@ import re
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
+from aion_chat.staged_store import OperationScopedSQLiteChatStore
 from aion_chat.store import HEALTHY, SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_chat_product_bridge import validate_product_binding
 from atlasquant_aion_chat_storage_resilience import (
@@ -153,20 +154,22 @@ def close_all_staged_host_stores(session_state: Any) -> int:
         if str(key).startswith(_STORE_PREFIX)
     ]
     for key in keys:
-        holder = session_state.pop(key, None)
+        holder = session_state.get(key)
         if not isinstance(holder, Mapping):
             continue
         store = holder.get("store")
-        if isinstance(store, SQLiteChatStore):
+        if isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
             try:
                 store.close()
-            finally:
-                closed += 1
+            except Exception as exc:
+                raise StorageUnavailableError("staged store cleanup failed") from exc
+            closed += 1
+        session_state.pop(key, None)
     session_state.pop(_ACTIVE_SCOPE_KEY, None)
     return closed
 
 
-def _validate_live_store(store: SQLiteChatStore) -> dict[str, Any]:
+def _validate_live_store(store: OperationScopedSQLiteChatStore) -> dict[str, Any]:
     health = store.storage_health(deep=True)
     if health.get("state") != HEALTHY:
         try:
@@ -185,8 +188,8 @@ def get_or_create_staged_store(
     root: Path,
     *,
     session_binding_digest: str = "",
-) -> SQLiteChatStore:
-    """Keep one healthy local staging handle for the active authenticated scope."""
+) -> OperationScopedSQLiteChatStore:
+    """Cache a connection-free, revocable handle for the authenticated scope."""
     key = _holder_key(scope)
     expected = str(_store_path(scope, root))
     expected_binding = _clean(session_binding_digest, 64)
@@ -203,19 +206,21 @@ def get_or_create_staged_store(
         if (
             existing_path == expected
             and existing_binding == expected_binding
-            and isinstance(existing, SQLiteChatStore)
+            and isinstance(existing, OperationScopedSQLiteChatStore)
         ):
             _validate_live_store(existing)
             session_state[_ACTIVE_SCOPE_KEY] = key
             return existing
-        if isinstance(existing, SQLiteChatStore):
+        if isinstance(existing, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
             try:
                 existing.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                # A legacy thread-affine connection must be closed by its owner.
+                # Preserve the holder and fail closed instead of losing its handle.
+                raise StorageUnavailableError("staged store cleanup failed") from exc
         session_state.pop(key, None)
 
-    store = SQLiteChatStore(expected)
+    store = OperationScopedSQLiteChatStore(expected)
     _validate_live_store(store)
     session_state[key] = {
         "schema": SCHEMA,
@@ -233,12 +238,13 @@ def close_staged_host_store(
 ) -> bool:
     """QA/staging lifecycle helper. It closes only the scoped injected handle."""
     key = _holder_key(scope)
-    holder = session_state.pop(key, None)
+    holder = session_state.get(key)
     if not isinstance(holder, Mapping):
         return False
     store = holder.get("store")
-    if isinstance(store, SQLiteChatStore):
+    if isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
         store.close()
+        session_state.pop(key, None)
         if session_state.get(_ACTIVE_SCOPE_KEY) == key:
             session_state.pop(_ACTIVE_SCOPE_KEY, None)
         return True
