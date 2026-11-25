@@ -34,6 +34,7 @@ SAGA_STATES = (
     "PLANNED",
     "RUNNING",
     "RECONCILIATION_REQUIRED",
+    "PRODUCER_ENROLLMENT_REQUIRED",
     "FAILED",
     "COMPENSATION_REQUIRED",
     "COMPENSATING",
@@ -44,6 +45,7 @@ SAGA_STATES = (
 STEP_STATES = (
     "PENDING",
     "ENQUEUED",
+    "BLOCKED_PRODUCER",
     "CONFIRMED",
     "RETRY",
     "UNCERTAIN",
@@ -544,6 +546,7 @@ class ExecutionSagaCoordinator:
         mapped = {
             "PENDING": "ENQUEUED",
             "CLAIMED": "ENQUEUED",
+            "BLOCKED_PRODUCER": "BLOCKED_PRODUCER",
             "RETRY": "RETRY",
             "UNCERTAIN": "UNCERTAIN",
             "SENT": "UNCERTAIN",
@@ -572,6 +575,10 @@ class ExecutionSagaCoordinator:
             saga_state = "RUNNING" if remaining else "COMPLETED"
         elif mapped == "UNCERTAIN":
             saga_state = "RECONCILIATION_REQUIRED"
+        elif mapped == "BLOCKED_PRODUCER":
+            # No send occurred. Never claim effect, terminal failure or a
+            # compensation; producer onboarding needs separate verification.
+            saga_state = "PRODUCER_ENROLLMENT_REQUIRED"
         elif mapped in {"FAILED", "REVOKED", "BLOCKED_REAPPROVAL"}:
             prior = [
                 row for row in saga["steps"]
@@ -784,7 +791,10 @@ class ExecutionSagaCoordinator:
         out = self.outbox.get(step["compensation_outbox_key"])
         now_iso = _iso(_utc(now))
         out_state = out["state"]
-        if out_state in {"UNCERTAIN", "SENT"}:
+        if out_state == "BLOCKED_PRODUCER":
+            mapped = "BLOCKED_PRODUCER"
+            saga_state = "PRODUCER_ENROLLMENT_REQUIRED"
+        elif out_state in {"UNCERTAIN", "SENT"}:
             mapped = "UNCERTAIN"
             saga_state = "RECONCILIATION_REQUIRED"
         elif out_state == "CONFIRMED":
